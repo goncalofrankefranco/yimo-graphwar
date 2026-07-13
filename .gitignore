@@ -1,0 +1,10 @@
+*.swp
+/bin
+*.jar
+/bin-test
+/backups
+/installer/payload
+/installer/payload.zip
+/installer/Graphwar-Setup.sed
+/Graphwar-Setup.exe
+/runtime-check.*

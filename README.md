@@ -1,6 +1,8 @@
 
 # Graphwar Tutorial
 
+CREDITS TO: https://github.com/catabriga/graphwar
+
 Graphwar is an artillery game in which you must hit your enemies using mathematical functions. The trajectory of your shot is determined by the function you wrote, and your goal is to avoid the obstacles and your teammates and hit your enemies. The game takes place in a Cartesian Plane.
 
 ![cam](/../screenshots/ss1graphwar.png?raw=true)

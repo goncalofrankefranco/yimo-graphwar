@@ -782,6 +782,7 @@ public class Function
 			double planeY = -Constants.PLANE_LENGTH*valuesY[i]/Constants.PLANE_GAME_LENGTH + Constants.PLANE_HEIGHT/2;
 			boolean inMap = planeX >= 0 && planeX < Constants.PLANE_LENGTH
 					&& planeY >= 0 && planeY < Constants.PLANE_HEIGHT;
+			numSteps = i+1;
 			if(inMap)
 			{
 				recordGlobalHits(players, numPlayers, currentTurn, i, valuesX[i], valuesY[i]);
@@ -790,7 +791,6 @@ public class Function
 					break;
 				}
 			}
-			numSteps = i+1;
 		}
 
 		lastX = Constants.PLANE_LENGTH*valuesX[numSteps-1]/Constants.PLANE_GAME_LENGTH + Constants.PLANE_LENGTH/2;

@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
@@ -41,6 +43,7 @@ public class GraphServer implements Runnable
 	protected int trajectoryMode;
 	protected boolean customMapEnabled;
 	protected List<MapShape> customMap;
+	private AuthoritativeGame authoritativeGame;
 	private boolean countingDown;
 	StartDelayer startDelayer;
 		
@@ -63,6 +66,7 @@ public class GraphServer implements Runnable
 		trajectoryMode = Constants.SHOOTER_RELATIVE_TRAJECTORY;
 		customMapEnabled = false;
 		customMap = new ArrayList<MapShape>();
+		authoritativeGame = new AuthoritativeGame();
 		
 		countingDown = false;
 		startDelayer = null;	
@@ -85,6 +89,7 @@ public class GraphServer implements Runnable
 		trajectoryMode = Constants.SHOOTER_RELATIVE_TRAJECTORY;
 		customMapEnabled = false;
 		customMap = new ArrayList<MapShape>();
+		authoritativeGame = new AuthoritativeGame();
 		
 		countingDown = false;
 		startDelayer = null;
@@ -1136,6 +1141,8 @@ public class GraphServer implements Runnable
 		}
 		
 		message = message +"&"+ startPlayer;
+
+		authoritativeGame.start(shapes, soldiers, players, startPlayer, gameMode, trajectoryMode);
 		
 		sendMessageAll(message);
 		
@@ -1166,7 +1173,12 @@ public class GraphServer implements Runnable
 	
 	private void nextTurn()
 	{
-		ListIterator<ClientConnection> itr = clients.listIterator();    	
+		if(authoritativeGame != null && authoritativeGame.isStarted())
+		{
+			authoritativeGame.advanceTurn();
+		}
+
+		ListIterator<ClientConnection> itr = clients.listIterator();
 		
     	while(itr.hasNext())
     	{
@@ -1183,6 +1195,11 @@ public class GraphServer implements Runnable
 	
 	protected void finishGame(ClientConnection client)
 	{
+		if(gameState != Constants.GAME || authoritativeGame == null || !authoritativeGame.isGameFinished())
+		{
+			return;
+		}
+
 		client.setFinished(true);
 		
 		ListIterator<ClientConnection> itr = clients.listIterator();    	
@@ -1233,10 +1250,24 @@ public class GraphServer implements Runnable
 	
 	private void checkTimeUp()
 	{
-		if(System.currentTimeMillis() - timeTurnStarted > turnTime)
+		if((authoritativeGame == null || !authoritativeGame.hasShotInTurn())
+				&& System.currentTimeMillis() - timeTurnStarted > turnTime)
 		{
 			nextTurn();
 		}
+	}
+
+	private String buildShotMessage(AuthoritativeGame.Shot shot) throws UnsupportedEncodingException
+	{
+		String message = NetworkProtocol.FIRE_FUNC+"&"+shot.getPlayerID()+"&"
+				+URLEncoder.encode(shot.getFunction(), "UTF-8")+"&"
+				+Double.toString(shot.getFireAngle())+"&"+shot.getHitCount();
+		for(int i=0; i<shot.getHitCount(); i++)
+		{
+			message = message+"&"+shot.getHitPlayerID(i)+"&"+shot.getHitSoldierIndex(i)
+					+"&"+shot.getHitPosition(i);
+		}
+		return message;
 	}
 	
 	private void checkSkipLevel()
@@ -1443,7 +1474,8 @@ public class GraphServer implements Runnable
 				
 				case NetworkProtocol.READY_NEXT_TURN:
 				{
-					if(gameState == Constants.GAME)
+					if(gameState == Constants.GAME && authoritativeGame != null
+							&& authoritativeGame.hasShotInTurn())
 					{
 						client.setReadyNextTurn(true);
 						checkNextTurn();
@@ -1452,11 +1484,20 @@ public class GraphServer implements Runnable
 				
 				case NetworkProtocol.FIRE_FUNC:
 				{
+					if(info.length != 3)
+					{
+						break;
+					}
 					int playerID = Integer.parseInt(info[1]);
 					
-					if(checkPlayer(playerID, client) && gameState == Constants.GAME)
+					if(checkPlayer(playerID, client) && gameState == Constants.GAME && authoritativeGame != null)
 					{
-						sendMessageAll(message);						
+						String function = URLDecoder.decode(info[2], "UTF-8");
+						AuthoritativeGame.Shot shot = authoritativeGame.acceptShot(playerID, function);
+						if(shot != null)
+						{
+							sendMessageAll(buildShotMessage(shot));
+						}
 					}
 				}break;
 				
@@ -1475,11 +1516,18 @@ public class GraphServer implements Runnable
 				
 				case NetworkProtocol.SET_ANGLE:
 				{
-					int playerID = Integer.parseInt(info[1]);
-					
-					if(checkPlayer(playerID, client) && gameState == Constants.GAME)
+					if(info.length != 4)
 					{
-						sendMessageAll(message);
+						break;
+					}
+					int playerID = Integer.parseInt(info[1]);
+					int soldierIndex = Integer.parseInt(info[2]);
+					double angle = Double.parseDouble(info[3]);
+					
+					if(checkPlayer(playerID, client) && gameState == Constants.GAME && authoritativeGame != null
+							&& authoritativeGame.setAngle(playerID, soldierIndex, angle))
+					{
+						sendMessageAll(NetworkProtocol.SET_ANGLE+"&"+playerID+"&"+soldierIndex+"&"+Double.toString(angle));
 					}
 				}break;
 				

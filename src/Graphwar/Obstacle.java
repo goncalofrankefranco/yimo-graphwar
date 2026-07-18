@@ -34,7 +34,7 @@ public class Obstacle
 	int expY;
 	int expRadius;
 	
-	Obstacle(int numCircles, int circleInfo[])
+	public Obstacle(int numCircles, int circleInfo[])
 	{
 		terrain = new BufferedImage(Constants.PLANE_LENGTH, Constants.PLANE_HEIGHT, BufferedImage.TYPE_3BYTE_BGR);
 		
@@ -66,7 +66,7 @@ public class Obstacle
 		expRadius = 0;
 	}
 
-	Obstacle(int numShapes, MapShape shapes[])
+	public Obstacle(int numShapes, MapShape shapes[])
 	{
 		terrain = new BufferedImage(Constants.PLANE_LENGTH, Constants.PLANE_HEIGHT, BufferedImage.TYPE_3BYTE_BGR);
 		terrainGraphics = (Graphics2D)terrain.getGraphics();

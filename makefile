@@ -7,7 +7,7 @@ all:
 	cp -r bin/GlobalServer GlobalServer
 	cp -r bin/RoomServer RoomServer
 	jar cfe graphwar.jar Graphwar.Graphwar GraphServer Graphwar rsc
-	jar cfe roomServer.jar RoomServer.RoomServer GraphServer RoomServer rsc
+	jar cfe roomServer.jar RoomServer.RoomServer GraphServer RoomServer Graphwar rsc
 	jar cfe globalServer.jar GlobalServer.GlobalServer GraphServer GlobalServer rsc
 	rm -rf Graphwar
 	rm -rf GraphServer

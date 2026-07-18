@@ -38,6 +38,17 @@ public class Player
 	
 	public Player(String name, int playerID, int team, boolean localPlayer, int numSoldiers, boolean ready)
 	{
+		this(name, playerID, team, localPlayer, numSoldiers, ready, false);
+	}
+
+	/** Creates the small headless representation used by the room server. */
+	public static Player createServerPlayer(String name, int playerID, int team, int numSoldiers)
+	{
+		return new Player(name, playerID, team, false, numSoldiers, false, true);
+	}
+
+	private Player(String name, int playerID, int team, boolean localPlayer, int numSoldiers, boolean ready, boolean serverMode)
+	{
 		this.name = name;		
 		this.team = team;	
 		this.numSoldiers = numSoldiers;
@@ -53,11 +64,19 @@ public class Player
 		
 		this.playerID = playerID;
 		
-		this.color = GraphUtil.getRandomColor();
+		this.color = serverMode ? Color.BLACK : GraphUtil.getRandomColor();
+
+		if(serverMode)
+		{
+			this.nameLength = 0;
+		}
+		else
+		{
+			@SuppressWarnings("deprecation")
+			FontMetrics fontMetrics = Toolkit.getDefaultToolkit().getFontMetrics (Constants.NAME_FONT);
+			this.nameLength = fontMetrics.stringWidth(name);
+		}
 		
-	@SuppressWarnings("deprecation")
-		FontMetrics fontMetrics = Toolkit.getDefaultToolkit().getFontMetrics (Constants.NAME_FONT);		
-		this.nameLength = fontMetrics.stringWidth(name);
 		
 		this.disconnected = false;
 	}

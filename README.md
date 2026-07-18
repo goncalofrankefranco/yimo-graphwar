@@ -11,6 +11,21 @@ Room hosts can choose between the original shooter-relative trajectory and
 Global graph mode. Global graph mode draws the entered graph in fixed map
 coordinates and can hit soldiers on either team.
 
+## Fair-play and server validation
+
+Room servers now validate every shot. They own the active turn, accept only one
+function per turn, reject forged angles and oversized or unsafe payloads, and
+calculate the hit list before broadcasting the shot. Clients use that server
+hit list for damage and turn progression, so a modified client cannot invent
+kills or fire out of turn for the other players.
+
+This does not—and cannot—reliably identify a program that merely suggests a
+mathematically valid function and enters it through the normal client. A
+cheatsheet, equation solver, or screen-based aim assistant produces the same
+valid input as a human. Stopping that category requires a separate gameplay
+choice such as a human-verification challenge or a room rule that limits
+function complexity; blacklisting the named tools would be easy to evade.
+
 ## Normal Function 
 
 The Normal Function mode is the most basic mode. In this mode the function shot is simply the function you typed in, so the trajectory of your shot will be same trajectory as the function's graph. 

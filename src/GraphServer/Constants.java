@@ -51,6 +51,7 @@ public class Constants
 	public static final int MAX_SOLDIERS_PER_PLAYER = 4;
 	public static final int MAX_CLIENTS = 10;
 	public static final int INITIAL_NUM_SOLDIERS = 2;
+	public static final int MAX_FUNCTION_LENGTH = 4096;
 	
 	public static final int MAXIMUM_COLOR_MODULE_SQUARED = 3*160*160;
 	

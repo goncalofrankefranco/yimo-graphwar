@@ -1068,16 +1068,25 @@ public class GameData implements Runnable
 	
 	private void fireFunctionMessage(String[] info) throws Exception
 	{
-		if(info.length == 3 && drawingFunction == false)
+		if((info.length == 3 || info.length >= 5) && drawingFunction == false)
 		{
 			int playerID = Integer.parseInt(info[1]);
 			String function = URLDecoder.decode(info[2], "UTF-8");
+			if(info.length >= 5)
+			{
+				int hitCount = Integer.parseInt(info[4]);
+				if(hitCount < 0 || hitCount > players.size()*Constants.MAX_SOLDIERS_PER_PLAYER
+						|| info.length != 5+3*hitCount)
+				{
+					return;
+				}
+			}
 						
 			if(players.get(currentTurn).getID() == playerID)
 			{
 				Player player = getPlayer(playerID);
 				
-				processFunction(player, function);
+				processFunction(player, function, info);
 				
 				this.drawingFunction = true;
 				this.timeStartedDrawingFunction = System.currentTimeMillis();	
@@ -1272,25 +1281,68 @@ public class GameData implements Runnable
 		return calculated;
 	}
 
-	private void processFunction(Player player, String functionString) throws MalformedFunction
+	private void processFunction(Player player, String functionString, String[] info) throws MalformedFunction
 	{
 		function = calculateFunction(player, functionString);
 		player.getCurrentTurnSoldier().setFunction(functionString);
 		
 		soldiersHit = new ArrayList<Soldier>();
 		int numPlayersHit = function.getNumPlayersHit();
+		boolean authoritative = info.length >= 5;
+		if(authoritative)
+		{
+			numPlayersHit = Integer.parseInt(info[4]);
+		}
 		for(int i=0; i<numPlayersHit; i++)
 		{
 			Soldier soldier;
-			
-			soldier = players.get(function.getPlayerHit(i)).getSoldiers()[function.getSoldierHit(i)];
-			soldier.setKillPosition(function.getSoldierHitPosition(i));
+			int hitPlayer;
+			int hitSoldier;
+			int hitPosition;
+			if(authoritative)
+			{
+				hitPlayer = findPlayerIndex(Integer.parseInt(info[5+3*i]));
+				hitSoldier = Integer.parseInt(info[6+3*i]);
+				hitPosition = Integer.parseInt(info[7+3*i]);
+				if(hitPlayer < 0 || hitSoldier < 0 || hitSoldier >= players.get(hitPlayer).getNumSoldiers())
+				{
+					throw new MalformedFunction();
+				}
+			}
+			else
+			{
+				hitPlayer = function.getPlayerHit(i);
+				hitSoldier = function.getSoldierHit(i);
+				hitPosition = function.getSoldierHitPosition(i);
+			}
+
+			soldier = players.get(hitPlayer).getSoldiers()[hitSoldier];
+			soldier.setKillPosition(hitPosition);
 			soldiersHit.add(soldier);
 		}
 		
-		player.getCurrentTurnSoldier().setAngle(function.getFireAngle());
+		if(authoritative)
+		{
+			player.getCurrentTurnSoldier().setAngle(Double.parseDouble(info[3]));
+		}
+		else
+		{
+			player.getCurrentTurnSoldier().setAngle(function.getFireAngle());
+		}
 		((GameScreen)graphwar.getUI().getScreen(Constants.GAME_SCREEN)).repaintAngle();
 					
+	}
+
+	private int findPlayerIndex(int playerID)
+	{
+		for(int i=0; i<players.size(); i++)
+		{
+			if(players.get(i).getID() == playerID)
+			{
+				return i;
+			}
+		}
+		return -1;
 	}
 	
 	private void removeDisconnectedPlayers()

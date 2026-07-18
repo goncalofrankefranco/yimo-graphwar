@@ -38,7 +38,7 @@ public class Function
 	private double lastX;
 	private double lastY;
 	
-	Function(String str) throws MalformedFunction
+	public Function(String str) throws MalformedFunction
 	{		
 		strFunc = str;
 		

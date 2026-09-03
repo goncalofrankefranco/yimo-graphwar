@@ -28,6 +28,8 @@ $cloudInit = Get-Content (Join-Path $root 'deploy/cloudzy/cloud-init.yaml') -Raw
 $bootstrap = Get-Content (Join-Path $root 'deploy/cloudzy/bootstrap-vps.sh') -Raw
 $firstBoot = Get-Content (Join-Path $root 'deploy/cloudzy/first-boot.sh') -Raw
 $snapshot = Get-Content (Join-Path $root 'deploy/cloudzy/prepare-snapshot.sh') -Raw
+$globalService = Get-Content (Join-Path $root 'deploy/cloudzy/yimo-global.service') -Raw
+$tournamentService = Get-Content (Join-Path $root 'deploy/cloudzy/yimo-tournament.service') -Raw
 
 Assert-True ($cloudInit -match 'YIMO_REPO_URL') 'Cloud-init must expose the repository URL.'
 Assert-True ($bootstrap -match 'YIMO_JAVA8_URL' -and $bootstrap -match 'setup_24\.x') 'Bootstrap must install Java 8 and Node 24.'
@@ -35,5 +37,8 @@ Assert-True ($firstBoot -match 'YIMO_PUBLIC_IP' -and $firstBoot -match 'YIMO_ROO
 Assert-True ($snapshot -match 'tournament\.sqlite' -and $snapshot -match 'tournament\.env') 'Snapshot preparation must remove runtime data and secrets.'
 Assert-True ($bootstrap -match '23762' -and $bootstrap -match '30000:30049') 'Firewall must expose only the documented YIMO ports.'
 Assert-True ($bootstrap -notmatch 'YIMO_ADMIN_TOKEN=.*[A-Za-z0-9]{20,}' -and $bootstrap -notmatch 'YIMO_ROOM_HMAC_SECRET=.*[A-Za-z0-9]{20,}') 'Bootstrap must not contain real secrets.'
+Assert-True ($globalService -match '-Xmx128m' -and $globalService -match 'UseSerialGC') 'Global Java service needs a bounded low-memory profile.'
+Assert-True ($tournamentService -match 'max-old-space-size=160') 'Tournament service needs a bounded Node memory profile.'
+Assert-True ($bootstrap -match 'YIMO_SWAP_SIZE') 'Bootstrap must provision the documented emergency swap file.'
 
 Write-Output 'stage7-deployment-config-check: PASS'

@@ -8,7 +8,7 @@ ConditionPathExists=/opt/yimo-graphwar/current/globalServer.jar
 User=yimo
 Group=yimo
 WorkingDirectory=/opt/yimo-graphwar/current
-ExecStart=/opt/yimo/java8/bin/java -jar /opt/yimo-graphwar/current/globalServer.jar --config /etc/yimo/yimo.properties
+ExecStart=/opt/yimo/java8/bin/java -Xms32m -Xmx128m -XX:+UseSerialGC -Djava.awt.headless=true -jar /opt/yimo-graphwar/current/globalServer.jar --config /etc/yimo/yimo.properties
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

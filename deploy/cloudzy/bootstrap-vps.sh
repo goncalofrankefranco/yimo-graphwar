@@ -16,6 +16,7 @@ fi
 YIMO_SSH_CIDR="${YIMO_SSH_CIDR:-}"
 YIMO_JAVA8_URL="${YIMO_JAVA8_URL:-https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jre/hotspot/normal/eclipse}"
 YIMO_JAVA8_SHA256="${YIMO_JAVA8_SHA256:-}"
+YIMO_SWAP_SIZE="${YIMO_SWAP_SIZE:-512M}"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
@@ -57,12 +58,31 @@ if ! getent passwd yimo >/dev/null 2>&1; then
 fi
 install -d -o yimo -g yimo "$YIMO_ROOT" "$YIMO_ROOT/releases" /var/lib/yimo /var/log/yimo /etc/yimo
 
+if [[ "$YIMO_SWAP_SIZE" != '0' ]]; then
+  if [[ ! -f /swapfile ]]; then
+    if [[ ! "$YIMO_SWAP_SIZE" =~ ^[0-9]+[MG]$ ]]; then
+      echo 'YIMO_SWAP_SIZE must be 0 or a size such as 512M.' >&2
+      exit 1
+    fi
+    fallocate -l "$YIMO_SWAP_SIZE" /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null
+  fi
+  if ! swapon --show=NAME --noheadings | grep -qx '/swapfile'; then
+    swapon /swapfile
+  fi
+  if ! grep -q '^/swapfile[[:space:]]' /etc/fstab; then
+    printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+  fi
+fi
+
 if [[ ! -f "$ENV_FILE" ]]; then
   cat > "$ENV_FILE" <<'EOF'
 # Local instance settings. Replace the SSH CIDR before exposing this host.
 YIMO_PUBLIC_IP=
 YIMO_SSH_CIDR=0.0.0.0/0
 YIMO_ENABLE_PRACTICE_ROOMS=0
+YIMO_SWAP_SIZE=512M
 EOF
 fi
 chmod 600 "$ENV_FILE"

@@ -51,6 +51,42 @@ public class GraphServer implements Runnable
 	private long timeTurnStarted;
 	
 	private static Random random = new Random();
+	private static int nextConfiguredRoomPort = Constants.ROOM_PORT_START;
+
+	/** Bind dynamic rooms inside the firewall range instead of an unreachable ephemeral port. */
+	private static synchronized ServerSocket openConfiguredRoomSocket() throws IOException
+	{
+		int start = Constants.ROOM_PORT_START;
+		int end = Constants.ROOM_PORT_END;
+		if(start < 1 || end > 65535 || start > end)
+		{
+			throw new IOException("Invalid configured room port range");
+		}
+
+		int range = end - start + 1;
+		int first = nextConfiguredRoomPort;
+		if(first < start || first > end)
+		{
+			first = start;
+		}
+
+		IOException lastError = null;
+		for(int attempt = 0; attempt < range; attempt++)
+		{
+			int candidate = start + ((first - start + attempt) % range);
+			try
+			{
+				ServerSocket socket = new ServerSocket(candidate);
+				nextConfiguredRoomPort = candidate == end ? start : candidate + 1;
+				return socket;
+			}
+			catch(IOException error)
+			{
+				lastError = error;
+			}
+		}
+		throw new IOException("No configured YIMO room port is available", lastError);
+	}
 	
 	public GraphServer(int port) throws IOException
 	{
@@ -91,7 +127,7 @@ public class GraphServer implements Runnable
 		clients = new ArrayList<ClientConnection>();
 		players = new ArrayList<Player>();
 		
-		serverSocket = new ServerSocket(0);	
+		serverSocket = openConfiguredRoomSocket();
 		this.port = serverSocket.getLocalPort();
 		this.roomAccessPolicy = roomAccessPolicy == null ? RoomAccessPolicy.open() : roomAccessPolicy;
 		

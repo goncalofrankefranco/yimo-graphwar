@@ -9,7 +9,7 @@ User=yimo
 Group=yimo
 WorkingDirectory=/opt/yimo-graphwar/current/tournament
 EnvironmentFile=/etc/yimo/tournament.env
-ExecStart=/usr/bin/node --experimental-strip-types /opt/yimo-graphwar/current/tournament/src/main.ts
+ExecStart=/usr/bin/node --max-old-space-size=160 --experimental-strip-types /opt/yimo-graphwar/current/tournament/src/main.ts
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

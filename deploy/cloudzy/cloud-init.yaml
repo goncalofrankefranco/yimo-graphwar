@@ -17,6 +17,7 @@ write_files:
       YIMO_JAVA8_URL=https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jre/hotspot/normal/eclipse
       YIMO_JAVA8_SHA256=
       YIMO_ENABLE_PRACTICE_ROOMS=0
+      YIMO_SWAP_SIZE=512M
 
 runcmd:
   - >-

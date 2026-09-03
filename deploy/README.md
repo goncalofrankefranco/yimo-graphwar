@@ -40,7 +40,8 @@ capacity limits.
   Git revision, and runs the bootstrap script.
 - `bootstrap-vps.sh` installs Java 8, Node 24, Nginx, UFW, the system user,
   and systemd units. It opens only SSH, HTTP, the YIMO lobby port `23762`,
-  and the documented room range `30000:30049`.
+  and the documented room range `30000:30049`. It also creates a 512 MB
+  swapfile and applies bounded Java/Node memory profiles for the 1 GB plan.
 - `first-boot.sh` runs on every restored instance. It detects the current
   IPv4 address, writes a fresh `yimo.properties`, and creates runtime
   tournament secrets only when they are missing.
@@ -165,6 +166,28 @@ first-boot unit detects the new IP, regenerates the tournament environment,
 and starts the installed services. The provider’s cloud-init behavior can
 vary for cloned snapshots; the systemd first-boot unit is the reliable
 restore hook.
+
+## Smoke-game mode on the 1 GB VM
+
+The small VM can host a lobby, the tournament API, and one lightweight
+practice room after the bounded memory profile is installed. It is still not
+an event server. To enable the practice room for a short manual test:
+
+```bash
+sudo sed -i 's/^YIMO_ENABLE_PRACTICE_ROOMS=.*/YIMO_ENABLE_PRACTICE_ROOMS=1/' /etc/yimo/bootstrap.env
+sudo systemctl enable --now yimo-public-rooms.service
+sudo ss -ltn | grep -E ':(30000|30001|30002|30003|30004) '
+```
+
+Room sockets now bind inside `room.port.start`–`room.port.end`, so the
+Cloudzy firewall can reach them. Stop the optional room when finished:
+
+```bash
+sudo systemctl disable --now yimo-public-rooms.service
+```
+
+Keep the room disabled while capturing the golden snapshot unless the
+practice-room smoke test is part of the image validation.
 
 ## Stage 7 checkpoint
 

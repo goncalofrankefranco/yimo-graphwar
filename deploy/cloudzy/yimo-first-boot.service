@@ -1,0 +1,13 @@
+[Unit]
+Description=Configure YIMO Graphwar for this instance IP
+Wants=network-online.target
+After=network-online.target
+Before=yimo-global.service yimo-tournament.service yimo-public-rooms.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/yimo-first-boot.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

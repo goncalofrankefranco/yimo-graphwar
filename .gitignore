@@ -2,6 +2,7 @@
 /bin
 *.jar
 /bin-test
+/build
 /backups
 /installer/payload
 /installer/payload.zip
@@ -13,3 +14,4 @@ tournament/*.sqlite
 tournament/*.sqlite-shm
 tournament/*.sqlite-wal
 tournament/.env
+.env.local

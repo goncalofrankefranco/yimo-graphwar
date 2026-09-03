@@ -1,0 +1,18 @@
+[Unit]
+Description=YIMO Graphwar global lobby
+After=network-online.target yimo-first-boot.service
+Wants=network-online.target
+ConditionPathExists=/opt/yimo-graphwar/current/globalServer.jar
+
+[Service]
+User=yimo
+Group=yimo
+WorkingDirectory=/opt/yimo-graphwar/current
+ExecStart=/opt/yimo/java8/bin/java -jar /opt/yimo-graphwar/current/globalServer.jar --config /etc/yimo/yimo.properties
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

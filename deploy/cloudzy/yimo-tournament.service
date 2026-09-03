@@ -1,0 +1,19 @@
+[Unit]
+Description=YIMO Graphwar tournament control service
+After=network-online.target yimo-first-boot.service
+Wants=network-online.target
+ConditionPathExists=/opt/yimo-graphwar/current/tournament/src/main.ts
+
+[Service]
+User=yimo
+Group=yimo
+WorkingDirectory=/opt/yimo-graphwar/current/tournament
+EnvironmentFile=/etc/yimo/tournament.env
+ExecStart=/usr/bin/node --experimental-strip-types /opt/yimo-graphwar/current/tournament/src/main.ts
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

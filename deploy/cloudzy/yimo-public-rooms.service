@@ -1,0 +1,18 @@
+[Unit]
+Description=YIMO Graphwar optional practice room server
+After=network-online.target yimo-first-boot.service
+Wants=network-online.target
+ConditionPathExists=/opt/yimo-graphwar/current/roomServer.jar
+
+[Service]
+User=yimo
+Group=yimo
+WorkingDirectory=/opt/yimo-graphwar/current
+ExecStart=/opt/yimo/java8/bin/java -jar /opt/yimo-graphwar/current/roomServer.jar --config /etc/yimo/yimo.properties
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

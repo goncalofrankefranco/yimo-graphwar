@@ -44,6 +44,7 @@ public class GraphServer implements Runnable
 	protected boolean customMapEnabled;
 	protected List<MapShape> customMap;
 	private AuthoritativeGame authoritativeGame;
+	private RoomAccessPolicy roomAccessPolicy;
 	private boolean countingDown;
 	StartDelayer startDelayer;
 		
@@ -53,11 +54,17 @@ public class GraphServer implements Runnable
 	
 	public GraphServer(int port) throws IOException
 	{
+		this(port, RoomAccessPolicy.open());
+	}
+
+	public GraphServer(int port, RoomAccessPolicy roomAccessPolicy) throws IOException
+	{
 		clients = new ArrayList<ClientConnection>();
 		players = new ArrayList<Player>();
 		
 		this.port = port;
 		serverSocket = new ServerSocket(port);	
+		this.roomAccessPolicy = roomAccessPolicy == null ? RoomAccessPolicy.open() : roomAccessPolicy;
 		
 		gameMode = Constants.NORMAL_FUNC;
 		gameState = Constants.PRE_GAME;
@@ -76,11 +83,17 @@ public class GraphServer implements Runnable
 	
 	public GraphServer() throws IOException
 	{
+		this(RoomAccessPolicy.open());
+	}
+
+	public GraphServer(RoomAccessPolicy roomAccessPolicy) throws IOException
+	{
 		clients = new ArrayList<ClientConnection>();
 		players = new ArrayList<Player>();
 		
 		serverSocket = new ServerSocket(0);	
 		this.port = serverSocket.getLocalPort();
+		this.roomAccessPolicy = roomAccessPolicy == null ? RoomAccessPolicy.open() : roomAccessPolicy;
 		
 		gameMode = Constants.NORMAL_FUNC;
 		gameState = Constants.PRE_GAME;
@@ -128,7 +141,7 @@ public class GraphServer implements Runnable
 		{
 			try
 			{
-				ClientConnection client = new ClientConnection(this, socket);
+				ClientConnection client = new ClientConnection(this, socket, roomAccessPolicy);
 				
 				if(clients.size() == 0)
 				{
@@ -155,7 +168,7 @@ public class GraphServer implements Runnable
 		{
 			try 
 			{
-				ClientConnection client = new ClientConnection(this, socket);
+				ClientConnection client = new ClientConnection(this, socket, roomAccessPolicy);
 				
 				String message = NetworkProtocol.GAME_FULL+"";
 				client.sendMessage(message);
@@ -190,7 +203,7 @@ public class GraphServer implements Runnable
 				}
 				else
 				{
-					ClientConnection client = new ClientConnection(this, socket);
+					ClientConnection client = new ClientConnection(this, socket, roomAccessPolicy);
 					
 					String message = NetworkProtocol.GAME_FULL+"";
 					client.sendMessage(message);

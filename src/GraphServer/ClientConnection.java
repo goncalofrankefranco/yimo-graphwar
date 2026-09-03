@@ -37,6 +37,11 @@ public class ClientConnection implements Runnable
 	
 	public ClientConnection(GraphServer server, Socket socket) throws IOException
 	{
+		this(server, socket, RoomAccessPolicy.open());
+	}
+
+	public ClientConnection(GraphServer server, Socket socket, RoomAccessPolicy roomAccessPolicy) throws IOException
+	{
 		this.server = server;		
 		this.connection = new Connection(socket);
 		String hello = connection.readMessage();
@@ -46,6 +51,21 @@ public class ClientConnection implements Runnable
 		{
 			connection.close();
 			throw new IOException("Rejected incompatible YIMO client");
+		}
+		if(roomAccessPolicy != null && roomAccessPolicy.isRequired())
+		{
+			String accessMessage = connection.readMessage();
+			String[] fields = accessMessage == null ? new String[0] : accessMessage.split("&", -1);
+			RoomAccessToken.Payload payload = fields.length == 2 && NetworkProtocol.TOURNAMENT_JOIN.equals(fields[0])
+					? roomAccessPolicy.accept(fields[1], System.currentTimeMillis()) : null;
+			if(payload == null)
+			{
+				connection.sendMessage(NetworkProtocol.TOURNAMENT_REJECTED);
+				connection.close();
+				throw new IOException("Rejected invalid tournament room token");
+			}
+			connection.sendMessage(NetworkProtocol.TOURNAMENT_ACCEPTED+"&"+payload.getMatchId()+"&"
+					+payload.getParticipantId()+"&"+payload.getRoomSlot());
 		}
 			
 		this.players = new ArrayList<Player>();

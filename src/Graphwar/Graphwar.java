@@ -156,6 +156,11 @@ public class Graphwar extends JFrame
 	{
 		gameData.connect(ip, port, playerName);
 	}
+
+	public void joinGame(String ip, int port, String playerName, String tournamentToken) throws IOException
+	{
+		gameData.connect(ip, port, playerName, tournamentToken);
+	}
 	
 	public void createGame(int port) throws IOException
 	{

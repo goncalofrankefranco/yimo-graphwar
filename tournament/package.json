@@ -1,0 +1,12 @@
+{
+  "name": "yimo-graphwar-tournament",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "start": "node --experimental-strip-types src/main.ts"
+  }
+}

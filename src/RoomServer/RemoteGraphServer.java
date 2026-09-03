@@ -23,6 +23,7 @@ import GraphServer.ClientConnection;
 import GraphServer.Constants;
 import GraphServer.GraphServer;
 import GraphServer.Player;
+import GraphServer.RoomAccessPolicy;
 
 public class RemoteGraphServer extends GraphServer
 {
@@ -53,6 +54,14 @@ public class RemoteGraphServer extends GraphServer
 		super();
 		
 		this.globalClient = globalClient;		
+	}
+
+	/** Hidden tournament rooms may use the same status bridge with a required signed token. */
+	public RemoteGraphServer(GlobalClient globalClient, RoomAccessPolicy roomAccessPolicy) throws IOException
+	{
+		super(roomAccessPolicy);
+
+		this.globalClient = globalClient;
 	}
 
 	protected void sendAddPlayerMessage(Player player, ClientConnection playerFrom)

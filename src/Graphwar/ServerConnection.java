@@ -38,6 +38,11 @@ public class ServerConnection implements Runnable
 
 	public ServerConnection(GameData gameClient, String ip, int port, String playerName) throws IOException
 	{
+		this(gameClient, ip, port, playerName, null);
+	}
+
+	public ServerConnection(GameData gameClient, String ip, int port, String playerName, String tournamentToken) throws IOException
+	{
 		this.gameData = gameClient;
 		
 		this.connection = new Connection(ip, port);
@@ -48,6 +53,16 @@ public class ServerConnection implements Runnable
 		{
 			this.connection.close();
 			throw new IOException("YIMO room rejected this client version: "+response);
+		}
+		if(tournamentToken != null && tournamentToken.length() > 0)
+		{
+			this.connection.sendMessage(NetworkProtocol.buildTournamentJoin(tournamentToken));
+			response = this.connection.readMessage();
+			if(!NetworkProtocol.isTournamentAccepted(response))
+			{
+				this.connection.close();
+				throw new IOException("YIMO tournament room rejected access: "+response);
+			}
 		}
 				
 		this.running = false;

@@ -21,6 +21,10 @@ public final class NetworkProtocolTest {
                 "an official pre-handshake client must be rejected");
         check(NetworkProtocol.handshakeResponse("HELLO&1&old-build&Ada").startsWith(NetworkProtocol.VERSION_MISMATCH + "&"),
                 "an incompatible build must be rejected");
+        check("TOURNAMENT_JOIN&opaque.token".equals(NetworkProtocol.buildTournamentJoin("opaque.token")),
+                "tournament join messages must preserve the opaque token");
+        check(NetworkProtocol.isTournamentAccepted("TOURNAMENT_ACCEPTED&match-1&p-1&30000"),
+                "valid tournament acceptance messages must be recognized");
 
         Properties properties = new Properties();
         properties.setProperty("global.host", "yimo.example");

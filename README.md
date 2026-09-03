@@ -3,6 +3,21 @@
 
 CREDITS TO: https://github.com/catabriga/graphwar
 
+## YIMO Graphwar 2.0 development
+
+This fork keeps the original Graphwar gameplay and GPL-3.0 notices while
+adding the YIMO client presentation, responsive window scaling, guided
+campaign, YIMO-only protocol handshake, and tournament components. The
+tournament control service and signed-room implementation are documented in
+[`docs/STAGES-5-6.md`](docs/STAGES-5-6.md) and
+[`tournament/README.md`](tournament/README.md).
+
+The Java client and room/global servers remain Java 8 compatible. The
+tournament service requires Node.js 24.x and uses only built-in Node modules.
+The current local defaults are in `rsc/yimo.properties`; deployment values
+belong in an external `yimo.properties` file or command-line overrides. Never
+commit endpoint secrets, organizer tokens, participant codes, or HMAC keys.
+
 Graphwar is an artillery game in which you must hit your enemies using mathematical functions. The trajectory of your shot is determined by the function you wrote, and your goal is to avoid the obstacles and your teammates and hit your enemies. The game takes place in a Cartesian Plane.
 
 ![cam](/../screenshots/ss1graphwar.png?raw=true)
@@ -124,15 +139,29 @@ Compile the game using the make command (or on your favorite IDE).
 
 To run the game execute graphwar.jar.
 
-Windows users can run `Graphwar-Setup.exe` to install the game and its bundled
-Java runtime. The installer also includes the local room and global server
-launchers.
+The checked-in `Graphwar-Setup.exe` is the previous approved client artifact.
+A reproducible YIMO 2.0 installer is a later release stage; the source and
+release notes must be updated together when it is published.
 
 ## Running Local Servers
 
-To run a local server and connect to it you must pass the ip of the local server to graphwar
-and to the globalServer as a command line argument. So to start a server locally the commands are:
+The Java programs read `yimo.properties` beside the JAR, then the packaged
+local defaults. Supported deployment overrides are explicit flags:
 
-* java -jar globalServer.jar [your-server-ip]
-* java -jar roomServer.jar [your-server-ip]
-* java -jar graphwar.jar [your-server-ip]
+* `--config <path>`
+* `--global-host <host>`
+* `--global-port <port>`
+* `--tournament-api <url>`
+
+For local development, the service and Java components can be started with:
+
+```text
+java -jar globalServer.jar --global-port 23762
+java -jar roomServer.jar --global-host 127.0.0.1 --global-port 23762
+java -jar graphwar.jar --global-host 127.0.0.1 --global-port 23762 --tournament-api http://127.0.0.1:8080
+```
+
+The tournament service setup and API examples are in
+[`tournament/README.md`](tournament/README.md). Do not use a positional server
+address; the YIMO client intentionally does not expose the official Graphwar
+server selector.

@@ -8,3 +8,8 @@
 /installer/Graphwar-Setup.sed
 /Graphwar-Setup.exe
 /runtime-check.*
+tournament/data/
+tournament/*.sqlite
+tournament/*.sqlite-shm
+tournament/*.sqlite-wal
+tournament/.env

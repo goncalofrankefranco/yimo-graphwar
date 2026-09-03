@@ -26,6 +26,9 @@ public class NetworkProtocol
 	public static final String HELLO = "HELLO";
 	public static final String HANDSHAKE_ACCEPTED = "CONNECTION_ACCEPTED";
 	public static final String VERSION_MISMATCH = "VERSION_MISMATCH";
+	public static final String TOURNAMENT_JOIN = "TOURNAMENT_JOIN";
+	public static final String TOURNAMENT_ACCEPTED = "TOURNAMENT_ACCEPTED";
+	public static final String TOURNAMENT_REJECTED = "TOURNAMENT_REJECTED";
 	public static final int NO_INFO = 10;
 	public static final int ALL_INFO = 11;
 	public static final int SET_NAME = 12;
@@ -86,6 +89,38 @@ public class NetworkProtocol
 		catch(UnsupportedEncodingException error)
 		{
 			throw new IllegalStateException("UTF-8 is unavailable", error);
+		}
+	}
+
+	public static String buildTournamentJoin(String roomToken)
+	{
+		if(roomToken == null || roomToken.length() == 0 || roomToken.indexOf('&') >= 0
+				|| roomToken.indexOf('\n') >= 0 || roomToken.indexOf('\r') >= 0)
+		{
+			throw new IllegalArgumentException("Tournament room token is invalid");
+		}
+		return TOURNAMENT_JOIN+"&"+roomToken;
+	}
+
+	public static boolean isTournamentAccepted(String message)
+	{
+		if(message == null)
+		{
+			return false;
+		}
+		String[] fields = message.split("&", -1);
+		if(fields.length != 4 || !TOURNAMENT_ACCEPTED.equals(fields[0])
+				|| fields[1].length() == 0 || fields[2].length() == 0)
+		{
+			return false;
+		}
+		try
+		{
+			return Integer.parseInt(fields[3]) > 0;
+		}
+		catch(NumberFormatException error)
+		{
+			return false;
 		}
 	}
 

@@ -17,8 +17,15 @@
 
 package GraphServer;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+
 public class NetworkProtocol
 {
+	public static final String HELLO = "HELLO";
+	public static final String HANDSHAKE_ACCEPTED = "CONNECTION_ACCEPTED";
+	public static final String VERSION_MISMATCH = "VERSION_MISMATCH";
 	public static final int NO_INFO = 10;
 	public static final int ALL_INFO = 11;
 	public static final int SET_NAME = 12;
@@ -67,5 +74,101 @@ public class NetworkProtocol
 	public static final int CLOSE_ROOM = 107;
 	public static final int CREATE_ROOM = 108;
 	public static final int ROOM_INVALID = 109;
+
+	public static String buildHello(String playerName)
+	{
+		String safeName = playerName == null ? "" : playerName;
+		try
+		{
+			return HELLO+"&"+Constants.PROTOCOL_VERSION+"&"+Constants.BUILD_ID+"&"
+					+URLEncoder.encode(safeName, "UTF-8");
+		}
+		catch(UnsupportedEncodingException error)
+		{
+			throw new IllegalStateException("UTF-8 is unavailable", error);
+		}
+	}
+
+	public static String handshakeResponse(String message)
+	{
+		Hello hello = parseHello(message);
+		if(hello == null || hello.getProtocolVersion() != Constants.PROTOCOL_VERSION
+				|| !Constants.BUILD_ID.equals(hello.getBuildId()))
+		{
+			return VERSION_MISMATCH+"&"+Constants.PROTOCOL_VERSION+"&"+Constants.BUILD_ID;
+		}
+		return HANDSHAKE_ACCEPTED+"&"+Constants.PROTOCOL_VERSION+"&"+Constants.BUILD_ID;
+	}
+
+	public static boolean isHandshakeAccepted(String message)
+	{
+		if(message == null)
+		{
+			return false;
+		}
+		String[] fields = message.split("&", -1);
+		return fields.length == 3 && HANDSHAKE_ACCEPTED.equals(fields[0])
+				&& Integer.toString(Constants.PROTOCOL_VERSION).equals(fields[1])
+				&& Constants.BUILD_ID.equals(fields[2]);
+	}
+
+	public static Hello parseHello(String message)
+	{
+		if(message == null)
+		{
+			return null;
+		}
+		String[] fields = message.split("&", -1);
+		if(fields.length != 4 || !HELLO.equals(fields[0]))
+		{
+			return null;
+		}
+		try
+		{
+			int protocolVersion = Integer.parseInt(fields[1]);
+			String buildId = fields[2];
+			String playerName = URLDecoder.decode(fields[3], "UTF-8");
+			if(protocolVersion <= 0 || buildId.length() == 0 || playerName.length() == 0
+					|| playerName.length() > 20 || playerName.indexOf('&') >= 0
+					|| playerName.indexOf('\n') >= 0 || playerName.indexOf('\r') >= 0)
+			{
+				return null;
+			}
+			return new Hello(protocolVersion, buildId, playerName);
+		}
+		catch(Exception error)
+		{
+			return null;
+		}
+	}
+
+	public static final class Hello
+	{
+		private final int protocolVersion;
+		private final String buildId;
+		private final String playerName;
+
+		private Hello(int protocolVersion, String buildId, String playerName)
+		{
+			this.protocolVersion = protocolVersion;
+			this.buildId = buildId;
+			this.playerName = playerName;
+		}
+
+		public int getProtocolVersion()
+		{
+			return protocolVersion;
+		}
+
+		public String getBuildId()
+		{
+			return buildId;
+		}
+
+		public String getPlayerName()
+		{
+			return playerName;
+		}
+	}
 	
-}	
+}

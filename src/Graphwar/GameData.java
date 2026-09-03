@@ -115,7 +115,12 @@ public class GameData implements Runnable
 	
 	public void connect(String ip, int port) throws IOException
 	{
-		serverConnection = new ServerConnection(this, ip, port);
+		connect(ip, port, "Player");
+	}
+
+	public void connect(String ip, int port, String playerName) throws IOException
+	{
+		serverConnection = new ServerConnection(this, ip, port, playerName);
 		
 		new Thread(serverConnection).start();
 	

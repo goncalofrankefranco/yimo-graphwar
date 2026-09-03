@@ -33,9 +33,22 @@ public class ServerConnection implements Runnable
 	
 	public ServerConnection(GameData gameClient, String ip, int port) throws IOException
 	{
+		this(gameClient, ip, port, "Player");
+	}
+
+	public ServerConnection(GameData gameClient, String ip, int port, String playerName) throws IOException
+	{
 		this.gameData = gameClient;
 		
 		this.connection = new Connection(ip, port);
+		this.connection.sendMessage(NetworkProtocol.buildHello(playerName == null || playerName.trim().length() == 0
+				? "Player" : playerName));
+		String response = this.connection.readMessage();
+		if(NetworkProtocol.isHandshakeAccepted(response) == false)
+		{
+			this.connection.close();
+			throw new IOException("YIMO room rejected this client version: "+response);
+		}
 				
 		this.running = false;
 	}

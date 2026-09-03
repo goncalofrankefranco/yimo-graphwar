@@ -33,9 +33,15 @@ public class Constants
 	public static final int TIMEOUT_KEEPALIVE = 5000;
 	public static final int TIMEOUT_DROP = 30000;
 	
-	public static String GLOBAL_IP = "www.graphwar.com";
-	public static final int DEFAULT_PORT = 6112;
-	public static final int GLOBAL_PORT = 23761;
+	private static final NetworkConfig NETWORK_CONFIG = NetworkConfig.load();
+	public static String GLOBAL_IP = NETWORK_CONFIG.getGlobalHost();
+	public static int DEFAULT_PORT = NETWORK_CONFIG.getRoomPortStart();
+	public static int GLOBAL_PORT = NETWORK_CONFIG.getGlobalPort();
+	public static int ROOM_PORT_START = NETWORK_CONFIG.getRoomPortStart();
+	public static int ROOM_PORT_END = NETWORK_CONFIG.getRoomPortEnd();
+	public static String TOURNAMENT_API_BASE_URL = NETWORK_CONFIG.getTournamentApiBaseUrl();
+	public static String BUILD_ID = NETWORK_CONFIG.getBuildId();
+	public static int PROTOCOL_VERSION = NETWORK_CONFIG.getProtocolVersion();
 	public static final int PUBLIC_ROOM_PORT = 28842;
 	
 	public static final String DUMMY_NAME = "23E(S_%24%40)!Xc";
@@ -134,5 +140,22 @@ public class Constants
 	public static final int PRE_GAME_SCREEN = 1;
 	public static final int GLOBAL_ROOM_SCREEN = 2;
 	public static final int GAME_SCREEN = 3;
-	public static final int NUM_SCREENS = 4;
+	public static final int CAMPAIGN_SCREEN = 4;
+	public static final int NUM_SCREENS = 5;
+
+	public static void applyNetworkConfig(NetworkConfig config)
+	{
+		if(config == null)
+		{
+			throw new IllegalArgumentException("YIMO network configuration is missing");
+		}
+		GLOBAL_IP = config.getGlobalHost();
+		DEFAULT_PORT = config.getRoomPortStart();
+		GLOBAL_PORT = config.getGlobalPort();
+		ROOM_PORT_START = config.getRoomPortStart();
+		ROOM_PORT_END = config.getRoomPortEnd();
+		TOURNAMENT_API_BASE_URL = config.getTournamentApiBaseUrl();
+		BUILD_ID = config.getBuildId();
+		PROTOCOL_VERSION = config.getProtocolVersion();
+	}
 }

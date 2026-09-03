@@ -49,6 +49,8 @@ public final class YimoTheme {
     public static final Color GOLD = new Color(183, 105, 46);
     public static final Color DANGER = new Color(176, 61, 47);
     public static final Color INPUT = new Color(255, 253, 247);
+    public static final Color PLAYER_BLUE = new Color(42, 105, 214);
+    public static final Color OPPONENT_RED = new Color(211, 67, 67);
 
     public static final Font BRAND = new Font("Serif", Font.BOLD, 22);
     public static final Font DISPLAY = new Font("Serif", Font.PLAIN, 58);

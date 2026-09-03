@@ -144,11 +144,7 @@ public class RoomServer implements Runnable
 
 	public static void handleArgs(String[] args)
 	{
-		if(args.length > 0)
-		{
-			// Overrides ip to create local server
-			Constants.GLOBAL_IP = args[0];
-		}
+		Constants.applyNetworkConfig(GraphServer.NetworkConfig.fromCommandLine(args));
 	}
 	
 	public static void main(String[] args)

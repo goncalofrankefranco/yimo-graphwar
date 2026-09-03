@@ -81,6 +81,7 @@ public class GraphPlane extends JPanel implements ActionListener
 	
 	private boolean nextMarker;
 	private Function previewFunction;
+	private boolean explosionSoundPlayed;
 	
 	private Timer timer;
 	
@@ -318,7 +319,9 @@ public class GraphPlane extends JPanel implements ActionListener
 		functionImage = new BufferedImage(Constants.PLANE_LENGTH, Constants.PLANE_HEIGHT, BufferedImage.TYPE_4BYTE_ABGR);
 		functionGraphics = functionImage.createGraphics();
 		functionGraphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		lastStepDrawn = 0;		
+		lastStepDrawn = 0;
+		explosionSoundPlayed = false;
+		SoundEffects.playShot();
 	}
 	
 	private double convertX(double x)
@@ -452,6 +455,11 @@ public class GraphPlane extends JPanel implements ActionListener
 	{
 		if(graphwar.getGameData().isExploding())
 		{			
+			if(!explosionSoundPlayed)
+			{
+				SoundEffects.playImpact();
+				explosionSoundPlayed = true;
+			}
 			repaintBack = true;
 			
 			long timePassedExploding = graphwar.getGameData().getTimeExploding();

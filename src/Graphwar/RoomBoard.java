@@ -197,7 +197,7 @@ public class RoomBoard extends JPanel implements MouseMotionListener, MouseListe
 				
 				try 
 				{			
-					graphwar.joinGame(room.getIp(), room.getPort());
+					graphwar.joinGame(room.getIp(), room.getPort(), graphwar.getGlobalClient().getLocalPlayerName());
 					graphwar.getGameData().addPlayer(graphwar.getGlobalClient().getLocalPlayerName());
 					graphwar.getUI().setScreen(Constants.PRE_GAME_SCREEN);		
 				} 

@@ -24,6 +24,7 @@ import javax.swing.JFrame;
 
 import GraphServer.Constants;
 import GraphServer.GraphServer;
+import GraphServer.NetworkConfig;
 
 public class Graphwar extends JFrame
 {
@@ -54,11 +55,7 @@ public class Graphwar extends JFrame
 	
 	public static void handleArgs(String[] args)
 	{
-		for(int i=0; i<args.length; i++)
-		{
-			// Overrides ip to create local server
-			Constants.GLOBAL_IP = args[i];
-		}
+		Constants.applyNetworkConfig(NetworkConfig.fromCommandLine(args));
 	}
 	
 	public void init()
@@ -154,13 +151,23 @@ public class Graphwar extends JFrame
 	{
 		gameData.connect(ip, port);		
 	}
+
+	public void joinGame(String ip, int port, String playerName) throws IOException
+	{
+		gameData.connect(ip, port, playerName);
+	}
 	
 	public void createGame(int port) throws IOException
+	{
+		createGame(port, "Player");
+	}
+
+	public void createGame(int port, String playerName) throws IOException
 	{
 		gameServer = new GraphServer(port);
 		new Thread(gameServer).start();
 		
-		gameData.connect("localhost", port);
+		gameData.connect("localhost", port, playerName);
 		
 		graphUI.setScreen(Constants.PRE_GAME_SCREEN);
 	}

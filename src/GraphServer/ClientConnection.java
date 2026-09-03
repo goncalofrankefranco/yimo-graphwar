@@ -39,6 +39,14 @@ public class ClientConnection implements Runnable
 	{
 		this.server = server;		
 		this.connection = new Connection(socket);
+		String hello = connection.readMessage();
+		String response = NetworkProtocol.handshakeResponse(hello);
+		connection.sendMessage(response);
+		if(NetworkProtocol.isHandshakeAccepted(response) == false)
+		{
+			connection.close();
+			throw new IOException("Rejected incompatible YIMO client");
+		}
 			
 		this.players = new ArrayList<Player>();
 		

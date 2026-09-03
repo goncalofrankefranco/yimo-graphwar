@@ -185,12 +185,19 @@ public class GlobalServer implements Runnable
 		
     }
     
-    private boolean tryConnection(Room room)
-    {
-    	try
+	private boolean tryConnection(Room room)
+	{
+		try
 		{
 			Connection connection = new Connection(room.getIp(), room.getPort());
-			String message = NetworkProtocol.DISCONNECT+"";    	
+			connection.sendMessage(NetworkProtocol.buildHello(Constants.DUMMY_NAME));
+			String response = connection.readMessage();
+			if(NetworkProtocol.isHandshakeAccepted(response) == false)
+			{
+				connection.close();
+				return false;
+			}
+			String message = NetworkProtocol.DISCONNECT+"";
 	    	connection.sendMessage(message);
 	    	connection.close();
 	    	return true;
@@ -349,12 +356,12 @@ public class GlobalServer implements Runnable
 			Connection connection = new Connection(tempSocket);
 			
 			LobbyPlayer player = new LobbyPlayer(connection, this);
-			new Thread(player).start();
 			
 			synchronized(players)
 			{
 				this.players.add(player);
 			}
+			new Thread(player).start();
 		}
 	}
 	
@@ -456,11 +463,7 @@ public class GlobalServer implements Runnable
 		
 	public static void handleArgs(String[] args)
 	{
-		if(args.length > 0)
-		{
-			// Overrides ip to create local server
-			Constants.GLOBAL_IP = args[0];
-		}
+		Constants.applyNetworkConfig(GraphServer.NetworkConfig.fromCommandLine(args));
 	}	
 	
 	public static void main(String[] args)

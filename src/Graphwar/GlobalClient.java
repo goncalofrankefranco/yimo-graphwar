@@ -99,8 +99,13 @@ public class GlobalClient implements Runnable
 	public void joinGlobalServer(String ip, int port, String playerName) throws IOException
 	{
 		connection = new Connection(ip, port);
-		
-		connection.sendMessage(URLEncoder.encode(playerName,"UTF-8"));
+		connection.sendMessage(NetworkProtocol.buildHello(playerName));
+		String response = connection.readMessage();
+		if(NetworkProtocol.isHandshakeAccepted(response) == false)
+		{
+			connection.close();
+			throw new IOException("YIMO lobby rejected this client version: "+response);
+		}
 		
 		this.localPlayer = playerName;
 					

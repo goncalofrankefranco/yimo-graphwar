@@ -130,7 +130,16 @@ public class LobbyPlayer implements Runnable
 		
 		try 
 		{
-			this.name = connection.readMessage();
+			String helloMessage = connection.readMessage();
+			String response = NetworkProtocol.handshakeResponse(helloMessage);
+			connection.sendMessage(response);
+			if(NetworkProtocol.isHandshakeAccepted(response) == false)
+			{
+				globalServer.removePlayer(this);
+				return;
+			}
+			NetworkProtocol.Hello hello = NetworkProtocol.parseHello(helloMessage);
+			this.name = hello.getPlayerName();
 			
 			System.out.println("New name: "+name);
 			

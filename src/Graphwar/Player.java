@@ -64,7 +64,8 @@ public class Player
 		
 		this.playerID = playerID;
 		
-		this.color = serverMode ? Color.BLACK : GraphUtil.getRandomColor();
+        this.color = serverMode ? Color.BLACK
+                : (team == Constants.TEAM1 ? YimoTheme.PLAYER_BLUE : YimoTheme.OPPONENT_RED);
 
 		if(serverMode)
 		{

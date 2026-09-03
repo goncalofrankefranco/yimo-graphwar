@@ -68,9 +68,13 @@ public class GlobalClient implements Runnable
 	public void joinGlobalServer(String ip, int port, String playerName) throws IOException
 	{
 		connection = new Connection(ip, port);
-		
-		// This is not encoded because the dummy name constants is already encoded
-		connection.sendMessage(playerName);
+		connection.sendMessage(NetworkProtocol.buildHello(playerName));
+		String response = connection.readMessage();
+		if(NetworkProtocol.isHandshakeAccepted(response) == false)
+		{
+			connection.close();
+			throw new IOException("YIMO lobby rejected this server version: "+response);
+		}
 		
 		this.localPlayer = playerName;
 					

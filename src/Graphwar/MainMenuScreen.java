@@ -33,6 +33,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
     private final JButton joinGlobal;
     private final JButton createGame;
     private final JButton joinGame;
+    private final JButton campaign;
 
     private final JTextField nameFieldGlobal;
     private final JButton yesButtonGlobal;
@@ -108,11 +109,13 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         joinGlobal = YimoTheme.accentButton("Join YIMO Lobby");
         createGame = YimoTheme.button("Create Practice Game");
         joinGame = YimoTheme.button("Join Room");
+        campaign = YimoTheme.button("Tutorial");
         addMenuFiller(menu, 0);
         addMenuButton(menu, joinGlobal, 1);
         addMenuButton(menu, createGame, 2);
         addMenuButton(menu, joinGame, 3);
-        addMenuFiller(menu, 4);
+        addMenuButton(menu, campaign, 4);
+        addMenuFiller(menu, 5);
         formCards.add(menu, "menu");
 
         nameFieldGlobal = YimoTheme.textField(18);
@@ -242,6 +245,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         joinGlobal.addActionListener(this);
         createGame.addActionListener(this);
         joinGame.addActionListener(this);
+        campaign.addActionListener(this);
         nameFieldGlobal.addActionListener(this);
         yesButtonGlobal.addActionListener(this);
         noButtonGlobal.addActionListener(this);
@@ -358,7 +362,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
                         status("Enter a room name first.", true);
                     } else {
                         status("Starting the practice room…", false);
-                        graphwar.createGame(port(portFieldCreate));
+						graphwar.createGame(port(portFieldCreate), name);
                         graphwar.getGameData().addPlayer(name);
                         showMenu();
                     }
@@ -375,7 +379,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
                         status("Enter a name and room address.", true);
                     } else {
                         status("Connecting to the room…", false);
-                        graphwar.joinGame(address, port(portFieldJoin));
+						graphwar.joinGame(address, port(portFieldJoin), name);
                         graphwar.getGameData().addPlayer(name);
                         showJoinGame(false);
                         graphwar.getUI().setScreen(Constants.PRE_GAME_SCREEN);
@@ -390,6 +394,8 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
                 showCreateGame(true);
             } else if (source == joinGame) {
                 showJoinGame(true);
+            } else if (source == campaign) {
+                graphwar.getUI().setScreen(Constants.CAMPAIGN_SCREEN);
             }
         } catch (NumberFormatException error) {
             status("Port must be a number between 1 and 65535.", true);

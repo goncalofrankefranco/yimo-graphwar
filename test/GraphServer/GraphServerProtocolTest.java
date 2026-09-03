@@ -2,6 +2,7 @@ package GraphServer;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -23,6 +24,8 @@ public final class GraphServerProtocolTest
 		Socket clientSocket = new Socket("127.0.0.1", pair.getLocalPort());
 		Socket serverSocket = pair.accept();
 		pair.close();
+		PrintWriter output = new PrintWriter(clientSocket.getOutputStream(), true);
+		output.println(NetworkProtocol.buildHello("smoke"));
 		ClientConnection client = new ClientConnection(server, serverSocket);
 		server.clients.add(client);
 
@@ -33,6 +36,7 @@ public final class GraphServerProtocolTest
 
 		server.startGame();
 		BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+		check(NetworkProtocol.isHandshakeAccepted(input.readLine()), "the server must accept the matching YIMO build");
 		String message;
 		while((message = input.readLine()) != null && !message.startsWith(NetworkProtocol.START_GAME+"&"))
 		{

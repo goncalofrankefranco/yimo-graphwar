@@ -27,6 +27,7 @@ import java.awt.RenderingHints;
 
 import javax.swing.JPanel;
 
+
 public class GlobalPlayerBoard extends JPanel 
 {
 	private Graphwar graphwar;
@@ -42,6 +43,8 @@ public class GlobalPlayerBoard extends JPanel
 		
 		this.width = width;
 		this.minHeight = minHeight;
+		setOpaque(true);
+		setBackground(YimoTheme.INPUT);
 	}
 	
 	public void resize()
@@ -53,33 +56,40 @@ public class GlobalPlayerBoard extends JPanel
 			height = minHeight;
 		}
 		
-		this.setPreferredSize(new Dimension(width, height));
-		this.revalidate();
+		Dimension desired = new Dimension(Math.max(width, getWidth()), height);
+		if(!desired.equals(this.getPreferredSize()))
+		{
+			this.setPreferredSize(desired);
+			this.revalidate();
+		}
 	}
 	
 	public void paintComponent(Graphics g)
 	{
+		super.paintComponent(g);
 		resize();
 		
-		g.setColor(Color.WHITE);
+		g.setColor(YimoTheme.INPUT);
 		
-		g.fillRect(0, 0, this.getWidth()-1, this.getHeight()-1);
+		g.fillRect(0, 0, Math.max(0, this.getWidth()-1), Math.max(0, this.getHeight()-1));
 		
-		g.setColor(Color.BLACK);
+		g.setColor(new Color(56, 90, 112));
 		
 		//g.drawRect(0, 0, width, height);
 		
 		Graphics2D g2d = (Graphics2D)g;
 		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g2d.setFont(new Font("Sans", Font.BOLD, 14));
+		g2d.setFont(new Font("Sans", Font.BOLD, 13));
 		
 		String[] playersNames = graphwar.getGlobalClient().getGlobalPlayers();
 		
 		
 		for(int i=0; i<playersNames.length; i++)
 		{
-			g2d.drawString(" "+playersNames[i], 0, entryHeight*(i+1)-5);
-			g2d.drawRect(0, entryHeight*i, this.getWidth()-1, entryHeight);
+			g2d.setColor(YimoTheme.TEXT);
+			g2d.drawString(" "+playersNames[i], 8, entryHeight*(i+1)-5);
+			g2d.setColor(new Color(56, 90, 112));
+			g2d.drawLine(0, entryHeight*(i+1)-1, this.getWidth()-1, entryHeight*(i+1)-1);
 		}
 	}
 }

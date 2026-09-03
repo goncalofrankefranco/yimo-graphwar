@@ -41,7 +41,11 @@ public class GraphAngleDisplay extends JPanel
 	
 	public void paintComponent(Graphics g)
 	{	
-		Player currentPlayer = graphwar.getGameData().getCurrentTurnPlayer();	
+		Player currentPlayer = graphwar.getGameData().getCurrentTurnPlayer();
+		if(currentPlayer == null || currentPlayer.getCurrentTurnSoldier() == null)
+		{
+			return;
+		}
 		double angle;
 		
 		if(graphwar.getGameData().isAngleDown() || graphwar.getGameData().isAngleUp())
@@ -56,11 +60,22 @@ public class GraphAngleDisplay extends JPanel
 			angle = currentPlayer.getCurrentTurnSoldier().getAngle();
 		}
 				
-		Graphics2D g2d = (Graphics2D)g;
+		Graphics2D g2d = (Graphics2D)g.create();
 		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+		double scale = Math.min((double)getWidth()/200.0, (double)getHeight()/113.0);
+		if(scale <= 0)
+		{
+			g2d.dispose();
+			return;
+		}
+		int offsetX = (int)Math.round((getWidth()-200*scale)/2.0);
+		int offsetY = (int)Math.round((getHeight()-113*scale)/2.0);
+		g2d.translate(offsetX, offsetY);
+		g2d.scale(scale, scale);
 		g2d.setColor(currentPlayer.getColor());		
 		paintCircle(g2d, angle);
 		paintAngleText(g2d, angle);
+		g2d.dispose();
 	}
 	
 	private void paintCircle(Graphics g, double angle)

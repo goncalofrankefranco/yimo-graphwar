@@ -42,6 +42,11 @@ public class GraphTextBox extends JScrollPane
 	{
 		textPane = new JTextPane();
 		textPane.setEditable(false);
+		textPane.setFont(new java.awt.Font("Sans", java.awt.Font.PLAIN, 13));
+		textPane.setForeground(YimoTheme.TEXT);
+		textPane.setBackground(YimoTheme.INPUT);
+		textPane.setCaretColor(YimoTheme.CYAN);
+		textPane.setBorder(javax.swing.BorderFactory.createEmptyBorder(6, 8, 6, 8));
 		text = (StyledDocument) textPane.getDocument();
 		
 		nameStyle = text.addStyle("nameStyle", null);
@@ -50,6 +55,7 @@ public class GraphTextBox extends JScrollPane
 		
 		StyleConstants.setForeground(systemStyle, new Color(160,160,160));
 		StyleConstants.setItalic(systemStyle, true);
+		StyleConstants.setForeground(messageStyle, YimoTheme.TEXT);
 				
 		this.setViewportView(textPane);
 		

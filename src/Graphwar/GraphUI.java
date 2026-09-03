@@ -17,6 +17,9 @@
 
 package Graphwar;
 
+import java.awt.CardLayout;
+import java.awt.Dimension;
+
 import javax.swing.JPanel;
 
 import GraphServer.Constants;
@@ -35,7 +38,9 @@ public class GraphUI extends JPanel
 		
 		this.graphwar = graphwar;
 		
-		this.setLayout(null);
+		this.setLayout(new CardLayout());
+		this.setPreferredSize(new Dimension(1100, 700));
+		this.setMinimumSize(new Dimension(800, 600));
 		
 		screens = new JPanel[Constants.NUM_SCREENS];
 		
@@ -43,6 +48,10 @@ public class GraphUI extends JPanel
 		screens[Constants.PRE_GAME_SCREEN] = new PreGameScreen(graphwar, "/rsc/PreGame.txt");
 		screens[Constants.GLOBAL_ROOM_SCREEN] = new GlobalScreen(graphwar, "/rsc/GlobalRoom.txt");
 		screens[Constants.GAME_SCREEN] = new GameScreen(graphwar, "/rsc/GameScreen.txt");
+		for(int i=0; i<screens.length; i++)
+		{
+			add(screens[i], Integer.toString(i));
+		}
 				
 		currentScreenIndex = -1;
 		currentScreen = null;
@@ -68,8 +77,7 @@ public class GraphUI extends JPanel
 				((StartStopPanel) currentScreen).stopPanel();
 			}
 			
-			this.removeAll();
-			this.add(screens[screenNum]);		
+			((CardLayout)getLayout()).show(this, Integer.toString(screenNum));
 			this.revalidate();
 			this.repaint();
 			

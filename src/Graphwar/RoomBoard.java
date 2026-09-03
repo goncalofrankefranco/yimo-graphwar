@@ -55,9 +55,15 @@ public class RoomBoard extends JPanel implements MouseMotionListener, MouseListe
 		this.width = width;
 		this.minHeight = minHeight;
 		this.height = minHeight;
+		this.setOpaque(true);
+		this.setBackground(YimoTheme.INPUT);
 			
-		this.setPreferredSize(new Dimension(width, height));
-		this.revalidate();
+		Dimension desired = new Dimension(Math.max(width, getWidth()), height);
+		if(!desired.equals(this.getPreferredSize()))
+		{
+			this.setPreferredSize(desired);
+			this.revalidate();
+		}
 		
 		this.addMouseListener(this);
 		this.addMouseMotionListener(this);
@@ -78,17 +84,20 @@ public class RoomBoard extends JPanel implements MouseMotionListener, MouseListe
 	
 	public void paintComponent(Graphics g)
 	{		
+		super.paintComponent(g);
 		resize();
 		
-		g.setColor(Color.WHITE);
+		int drawWidth = Math.max(1, this.getWidth());
+		g.setColor(YimoTheme.INPUT);
 		
-		g.fillRect(0, 0, this.getWidth()-1, this.getHeight()-1);
+		g.fillRect(0, 0, drawWidth-1, Math.max(0, this.getHeight()-1));
 		
-		g.setColor(Color.BLACK);
+		g.setColor(new Color(56, 90, 112));
 				
 		Graphics2D g2d = (Graphics2D)g;
 		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		g2d.setFont(new Font("Sans", Font.BOLD, 14));
+		g2d.setFont(new Font("Sans", Font.BOLD, 13));
+		drawWidth = Math.max(1, this.getWidth());
 	
 		ListIterator<Room> itr = graphwar.getGlobalClient().getRooms().listIterator();    	
 		int i=0;
@@ -100,13 +109,13 @@ public class RoomBoard extends JPanel implements MouseMotionListener, MouseListe
 			{
 				if(focusedRoomNum == i)
 				{
-					g2d.setColor(focusColor);
-					g2d.fillRect(0, entryHeight*i, width, entryHeight);
+					g2d.setColor(new Color(242, 163, 91, 90));
+					g2d.fillRect(0, entryHeight*i, drawWidth, entryHeight);
 				}
 			}
 				
-			g2d.setColor(Color.BLACK);
-			g2d.drawString(" "+room.getName(), 0, entryHeight*(i+1)-4);
+			g2d.setColor(YimoTheme.TEXT);
+			g2d.drawString(" "+room.getName(), 8, entryHeight*(i+1)-4);
 			
 			String mode = "y";
 			
@@ -119,11 +128,12 @@ public class RoomBoard extends JPanel implements MouseMotionListener, MouseListe
 				mode = "y''";
 			}
 			
-			g2d.drawString(mode, width-40, entryHeight*(i+1)-7);
+			g2d.drawString(mode, Math.max(8, drawWidth-42), entryHeight*(i+1)-7);
 			
-			g2d.drawString(room.getNumPlayers()+"/10", width-110, entryHeight*(i+1)-6);
+			g2d.drawString(room.getNumPlayers()+"/10", Math.max(8, drawWidth-110), entryHeight*(i+1)-6);
 			
-			g2d.drawRect(0, entryHeight*i, width, entryHeight);
+			g2d.setColor(new Color(56, 90, 112));
+			g2d.drawLine(0, entryHeight*(i+1)-1, drawWidth-1, entryHeight*(i+1)-1);
 			
 			i++;
 		}		

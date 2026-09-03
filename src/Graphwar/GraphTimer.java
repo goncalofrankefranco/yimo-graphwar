@@ -50,6 +50,7 @@ public class GraphTimer extends JPanel implements ActionListener
 	
 	public void paintComponent(Graphics g)
 	{			
+		super.paintComponent(g);
 		Graphics2D g2d = (Graphics2D)g;
 		g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
 		
@@ -72,7 +73,10 @@ public class GraphTimer extends JPanel implements ActionListener
 			g2d.setColor(Color.RED);
 		}
 	
-		g2d.drawString(Double.toString(timeLeftDecimal), 4, 19);
+		String text = Double.toString(timeLeftDecimal);
+		int x = Math.max(4, (getWidth()-g2d.getFontMetrics().stringWidth(text))/2);
+		int y = Math.max(19, (getHeight()+g2d.getFontMetrics().getAscent()-g2d.getFontMetrics().getDescent())/2);
+		g2d.drawString(text, x, y);
 	}
 	
 	public void startRunning()

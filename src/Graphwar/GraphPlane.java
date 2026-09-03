@@ -20,6 +20,7 @@ package Graphwar;
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
@@ -88,6 +89,9 @@ public class GraphPlane extends JPanel implements ActionListener
 	public GraphPlane(Graphwar graphwar) throws Exception
 	{
 		this.graphwar = graphwar;
+		setOpaque(true);
+		setBackground(Color.WHITE);
+		setPreferredSize(new Dimension(Constants.PLANE_LENGTH, Constants.PLANE_HEIGHT));
 		
 		//this.setOpaque(false);
 		
@@ -226,8 +230,26 @@ public class GraphPlane extends JPanel implements ActionListener
 		repaintBack = true;
 	}
 	
-	public void paintComponent(Graphics g)
-	{		
+	public void paintComponent(Graphics graphics)
+	{
+		super.paintComponent(graphics);
+		if(getWidth() <= 0 || getHeight() <= 0)
+		{
+			return;
+		}
+
+		Graphics2D g = (Graphics2D)graphics.create();
+		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+		// The game engine keeps one logical board; only this view scales and letterboxes it.
+		double scale = Math.min((double)getWidth()/Constants.PLANE_LENGTH,
+				(double)getHeight()/Constants.PLANE_HEIGHT);
+		int offsetX = (int)Math.round((getWidth()-Constants.PLANE_LENGTH*scale)/2.0);
+		int offsetY = (int)Math.round((getHeight()-Constants.PLANE_HEIGHT*scale)/2.0);
+		g.translate(offsetX, offsetY);
+		g.scale(scale, scale);
+		try
+		{
 		//long times[] = new long[6];
 		
 		//times[0] = System.nanoTime();
@@ -267,6 +289,11 @@ public class GraphPlane extends JPanel implements ActionListener
 	
 	//	System.out.println();
 	//	timeFinishedLastPaint = System.currentTimeMillis();
+		}
+		finally
+		{
+			g.dispose();
+		}
 	}
 		
 	private void drawBackground(Graphics2D g, boolean reversed)

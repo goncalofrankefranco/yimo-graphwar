@@ -63,7 +63,7 @@ public class Graphwar extends JFrame
 	
 	public void init()
 	{		
-		setTitle("Graphwar");
+		setTitle("YIMO Graphwar");
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setBackground(new java.awt.Color(8, 14, 26));
 		setResizable(true);
@@ -72,7 +72,7 @@ public class Graphwar extends JFrame
 		{
 			gameData = new GameData(this);
 			globalClient = new GlobalClient(this);
-			graphUI = new GraphUI(this);			
+			graphUI = new GraphUI(this);
 		}
 		catch (InterruptedException e) 
 		{
@@ -84,7 +84,7 @@ public class Graphwar extends JFrame
 		}
 		
 		setContentPane(graphUI);
-		setMinimumSize(new Dimension(Constants.WIDTH, Constants.HEIGHT));
+		setMinimumSize(new Dimension(800, 600));
 		pack();
 		setLocationRelativeTo(null);
 		setVisible(true);

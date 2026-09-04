@@ -137,11 +137,16 @@ Just type them on the game chat to use them.
 
 Compile the game using the make command (or on your favorite IDE).
 
-To run the game execute graphwar.jar.
+On Windows, run the installer and launch `YIMO-Graphwar.exe`; the bundled
+Java runtime means no separate Java installation is required. For source
+builds, run `YIMO-Graphwar-2.0.0.jar` with Java 8.
 
 The v2 Windows package is built by `installer/build-stage8-release.ps1`. It
-produces `YIMO-Graphwar-2.0.0-Setup.exe` with a bundled Java 8 runtime and a
-portable ZIP. See [`docs/STAGE-8-RELEASE.md`](docs/STAGE-8-RELEASE.md) and
+produces `YIMO-Graphwar-2.0.0-Setup.exe` with a bundled Java 8 runtime,
+clickable `YIMO-Graphwar.exe`, and a portable ZIP. Install it, search for
+“YIMO Graphwar”, and click the Start menu shortcut. Connection values can be
+changed in the in-app Settings screen and are saved per Windows user. See
+[`docs/STAGE-8-RELEASE.md`](docs/STAGE-8-RELEASE.md) and
 [`installer/README.md`](installer/README.md) for the reproducible release
 procedure.
 
@@ -160,7 +165,7 @@ For local development, the service and Java components can be started with:
 ```text
 java -jar globalServer.jar --global-port 23762
 java -jar roomServer.jar --global-host 127.0.0.1 --global-port 23762
-java -jar graphwar.jar --global-host 127.0.0.1 --global-port 23762 --tournament-api http://127.0.0.1:8080
+java -jar YIMO-Graphwar-2.0.0.jar --global-host 127.0.0.1 --global-port 23762 --tournament-api http://127.0.0.1:8080
 ```
 
 The tournament service setup and API examples are in

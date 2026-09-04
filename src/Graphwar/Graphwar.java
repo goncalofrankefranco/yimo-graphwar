@@ -25,6 +25,7 @@ import javax.swing.JFrame;
 import GraphServer.Constants;
 import GraphServer.GraphServer;
 import GraphServer.NetworkConfig;
+import GraphServer.NetworkPreferences;
 
 public class Graphwar extends JFrame
 {
@@ -55,7 +56,12 @@ public class Graphwar extends JFrame
 	
 	public static void handleArgs(String[] args)
 	{
-		Constants.applyNetworkConfig(NetworkConfig.fromCommandLine(args));
+		NetworkConfig config = NetworkConfig.fromCommandLine(args);
+		if (!NetworkPreferences.hasExplicitArguments(args))
+		{
+			config = NetworkPreferences.load(NetworkPreferences.userNode(), config);
+		}
+		Constants.applyNetworkConfig(config);
 	}
 	
 	public void init()

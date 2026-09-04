@@ -34,6 +34,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
     private final JButton createGame;
     private final JButton joinGame;
     private final JButton campaign;
+    private final JButton settings;
 
     private final JTextField nameFieldGlobal;
     private final JButton yesButtonGlobal;
@@ -110,12 +111,14 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         createGame = YimoTheme.button("Create Practice Game");
         joinGame = YimoTheme.button("Join Room");
         campaign = YimoTheme.button("Tutorial");
+        settings = YimoTheme.quietButton("Settings");
         addMenuFiller(menu, 0);
         addMenuButton(menu, joinGlobal, 1);
         addMenuButton(menu, createGame, 2);
         addMenuButton(menu, joinGame, 3);
         addMenuButton(menu, campaign, 4);
-        addMenuFiller(menu, 5);
+        addMenuButton(menu, settings, 5);
+        addMenuFiller(menu, 6);
         formCards.add(menu, "menu");
 
         nameFieldGlobal = YimoTheme.textField(18);
@@ -246,6 +249,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         createGame.addActionListener(this);
         joinGame.addActionListener(this);
         campaign.addActionListener(this);
+        settings.addActionListener(this);
         nameFieldGlobal.addActionListener(this);
         yesButtonGlobal.addActionListener(this);
         noButtonGlobal.addActionListener(this);
@@ -396,6 +400,8 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
                 showJoinGame(true);
             } else if (source == campaign) {
                 graphwar.getUI().setScreen(Constants.CAMPAIGN_SCREEN);
+            } else if (source == settings) {
+                graphwar.getUI().setScreen(Constants.SETTINGS_SCREEN);
             }
         } catch (NumberFormatException error) {
             status("Port must be a number between 1 and 65535.", true);

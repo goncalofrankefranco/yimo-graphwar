@@ -18,12 +18,12 @@ Expand-Archive -LiteralPath $archive -DestinationPath $target -Force
 $shell = New-Object -ComObject WScript.Shell
 New-Item -ItemType Directory -Force -Path $startMenu | Out-Null
 $shortcut = $shell.CreateShortcut((Join-Path $startMenu 'YIMO Graphwar.lnk'))
-$shortcut.TargetPath = Join-Path $target 'launch-yimo.cmd'
+$shortcut.TargetPath = Join-Path $target 'YIMO-Graphwar.exe'
 $shortcut.WorkingDirectory = $target
-$shortcut.IconLocation = Join-Path $target 'runtime\bin\javaw.exe'
+$shortcut.IconLocation = Join-Path $target 'YIMO-Graphwar.exe'
 $shortcut.Save()
 
 Write-Host "YIMO Graphwar installed to $target"
 if (-not $NoLaunch) {
-    Start-Process -FilePath (Join-Path $target 'launch-yimo.cmd') -WorkingDirectory $target
+    Start-Process -FilePath (Join-Path $target 'YIMO-Graphwar.exe') -WorkingDirectory $target
 }

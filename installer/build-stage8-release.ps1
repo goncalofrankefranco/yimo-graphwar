@@ -56,6 +56,10 @@ try {
     Copy-Item -LiteralPath (Join-Path $installerRoot 'launch-practice-server.cmd') -Destination $payload -Force
     Copy-Item -LiteralPath (Join-Path $installerRoot 'launch-practice-client.cmd') -Destination $payload -Force
 
+    $csc = Get-ChildItem -Path "$env:WINDIR\Microsoft.NET\Framework*\v4.0.30319\csc.exe" -File |
+        Select-Object -First 1
+    if ($null -eq $csc) { Fail 'The Windows .NET Framework C# compiler was not found.' }
+
     $yimoProperties = @"
 # YIMO Graphwar 2.0.0 default endpoint
 global.host=$GlobalHost
@@ -83,7 +87,9 @@ protocol.version=2
     $installedReadme = @"
 YIMO Graphwar 2.0.0
 
-Run launch-yimo.cmd to connect to the configured YIMO endpoint.
+Double-click YIMO-Graphwar.exe to connect to the configured YIMO endpoint.
+The Start menu shortcut launches the same executable.
+Run launch-yimo.cmd only as a command-line fallback.
 Run launch-practice-server.cmd followed by launch-practice-client.cmd for a local practice server.
 
 Installed files: %~dp0
@@ -95,6 +101,13 @@ License: GPL-3.0-or-later; see COPYING and NOTICE.md.
     $runtime = Join-Path $payload 'runtime'
     New-Item -ItemType Directory -Path $runtime -Force | Out-Null
     Copy-Item -Path (Join-Path $RuntimeSource '*') -Destination $runtime -Recurse -Force
+
+    $launcher = Join-Path $payload 'YIMO-Graphwar.exe'
+    & $csc.FullName /nologo /target:winexe /optimize+ /out:$launcher /r:System.Windows.Forms.dll `
+        (Join-Path $installerRoot 'YimoLauncher.cs')
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
+        Fail 'The clickable YIMO launcher could not be compiled.'
+    }
 
     $portable = Join-Path $output 'YIMO-Graphwar-2.0.0-Portable.zip'
     Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $portable -CompressionLevel Optimal

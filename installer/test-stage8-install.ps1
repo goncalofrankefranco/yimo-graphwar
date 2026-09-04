@@ -43,6 +43,7 @@ try {
     $target = Join-Path $env:LOCALAPPDATA 'YIMO Graphwar'
     foreach ($relative in @(
             'YIMO-Graphwar-2.0.0.jar',
+            'YIMO-Graphwar.exe',
             'globalServer.jar',
             'roomServer.jar',
             'yimo.properties',

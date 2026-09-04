@@ -1,5 +1,5 @@
 
-# Graphwar Tutorial
+# YIMO Graphwar 2.0.0
 
 CREDITS TO: https://github.com/catabriga/graphwar
 
@@ -139,9 +139,11 @@ Compile the game using the make command (or on your favorite IDE).
 
 To run the game execute graphwar.jar.
 
-The checked-in `Graphwar-Setup.exe` is the previous approved client artifact.
-A reproducible YIMO 2.0 installer is a later release stage; the source and
-release notes must be updated together when it is published.
+The v2 Windows package is built by `installer/build-stage8-release.ps1`. It
+produces `YIMO-Graphwar-2.0.0-Setup.exe` with a bundled Java 8 runtime and a
+portable ZIP. See [`docs/STAGE-8-RELEASE.md`](docs/STAGE-8-RELEASE.md) and
+[`installer/README.md`](installer/README.md) for the reproducible release
+procedure.
 
 ## Running Local Servers
 

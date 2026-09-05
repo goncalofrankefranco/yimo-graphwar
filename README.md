@@ -159,6 +159,9 @@ changed in the in-app Settings screen and are saved per Windows user. See
 [`installer/README.md`](installer/README.md) for the reproducible release
 procedure.
 
+The hosting choice, load-test thresholds, and event runbook are in
+[`docs/SCALING-PLAN.md`](docs/SCALING-PLAN.md).
+
 ## Running Local Servers
 
 The Java programs read `yimo.properties` beside the JAR, then the packaged

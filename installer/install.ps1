@@ -36,10 +36,14 @@ if (-not $alreadyInstalled) {
 
 $shell = New-Object -ComObject WScript.Shell
 New-Item -ItemType Directory -Force -Path $startMenu | Out-Null
-$shortcut = $shell.CreateShortcut((Join-Path $startMenu 'YIMO Graphwar.lnk'))
+$shortcutPath = Join-Path $startMenu 'YIMO Graphwar.lnk'
+if (Test-Path -LiteralPath $shortcutPath) {
+    Remove-Item -LiteralPath $shortcutPath -Force
+}
+$shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = Join-Path $target 'YIMO-Graphwar.exe'
 $shortcut.WorkingDirectory = $target
-$shortcut.IconLocation = Join-Path $target 'YIMO-Graphwar.exe'
+$shortcut.IconLocation = (Join-Path $target 'YIMO.ico') + ',0'
 $shortcut.Save()
 
 Write-Host "YIMO Graphwar installed to $target"

@@ -61,6 +61,8 @@ try {
     Assert-True ($properties -notmatch '(?i)(YIMO_ADMIN_TOKEN|ROOM_HMAC_SECRET|BEGIN (RSA|OPENSSH) PRIVATE KEY)') 'secret-like value was installed.'
     $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\YIMO Graphwar\YIMO Graphwar.lnk'
     Assert-True (Test-Path -LiteralPath $shortcut -PathType Leaf) 'Start menu shortcut is missing.'
+    $shortcutInfo = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
+    Assert-True ($shortcutInfo.IconLocation -match 'YIMO\.ico') 'shortcut must use the YIMO icon file.'
 
     $secondProcess = Start-Process -FilePath $setup -Wait -PassThru -WindowStyle Hidden
     Assert-True ($secondProcess.ExitCode -eq 0) "second setup run exited with code $($secondProcess.ExitCode)."

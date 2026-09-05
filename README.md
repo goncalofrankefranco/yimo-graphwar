@@ -18,6 +18,11 @@ The current local defaults are in `rsc/yimo.properties`; deployment values
 belong in an external `yimo.properties` file or command-line overrides. Never
 commit endpoint secrets, organizer tokens, participant codes, or HMAC keys.
 
+The client scales the battlefield to the available resizable window while
+preserving its logical game coordinates. Room hosts select Normal functions,
+First-order ODE, or Second-order ODE directly. The offline campaign has two
+steps per lesson: a guided model shot followed by an adapted target challenge.
+
 Graphwar is an artillery game in which you must hit your enemies using mathematical functions. The trajectory of your shot is determined by the function you wrote, and your goal is to avoid the obstacles and your teammates and hit your enemies. The game takes place in a Cartesian Plane.
 
 ![cam](/../screenshots/ss1graphwar.png?raw=true)
@@ -27,6 +32,10 @@ Graphwar is an artillery game in which you must hit your enemies using mathemati
 Room hosts can choose between the original shooter-relative trajectory and
 Global graph mode. Global graph mode draws the entered graph in fixed map
 coordinates and can hit soldiers on either team.
+
+The YIMO main menu uses a black, white, and orange Olympiad control-deck
+design with responsive action cards and animated button states. The installed
+client remains a resizable window; fullscreen APIs are not used.
 
 ## Fair-play and server validation
 

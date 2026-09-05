@@ -27,6 +27,11 @@ launcher for the bundled Java runtime. The client’s Settings screen stores
 the lobby host, lobby port, and tournament API per Windows user; command-line
 flags remain available for deployment and testing.
 
+The package also includes the responsive battlefield viewport, explicit
+room-mode selection, two-step guided/adaptation campaign lessons, and the
+YIMO Olympiad main-menu redesign. These changes preserve Java 8 compatibility
+and the existing logical game coordinates.
+
 The default IP is a deployment input. Change `-GlobalHost` and
 `-TournamentApiBaseUrl` for a restored snapshot with a different public IP;
 never put server secrets in the client package.

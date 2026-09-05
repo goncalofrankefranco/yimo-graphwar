@@ -141,7 +141,8 @@ public class Constants
 	public static final int GLOBAL_ROOM_SCREEN = 2;
 	public static final int GAME_SCREEN = 3;
 	public static final int CAMPAIGN_SCREEN = 4;
-	public static final int NUM_SCREENS = 5;
+	public static final int SETTINGS_SCREEN = 5;
+	public static final int NUM_SCREENS = 6;
 
 	public static void applyNetworkConfig(NetworkConfig config)
 	{

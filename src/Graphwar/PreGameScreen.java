@@ -476,6 +476,16 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
         button.setForeground(selected ? Color.WHITE : YimoTheme.TEXT);
     }
 
+    static int modeForButton(int buttonIndex) {
+        if (buttonIndex == 1) {
+            return Constants.FST_ODE;
+        }
+        if (buttonIndex == 2) {
+            return Constants.SND_ODE;
+        }
+        return Constants.NORMAL_FUNC;
+    }
+
     private void showCard(final String card, final boolean message, final boolean local, final boolean pc) {
         Runnable update = new Runnable() {
             public void run() {
@@ -680,7 +690,8 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
                 chatField.setText("");
             }
         } else if (source == normalFuncButton || source == firstFuncButton || source == secondFuncButton) {
-            graphwar.getGameData().nextMode();
+            int buttonIndex = source == normalFuncButton ? 0 : source == firstFuncButton ? 1 : 2;
+            graphwar.getGameData().setMode(modeForButton(buttonIndex));
         } else if (source == back) {
             graphwar.getGameData().disconnect();
             graphwar.getGlobalClient().closeRoom();

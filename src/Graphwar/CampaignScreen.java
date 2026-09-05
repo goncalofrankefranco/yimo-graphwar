@@ -58,6 +58,8 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
     private final JButton fireButton;
     private final JButton retryButton;
     private final JButton lessonBackButton;
+    private final JButton stepBackButton;
+    private final JButton stepContinueButton;
     private final JButton previousButton;
     private final JButton nextButton;
     private final JButton hintButton;
@@ -67,16 +69,20 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
     private final JLabel selectorObjectiveLabel;
     private final JLabel selectorModeLabel;
     private final JLabel lessonTitleLabel;
+    private final JLabel stepLabel;
     private final JLabel lessonObjectiveLabel;
     private final JLabel lessonModeLabel;
     private final JLabel lessonStatusLabel;
     private final JLabel hintLabel;
     private final JTextArea instructionsArea;
+    private final JTextArea stepInstructionsArea;
     private final JTextArea lessonGuideArea;
     private final CampaignCanvas canvas;
 
     private CampaignLesson selectedLesson;
+    private CampaignStep selectedStep;
     private int selectedIndex = -1;
+    private int selectedStepNumber = 1;
 
     public CampaignScreen(Graphwar graphwar) {
         super(graphwar);
@@ -100,6 +106,8 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         fireButton = YimoTheme.accentButton("Fire");
         retryButton = YimoTheme.button("Retry");
         lessonBackButton = YimoTheme.quietButton("Back to Lessons");
+        stepBackButton = YimoTheme.quietButton("Review Example");
+        stepContinueButton = YimoTheme.accentButton("Try Adaptation");
         previousButton = YimoTheme.quietButton("Previous Lesson");
         nextButton = YimoTheme.accentButton("Next Lesson");
         hintButton = YimoTheme.button("Hint");
@@ -109,16 +117,22 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         selectorObjectiveLabel = YimoTheme.mutedLabel("");
         selectorModeLabel = YimoTheme.mutedLabel("");
         lessonTitleLabel = YimoTheme.title("");
+        stepLabel = YimoTheme.mutedLabel("");
         lessonObjectiveLabel = YimoTheme.mutedLabel("");
         lessonModeLabel = YimoTheme.mutedLabel("");
         lessonStatusLabel = YimoTheme.mutedLabel("");
         hintLabel = YimoTheme.mutedLabel("");
         instructionsArea = textArea();
+        stepInstructionsArea = textArea();
         lessonGuideArea = textArea();
         lessonGuideArea.setRows(5);
         lessonGuideArea.setColumns(20);
         lessonGuideArea.setPreferredSize(new Dimension(0, 112));
         lessonGuideArea.setMaximumSize(new Dimension(Integer.MAX_VALUE, 112));
+        stepInstructionsArea.setRows(3);
+        stepInstructionsArea.setColumns(20);
+        stepInstructionsArea.setPreferredSize(new Dimension(0, 72));
+        stepInstructionsArea.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
         canvas = new CampaignCanvas();
 
         add(topBar("Tutorial"), BorderLayout.NORTH);
@@ -135,9 +149,13 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         fireButton.addActionListener(this);
         retryButton.addActionListener(this);
         lessonBackButton.addActionListener(this);
+        stepBackButton.addActionListener(this);
+        stepContinueButton.addActionListener(this);
         previousButton.addActionListener(this);
         nextButton.addActionListener(this);
         hintButton.addActionListener(this);
+        stepBackButton.setVisible(false);
+        stepContinueButton.setVisible(false);
 
         if (lessons.length > 0) {
             selectFirstUnlocked();
@@ -246,12 +264,17 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         heading.setOpaque(false);
         heading.setLayout(new BoxLayout(heading, BoxLayout.Y_AXIS));
         heading.add(lessonTitleLabel);
+        heading.add(stepLabel);
         heading.add(lessonModeLabel);
         controls.add(heading, BorderLayout.NORTH);
 
         JPanel controlStack = new JPanel();
         controlStack.setOpaque(false);
         controlStack.setLayout(new BoxLayout(controlStack, BoxLayout.Y_AXIS));
+        controlStack.add(YimoTheme.sectionTitle("Instructions"));
+        controlStack.add(Box.createVerticalStrut(7));
+        controlStack.add(stepInstructionsArea);
+        controlStack.add(Box.createVerticalStrut(14));
         controlStack.add(YimoTheme.sectionTitle("Function"));
         controlStack.add(Box.createVerticalStrut(7));
         controlStack.add(functionField);
@@ -279,6 +302,8 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
 
         JPanel actions = new JPanel(new GridLayout(0, 1, 8, 8));
         actions.setOpaque(false);
+        actions.add(stepBackButton);
+        actions.add(stepContinueButton);
         actions.add(lessonBackButton);
         actions.add(previousButton);
         actions.add(retryButton);
@@ -344,6 +369,10 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         return "";
     }
 
+    private static String modelExpression(CampaignStep step) {
+        return step == null ? "" : step.getFunction();
+    }
+
     private void selectFirstUnlocked() {
         for (int i = 0; i < lessons.length; i++) {
             if (progress.isUnlocked(lessons, i)) {
@@ -360,6 +389,8 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         }
         selectedIndex = index;
         selectedLesson = lessons[index];
+        selectedStepNumber = 1;
+        selectedStep = selectedLesson.getStep(1);
         String displayTitle = String.format("%02d  %s", index + 1, selectedLesson.getTitle());
         selectorTitleLabel.setText(displayTitle);
         lessonTitleLabel.setText(displayTitle);
@@ -370,6 +401,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         String displayMode = modeText(selectedLesson);
         selectorModeLabel.setText(displayMode);
         lessonModeLabel.setText(displayMode);
+        stepLabel.setText("Step 1 of " + selectedLesson.getStepCount() + "  ·  Guided example");
         lessonCountLabel.setText(progress.completedCount(lessons) + " / " + lessons.length);
         startButton.setEnabled(true);
         refreshLessonButtons();
@@ -408,22 +440,40 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         if (selectedLesson == null) {
             return;
         }
-        functionField.setText(startingExpression(selectedLesson));
-        functionField.setToolTipText("Build your function using the guide, then fire.");
-        hintLabel.setText(selectedLesson.getHint());
-        hintLabel.setVisible(false);
-        hintButton.setText("Hint");
-        lessonStatusLabel.setText("");
-        lessonStatusLabel.setForeground(YimoTheme.MUTED);
-        canvas.setLesson(selectedLesson);
-        updateTrajectory(false);
+        startStep(1);
         cardLayout.show(cards, "lesson");
         revalidate();
         repaint();
     }
 
-    private void updateTrajectory(boolean fired) {
+    private void startStep(int stepNumber) {
         if (selectedLesson == null) {
+            return;
+        }
+        selectedStepNumber = stepNumber;
+        selectedStep = selectedLesson.getStep(stepNumber);
+        boolean guided = stepNumber == 1;
+        functionField.setText(guided ? modelExpression(selectedStep) : "");
+        functionField.setToolTipText("Build your function using the guide, then fire.");
+        stepLabel.setText("Step " + stepNumber + " of " + selectedLesson.getStepCount()
+                + (guided ? "  ·  Guided example" : "  ·  Adapt the formula"));
+        stepInstructionsArea.setText(selectedStep.getInstructions());
+        lessonGuideArea.setText(selectedStep.getGuide());
+        hintLabel.setText(selectedStep.getHint());
+        hintLabel.setVisible(false);
+        hintButton.setText("Hint");
+        lessonStatusLabel.setText("");
+        lessonStatusLabel.setForeground(YimoTheme.MUTED);
+        stepBackButton.setVisible(!guided);
+        stepContinueButton.setVisible(false);
+        canvas.setLesson(selectedStep);
+        updateTrajectory(false);
+        revalidate();
+        repaint();
+    }
+
+    private void updateTrajectory(boolean fired) {
+        if (selectedLesson == null || selectedStep == null) {
             return;
         }
         String expression = functionField.getText();
@@ -439,14 +489,20 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
             return;
         }
         try {
-            Function trajectory = simulate(selectedLesson, expression);
+            Function trajectory = simulateStep(selectedLesson, selectedStepNumber, expression);
             canvas.setFunction(trajectory, fired);
             if (fired) {
                 if (trajectory.getNumPlayersHit() > 0) {
-                    progress.markComplete(selectedLesson.getId());
-                    lessonStatusLabel.setText("Lesson complete");
+                    progress.markStepComplete(selectedLesson.getId(), selectedStepNumber);
+                    if (selectedStepNumber == 1) {
+                        lessonStatusLabel.setText("Guided example complete. Continue to the adaptation.");
+                        stepContinueButton.setVisible(true);
+                    } else {
+                        lessonStatusLabel.setText("Lesson complete");
+                        refreshLessonButtons();
+                    }
                     lessonStatusLabel.setForeground(YimoTheme.MINT);
-                    refreshLessonButtons();
+                    revalidate();
                 } else {
                     lessonStatusLabel.setText("Target not reached");
                     lessonStatusLabel.setForeground(YimoTheme.DANGER);
@@ -464,20 +520,43 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         if (lesson == null) {
             throw new MalformedFunction();
         }
-        MapShape[] shapes = lesson.getShapes();
+        return simulate(lesson.getStep(1), expression, lesson.getMode(), lesson.getTrajectory());
+    }
+
+    static Function simulateStep(CampaignLesson lesson, int stepNumber, String expression)
+            throws MalformedFunction {
+        if (lesson == null) {
+            throw new MalformedFunction();
+        }
+        return simulate(lesson.getStep(stepNumber), expression, lesson.getMode(), lesson.getTrajectory());
+    }
+
+    static Function simulate(CampaignStep step, String expression) throws MalformedFunction {
+        if (step == null) {
+            throw new MalformedFunction();
+        }
+        return simulate(step, expression, Constants.NORMAL_FUNC, Constants.SHOOTER_RELATIVE_TRAJECTORY);
+    }
+
+    private static Function simulate(CampaignStep step, String expression, int mode, int trajectoryMode)
+            throws MalformedFunction {
+        if (step == null) {
+            throw new MalformedFunction();
+        }
+        MapShape[] shapes = step.getShapes();
         Obstacle obstacle = new Obstacle(shapes.length, shapes);
         Player shooter = new Player("You", 0, Constants.TEAM1, true, 1, true);
         shooter.startSoldier(0, SHOOTER_X, SHOOTER_Y);
         Player target = new Player("Target", 1, Constants.TEAM2, false, 1, false);
-        target.startSoldier(0, lesson.getTargetX(), lesson.getTargetY());
+        target.startSoldier(0, step.getTargetX(), step.getTargetY());
         Player[] players = new Player[] { shooter, target };
         Function trajectory = new Function(expression);
 
-        if (lesson.getTrajectory() == Constants.GLOBAL_TRAJECTORY) {
-            trajectory.processGlobalRange(obstacle, players, players.length, 0, lesson.getMode());
-        } else if (lesson.getMode() == Constants.FST_ODE) {
+        if (trajectoryMode == Constants.GLOBAL_TRAJECTORY) {
+            trajectory.processGlobalRange(obstacle, players, players.length, 0, mode);
+        } else if (mode == Constants.FST_ODE) {
             trajectory.processRK4Range(obstacle, players, players.length, 0, false);
-        } else if (lesson.getMode() == Constants.SND_ODE) {
+        } else if (mode == Constants.SND_ODE) {
             trajectory.processRK42Range(obstacle, players, players.length, 0, 0.0, false);
         } else {
             trajectory.processFunctionRange(obstacle, players, players.length, 0, false);
@@ -490,6 +569,10 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         Object source = event.getSource();
         if (source == startButton) {
             startLesson();
+        } else if (source == stepContinueButton) {
+            startStep(2);
+        } else if (source == stepBackButton) {
+            startStep(1);
         } else if (source == backButton || source == lessonBackButton) {
             if (source == lessonBackButton) {
                 cardLayout.show(cards, "selector");
@@ -511,7 +594,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         } else if (source == fireButton) {
             updateTrajectory(true);
         } else if (source == retryButton) {
-            startLesson();
+            startStep(selectedStepNumber);
         } else if (source == hintButton) {
             boolean visible = !hintLabel.isVisible();
             hintLabel.setVisible(visible);
@@ -529,7 +612,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
     }
 
     private static final class CampaignCanvas extends JPanel {
-        private CampaignLesson lesson;
+        private CampaignStep step;
         private Function function;
         private boolean fired;
         private int visibleSteps;
@@ -556,9 +639,9 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
             animationTimer.setCoalesce(true);
         }
 
-        void setLesson(CampaignLesson lesson) {
+        void setLesson(CampaignStep step) {
             animationTimer.stop();
-            this.lesson = lesson;
+            this.step = step;
             this.function = null;
             this.fired = false;
             this.visibleSteps = 0;
@@ -649,7 +732,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         @Override
         protected void paintComponent(Graphics graphics) {
             super.paintComponent(graphics);
-            if (lesson == null || getWidth() <= 0 || getHeight() <= 0) {
+            if (step == null || getWidth() <= 0 || getHeight() <= 0) {
                 return;
             }
             Graphics2D g = (Graphics2D) graphics.create();
@@ -678,7 +761,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
                 g.drawLine(Constants.PLANE_LENGTH / 2, 0, Constants.PLANE_LENGTH / 2, Constants.PLANE_HEIGHT);
 
                 g.setColor(YimoTheme.TEXT);
-                for (MapShape shape : lesson.getShapes()) {
+                for (MapShape shape : step.getShapes()) {
                     if (shape.getType() == MapShape.CIRCLE) {
                         int radius = shape.getA();
                         g.fillOval(shape.getX() - radius, shape.getY() - radius, radius * 2, radius * 2);
@@ -690,16 +773,16 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
                 drawLegend(g);
                 drawFunction(g);
                 boolean complete = function != null && function.getNumPlayersHit() > 0;
-                int targetRadius = lesson.getTargetRadius();
+                int targetRadius = step.getTargetRadius();
                 if (targetEliminated) {
                     drawEliminatedTarget(g);
                 } else {
-                    drawPoint(g, lesson.getTargetX(), lesson.getTargetY(), targetRadius,
+                    drawPoint(g, step.getTargetX(), step.getTargetY(), targetRadius,
                             pointColor(Constants.TEAM2), "OPPONENT");
                     if (complete) {
                         g.setColor(YimoTheme.MINT);
                         g.setStroke(new BasicStroke(2.0f));
-                        g.drawOval(lesson.getTargetX() - targetRadius - 4, lesson.getTargetY() - targetRadius - 4,
+                        g.drawOval(step.getTargetX() - targetRadius - 4, step.getTargetY() - targetRadius - 4,
                                 targetRadius * 2 + 8, targetRadius * 2 + 8);
                     }
                 }
@@ -742,14 +825,14 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         }
 
         private void drawEliminatedTarget(Graphics2D g) {
-            int x = lesson.getTargetX();
-            int y = lesson.getTargetY();
+            int x = step.getTargetX();
+            int y = step.getTargetY();
             int frame = eliminationFrame(System.currentTimeMillis() - targetEliminatedAt);
             if (frame < deathImages.length && deathImages[frame] != null) {
                 Image image = deathImages[frame];
                 g.drawImage(image, x - image.getWidth(null) / 2, y - image.getHeight(null) / 2, null);
             } else {
-                int radius = lesson.getTargetRadius();
+                int radius = step.getTargetRadius();
                 g.setColor(pointColor(Constants.TEAM2));
                 g.setStroke(new BasicStroke(2.0f));
                 g.drawOval(x - radius, y - radius, radius * 2, radius * 2);
@@ -758,7 +841,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
             }
             g.setFont(YimoTheme.SMALL);
             g.setColor(pointColor(Constants.TEAM2));
-            g.drawString("ELIMINATED", x - 28, y + lesson.getTargetRadius() + 17);
+            g.drawString("ELIMINATED", x - 28, y + step.getTargetRadius() + 17);
         }
 
         private void drawFunction(Graphics2D g) {

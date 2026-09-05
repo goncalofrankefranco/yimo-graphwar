@@ -243,12 +243,9 @@ public class GraphPlane extends JPanel implements ActionListener
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 		// The game engine keeps one logical board; only this view scales and letterboxes it.
-		double scale = Math.min((double)getWidth()/Constants.PLANE_LENGTH,
-				(double)getHeight()/Constants.PLANE_HEIGHT);
-		int offsetX = (int)Math.round((getWidth()-Constants.PLANE_LENGTH*scale)/2.0);
-		int offsetY = (int)Math.round((getHeight()-Constants.PLANE_HEIGHT*scale)/2.0);
-		g.translate(offsetX, offsetY);
-		g.scale(scale, scale);
+		ScaleViewport.Transform viewport = ScaleViewport.forSize(getWidth(), getHeight());
+		g.translate(viewport.offsetX, viewport.offsetY);
+		g.scale(viewport.scale, viewport.scale);
 		try
 		{
 		//long times[] = new long[6];

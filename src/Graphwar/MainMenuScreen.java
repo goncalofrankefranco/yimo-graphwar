@@ -9,11 +9,17 @@
 package Graphwar;
 
 import java.awt.BorderLayout;
+import java.awt.BasicStroke;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
@@ -34,6 +40,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
     private final JButton createGame;
     private final JButton joinGame;
     private final JButton campaign;
+    private final JButton settings;
 
     private final JTextField nameFieldGlobal;
     private final JButton yesButtonGlobal;
@@ -76,17 +83,33 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
 
         JPanel intro = new JPanel(new GridBagLayout());
         intro.setOpaque(false);
-        JLabel title = new JLabel("<html><div style='line-height:90%'>YIMO<br>GRAPHWAR</div></html>");
-        title.setFont(YimoTheme.DISPLAY);
-        title.setForeground(YimoTheme.TEXT);
-        title.setHorizontalAlignment(JLabel.CENTER);
+        JPanel hero = new JPanel();
+        hero.setOpaque(false);
+        hero.setLayout(new BoxLayout(hero, BoxLayout.Y_AXIS));
+        JLabel kicker = new JLabel("YIMO  //  OLYMPIAD EDITION");
+        kicker.setFont(YimoTheme.SMALL);
+        kicker.setForeground(YimoTheme.ORANGE);
+        kicker.setAlignmentX(JLabel.CENTER_ALIGNMENT);
+        JLabel title = new JLabel("<html><div style='line-height:86%; text-align:center'>YIMO<br><span style='color:#F2A35B'>GRAPHWAR</span></div></html>");
+        title.setFont(new java.awt.Font("Serif", java.awt.Font.BOLD, 72));
+        title.setForeground(YimoTheme.MENU_WHITE);
+        title.setAlignmentX(JLabel.CENTER_ALIGNMENT);
+        JLabel tagline = new JLabel("READ THE CURVE.  ADAPT THE SHOT.");
+        tagline.setFont(new java.awt.Font("Sans", java.awt.Font.BOLD, 13));
+        tagline.setForeground(YimoTheme.MENU_LINE);
+        tagline.setAlignmentX(JLabel.CENTER_ALIGNMENT);
+        hero.add(kicker);
+        hero.add(Box.createVerticalStrut(18));
+        hero.add(title);
+        hero.add(Box.createVerticalStrut(18));
+        hero.add(tagline);
         GridBagConstraints introConstraints = new GridBagConstraints();
         introConstraints.gridx = 0;
         introConstraints.gridy = 0;
         introConstraints.weightx = 1.0;
         introConstraints.weighty = 1.0;
         introConstraints.anchor = GridBagConstraints.CENTER;
-        intro.add(title, introConstraints);
+        intro.add(hero, introConstraints);
         content.add(intro, left);
 
         GridBagConstraints right = new GridBagConstraints();
@@ -99,6 +122,9 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
 
         JPanel actionCard = YimoTheme.card();
         actionCard.setLayout(new BorderLayout());
+        actionCard.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(YimoTheme.ORANGE, 2),
+                BorderFactory.createEmptyBorder(18, 18, 18, 18)));
 
         formLayout = new java.awt.CardLayout();
         formCards = new JPanel(formLayout);
@@ -106,16 +132,18 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
 
         JPanel menu = new JPanel(new GridBagLayout());
         menu.setOpaque(false);
-        joinGlobal = YimoTheme.accentButton("Join YIMO Lobby");
-        createGame = YimoTheme.button("Create Practice Game");
-        joinGame = YimoTheme.button("Join Room");
-        campaign = YimoTheme.button("Tutorial");
+        joinGlobal = YimoTheme.menuButton("Join YIMO Lobby", true);
+        createGame = YimoTheme.menuButton("Create Practice Game", false);
+        joinGame = YimoTheme.menuButton("Join Room", false);
+        campaign = YimoTheme.menuButton("Tutorial", false);
+        settings = YimoTheme.menuButton("Settings", false);
         addMenuFiller(menu, 0);
         addMenuButton(menu, joinGlobal, 1);
         addMenuButton(menu, createGame, 2);
         addMenuButton(menu, joinGame, 3);
         addMenuButton(menu, campaign, 4);
-        addMenuFiller(menu, 5);
+        addMenuButton(menu, settings, 5);
+        addMenuFiller(menu, 6);
         formCards.add(menu, "menu");
 
         nameFieldGlobal = YimoTheme.textField(18);
@@ -141,6 +169,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         add(content, BorderLayout.CENTER);
 
         statusLabel = YimoTheme.mutedLabel("");
+        statusLabel.setForeground(YimoTheme.MENU_LINE);
         statusLabel.setBorder(BorderFactory.createEmptyBorder(6, 2, 0, 2));
         add(statusLabel, BorderLayout.SOUTH);
 
@@ -149,7 +178,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
     }
 
     private void addMenuButton(JPanel menu, JButton button, int row) {
-        button.setPreferredSize(new Dimension(260, 54));
+        button.setPreferredSize(new Dimension(320, 58));
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.gridx = 0;
         constraints.gridy = row;
@@ -157,6 +186,54 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         constraints.fill = GridBagConstraints.HORIZONTAL;
         constraints.insets = new Insets(0, 0, 12, 0);
         menu.add(button, constraints);
+    }
+
+    static String[] menuLabels() {
+        return new String[] { "Join YIMO Lobby", "Create Practice Game", "Join Room", "Tutorial", "Settings" };
+    }
+
+    @Override
+    protected void paintComponent(Graphics graphics) {
+        Graphics2D g = (Graphics2D) graphics.create();
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setPaint(new GradientPaint(0, 0, YimoTheme.MENU_INK,
+                    getWidth(), getHeight(), new Color(20, 31, 37)));
+            g.fillRect(0, 0, getWidth(), getHeight());
+
+            g.setColor(new Color(245, 242, 232, 18));
+            g.setStroke(new BasicStroke(1.0f));
+            for (int x = -getHeight(); x < getWidth(); x += 54) {
+                g.drawLine(x, 0, x + getHeight(), getHeight());
+            }
+            for (int y = 36; y < getHeight(); y += 54) {
+                g.drawLine(0, y, getWidth(), y);
+            }
+
+            int ring = Math.max(300, Math.min(getWidth(), getHeight()) + 80);
+            g.setColor(new Color(YimoTheme.ORANGE.getRed(), YimoTheme.ORANGE.getGreen(),
+                    YimoTheme.ORANGE.getBlue(), 34));
+            g.setStroke(new BasicStroke(2.0f));
+            g.drawOval(getWidth() / 2 - ring / 2, getHeight() / 2 - ring / 2, ring, ring);
+            g.drawOval(getWidth() / 2 - ring / 2 + 22, getHeight() / 2 - ring / 2 + 22,
+                    ring - 44, ring - 44);
+
+            g.setColor(YimoTheme.ORANGE);
+            g.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                    10.0f, new float[] { 10.0f, 8.0f }, 0.0f));
+            java.awt.geom.Path2D trajectory = new java.awt.geom.Path2D.Double();
+            trajectory.moveTo(0, getHeight() * 0.78);
+            trajectory.curveTo(getWidth() * 0.28, getHeight() * 0.54,
+                    getWidth() * 0.55, getHeight() * 0.65,
+                    getWidth(), getHeight() * 0.22);
+            g.draw(trajectory);
+
+            g.setColor(new Color(YimoTheme.ORANGE.getRed(), YimoTheme.ORANGE.getGreen(),
+                    YimoTheme.ORANGE.getBlue(), 150));
+            g.fillOval(getWidth() - 28, (int) (getHeight() * 0.22) - 5, 10, 10);
+        } finally {
+            g.dispose();
+        }
     }
 
     private void addMenuFiller(JPanel menu, int row) {
@@ -246,6 +323,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         createGame.addActionListener(this);
         joinGame.addActionListener(this);
         campaign.addActionListener(this);
+        settings.addActionListener(this);
         nameFieldGlobal.addActionListener(this);
         yesButtonGlobal.addActionListener(this);
         noButtonGlobal.addActionListener(this);
@@ -396,6 +474,8 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
                 showJoinGame(true);
             } else if (source == campaign) {
                 graphwar.getUI().setScreen(Constants.CAMPAIGN_SCREEN);
+            } else if (source == settings) {
+                graphwar.getUI().setScreen(Constants.SETTINGS_SCREEN);
             }
         } catch (NumberFormatException error) {
             status("Port must be a number between 1 and 65535.", true);

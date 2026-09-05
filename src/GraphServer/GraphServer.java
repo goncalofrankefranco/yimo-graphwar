@@ -31,6 +31,11 @@ import java.util.Random;
 
 public class GraphServer implements Runnable
 {
+	public static boolean isValidGameMode(int mode)
+	{
+		return mode == Constants.NORMAL_FUNC || mode == Constants.FST_ODE || mode == Constants.SND_ODE;
+	}
+
 	private int port;
 	private ServerSocket serverSocket;	
 	protected List<ClientConnection> clients;	
@@ -1461,6 +1466,27 @@ public class GraphServer implements Runnable
 						
 						setEveryoneNotReady();
 						sendModeMessage();
+					}
+				}break;
+
+				case NetworkProtocol.SET_MODE:
+				{
+					if(client.isLeader() && gameState == Constants.PRE_GAME && info.length > 1)
+					{
+						try
+						{
+							int requestedMode = Integer.parseInt(info[1]);
+							if(isValidGameMode(requestedMode))
+							{
+								gameMode = requestedMode;
+								setEveryoneNotReady();
+								sendModeMessage();
+							}
+						}
+						catch(NumberFormatException ignored)
+						{
+							// Ignore malformed mode messages from incompatible clients.
+						}
 					}
 				}break;
 

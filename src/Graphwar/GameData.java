@@ -28,6 +28,7 @@ import java.util.ListIterator;
 import java.util.Queue;
 
 import GraphServer.Constants;
+import GraphServer.GraphServer;
 import GraphServer.MapShape;
 import GraphServer.NetworkProtocol;
 
@@ -348,6 +349,18 @@ public class GameData implements Runnable
 	{
 		String message = NetworkProtocol.NEXT_MODE+"";
 		serverConnection.sendMessage(message);
+	}
+
+	public void setMode(int mode)
+	{
+		if(!GraphServer.isValidGameMode(mode))
+		{
+			return;
+		}
+		if(leader && gameState == Constants.PRE_GAME && serverConnection != null)
+		{
+			serverConnection.sendMessage(NetworkProtocol.SET_MODE+"&"+mode);
+		}
 	}
 
 	public boolean isPreviewEnabled()

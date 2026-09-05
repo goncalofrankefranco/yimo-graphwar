@@ -105,12 +105,16 @@ License: GPL-3.0-or-later; see COPYING and NOTICE.md.
 
     $icon = Join-Path $work 'YIMO.ico'
     $iconBuilder = Join-Path $work 'YimoIconBuilder.exe'
+    $officialLogo = Join-Path $installerRoot 'yimo-logo.png'
+    if (-not (Test-Path -LiteralPath $officialLogo -PathType Leaf)) {
+        Fail 'The official YIMO logo asset is missing.'
+    }
     & $csc.FullName /nologo /target:exe /optimize+ /out:$iconBuilder /r:System.Drawing.dll `
         (Join-Path $installerRoot 'YimoIconBuilder.cs')
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $iconBuilder -PathType Leaf)) {
         Fail 'The YIMO icon builder could not be compiled.'
     }
-    & $iconBuilder $icon
+    & $iconBuilder $officialLogo $icon
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $icon -PathType Leaf)) {
         Fail 'The YIMO icon could not be generated.'
     }
@@ -122,6 +126,7 @@ License: GPL-3.0-or-later; see COPYING and NOTICE.md.
         Fail 'The clickable YIMO launcher could not be compiled.'
     }
     Copy-Item -LiteralPath $icon -Destination (Join-Path $payload 'YIMO.ico') -Force
+    Copy-Item -LiteralPath $officialLogo -Destination (Join-Path $payload 'yimo-logo.png') -Force
 
     $portable = Join-Path $output 'YIMO-Graphwar-2.0.0-Portable.zip'
     Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $portable -CompressionLevel Optimal

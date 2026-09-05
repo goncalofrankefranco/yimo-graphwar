@@ -38,3 +38,8 @@ the release audit, especially for any replacement YIMO logo, font, sound, or
 image. No asset is granted a broader license by this file. The build output
 includes the source repository and this notice so the audit trail travels with
 the release.
+
+The Windows launcher uses the official YIMO logo downloaded from
+<https://yimo-official.org/yimo-logo.png>. It is included as a branded asset
+with authorization for the YIMO Graphwar release; it is not relicensed as
+Graphwar source code.

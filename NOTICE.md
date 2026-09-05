@@ -17,7 +17,9 @@ The complete corresponding source for this release is available at:
 <https://github.com/goncalofrankefranco/yimo-graphwar>
 
 YIMO branding and the YIMO name are used only to identify this modified
-release. This notice does not grant trademark rights in any name or logo.
+release. The launcher uses the official YIMO logo asset from
+<https://yimo-official.org/yimo-logo.png> with the project’s authorized YIMO
+branding. This notice does not grant trademark rights in any name or logo.
 
 This project is licensed under the GNU General Public License, version 3 or
 later. See [`COPYING`](COPYING) for the complete license text.

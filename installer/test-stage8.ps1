@@ -17,6 +17,7 @@ Assert-File (Join-Path $PSScriptRoot 'test-stage8-install.ps1') 'Clean-install t
 Assert-File (Join-Path $PSScriptRoot 'launch-yimo.cmd') 'YIMO launcher is required.'
 Assert-File (Join-Path $PSScriptRoot 'YimoLauncher.cs') 'Clickable launcher source is required.'
 Assert-File (Join-Path $PSScriptRoot 'YimoIconBuilder.cs') 'YIMO icon source is required.'
+Assert-File (Join-Path $PSScriptRoot 'yimo-logo.png') 'Official YIMO logo asset is required.'
 Assert-File (Join-Path $PSScriptRoot 'launch-practice-server.cmd') 'Practice-server launcher is required.'
 Assert-File (Join-Path $PSScriptRoot 'launch-practice-client.cmd') 'Practice-client launcher is required.'
 
@@ -33,6 +34,7 @@ $sourceFiles = @(
         (Join-Path $PSScriptRoot 'install.ps1'),
         (Join-Path $PSScriptRoot 'YimoLauncher.cs'),
         (Join-Path $PSScriptRoot 'YimoIconBuilder.cs'),
+        (Join-Path $PSScriptRoot 'yimo-logo.png'),
         (Join-Path $PSScriptRoot 'launch-yimo.cmd'),
         (Join-Path $PSScriptRoot 'launch-practice-server.cmd'),
         (Join-Path $PSScriptRoot 'launch-practice-client.cmd')

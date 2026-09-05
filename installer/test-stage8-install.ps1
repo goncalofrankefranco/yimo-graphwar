@@ -45,6 +45,7 @@ try {
             'YIMO-Graphwar-2.0.0.jar',
             'YIMO-Graphwar.exe',
             'YIMO.ico',
+            'yimo-logo.png',
             '.yimo-installed-version',
             'globalServer.jar',
             'roomServer.jar',

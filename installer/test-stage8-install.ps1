@@ -44,6 +44,7 @@ try {
     foreach ($relative in @(
             'YIMO-Graphwar-2.0.0.jar',
             'YIMO-Graphwar.exe',
+            'YIMO.ico',
             '.yimo-installed-version',
             'globalServer.jar',
             'roomServer.jar',

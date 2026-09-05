@@ -16,6 +16,7 @@ Assert-File (Join-Path $PSScriptRoot 'build-stage8-release.ps1') 'Stage 8 build 
 Assert-File (Join-Path $PSScriptRoot 'test-stage8-install.ps1') 'Clean-install test is required.'
 Assert-File (Join-Path $PSScriptRoot 'launch-yimo.cmd') 'YIMO launcher is required.'
 Assert-File (Join-Path $PSScriptRoot 'YimoLauncher.cs') 'Clickable launcher source is required.'
+Assert-File (Join-Path $PSScriptRoot 'YimoIconBuilder.cs') 'YIMO icon source is required.'
 Assert-File (Join-Path $PSScriptRoot 'launch-practice-server.cmd') 'Practice-server launcher is required.'
 Assert-File (Join-Path $PSScriptRoot 'launch-practice-client.cmd') 'Practice-client launcher is required.'
 
@@ -31,6 +32,7 @@ $sourceFiles = @(
         (Join-Path $PSScriptRoot 'build-stage8-release.ps1'),
         (Join-Path $PSScriptRoot 'install.ps1'),
         (Join-Path $PSScriptRoot 'YimoLauncher.cs'),
+        (Join-Path $PSScriptRoot 'YimoIconBuilder.cs'),
         (Join-Path $PSScriptRoot 'launch-yimo.cmd'),
         (Join-Path $PSScriptRoot 'launch-practice-server.cmd'),
         (Join-Path $PSScriptRoot 'launch-practice-client.cmd')
@@ -43,6 +45,7 @@ foreach ($path in $sourceFiles) {
 $buildScript = Get-Content -Raw (Join-Path $PSScriptRoot 'build-stage8-release.ps1')
 $installScript = Get-Content -Raw (Join-Path $PSScriptRoot 'install.ps1')
 Assert-True ($buildScript -match 'YIMO-Graphwar\.exe') 'Build must package the clickable executable.'
+Assert-True ($buildScript -match 'win32icon') 'Build must embed the YIMO icon in the executable.'
 Assert-True ($installScript -match 'YIMO-Graphwar\.exe') 'Shortcut must target the clickable executable.'
 
 Write-Output 'Stage 8 installer/source smoke checks passed.'

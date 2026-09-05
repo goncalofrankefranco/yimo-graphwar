@@ -19,6 +19,7 @@ $required = @(
     'deploy/cloudzy/setup-yimo-vps.sh',
     'deploy/cloudzy/prepare-snapshot.sh',
     'deploy/cloudzy/cloud-init.yaml'
+    'deploy/cloudzy/cloud-init-recovery.yaml'
 )
 
 foreach ($relative in $required) {
@@ -32,6 +33,7 @@ $snapshot = Get-Content (Join-Path $root 'deploy/cloudzy/prepare-snapshot.sh') -
 $globalService = Get-Content (Join-Path $root 'deploy/cloudzy/yimo-global.service') -Raw
 $tournamentService = Get-Content (Join-Path $root 'deploy/cloudzy/yimo-tournament.service') -Raw
 $setup = Get-Content (Join-Path $root 'deploy/cloudzy/setup-yimo-vps.sh') -Raw
+$recoveryCloudInit = Get-Content (Join-Path $root 'deploy/cloudzy/cloud-init-recovery.yaml') -Raw
 
 Assert-True ($cloudInit -match 'YIMO_REPO_URL') 'Cloud-init must expose the repository URL.'
 Assert-True ($bootstrap -match 'YIMO_JAVA8_URL' -and $bootstrap -match 'setup_24\.x') 'Bootstrap must install Java 8 and Node 24.'
@@ -45,5 +47,8 @@ Assert-True ($bootstrap -match 'YIMO_SWAP_SIZE') 'Bootstrap must provision the d
 Assert-True ($setup -match 'YIMO_REPO_REF' -and $setup -match 'YIMO_RELEASE_URL') 'Recovery setup must pin source and release inputs.'
 Assert-True ($setup -match 'YIMO_RELEASE_SHA256' -and $setup -match 'sha256sum') 'Recovery setup must support release verification.'
 Assert-True ($setup -notmatch '(?i)(YIMO_ADMIN_TOKEN|YIMO_ROOM_HMAC_SECRET)=.{20,}') 'Recovery setup must not contain runtime secrets.'
+Assert-True ($recoveryCloudInit -match 'YIMO_REPO_REF' -and $recoveryCloudInit -match 'setup-yimo-vps.sh') 'Recovery cloud-init must invoke the setup script.'
+Assert-True ($recoveryCloudInit -match 'REPLACE_WITH_ORGANIZER_CIDR') 'Recovery cloud-init must require a restricted SSH CIDR.'
+Assert-True ($recoveryCloudInit -notmatch '(?i)(YIMO_ADMIN_TOKEN|YIMO_ROOM_HMAC_SECRET)=.{20,}') 'Recovery cloud-init must not contain runtime secrets.'
 
 Write-Output 'stage7-deployment-config-check: PASS'

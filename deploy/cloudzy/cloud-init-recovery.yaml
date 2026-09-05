@@ -1,0 +1,34 @@
+#cloud-config
+# Paste this file into Cloudzy Startup Scripts & Templates as Ubuntu user-data.
+# Replace the two safety placeholders before saving the template.
+
+write_files:
+  - path: /root/yimo-recovery.env
+    owner: root:root
+    permissions: '0600'
+    content: |
+      YIMO_REPO_URL=https://github.com/goncalofrankefranco/yimo-graphwar.git
+      YIMO_REPO_REF=REPLACE_WITH_APPROVED_COMMIT
+      YIMO_SSH_CIDR=REPLACE_WITH_ORGANIZER_CIDR
+      YIMO_PUBLIC_IP=
+      YIMO_RELEASE_URL=https://github.com/goncalofrankefranco/yimo-graphwar/releases/download/v2.0.0/YIMO-Graphwar-2.0.0-Portable.zip
+      YIMO_RELEASE_SHA256=087638A79D946C419903749689A8BC9D4DB75C1DB1733A530C57365E4CC93064
+      YIMO_ENABLE_PRACTICE_ROOMS=0
+      YIMO_SWAP_SIZE=512M
+
+runcmd:
+  - |
+      set -Eeuo pipefail
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get install -y --no-install-recommends ca-certificates git
+      . /root/yimo-recovery.env
+      test "$YIMO_REPO_REF" != "REPLACE_WITH_APPROVED_COMMIT"
+      test "$YIMO_SSH_CIDR" != "REPLACE_WITH_ORGANIZER_CIDR"
+      rm -rf /opt/yimo-source
+      git clone --no-checkout "$YIMO_REPO_URL" /opt/yimo-source
+      git -C /opt/yimo-source fetch --depth 1 origin "$YIMO_REPO_REF"
+      git -C /opt/yimo-source checkout --detach FETCH_HEAD
+      export YIMO_REPO_URL YIMO_REPO_REF YIMO_SSH_CIDR YIMO_PUBLIC_IP
+      export YIMO_RELEASE_URL YIMO_RELEASE_SHA256 YIMO_ENABLE_PRACTICE_ROOMS YIMO_SWAP_SIZE
+      bash /opt/yimo-source/deploy/cloudzy/setup-yimo-vps.sh

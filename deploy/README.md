@@ -52,6 +52,10 @@ capacity limits.
   pinned public release, strips Windows-only files, and starts the lobby and
   tournament services. It creates fresh runtime secrets through
   `first-boot.sh`; no secrets are stored in the script.
+- `cloud-init-recovery.yaml` is the paste-ready Cloudzy Startup Scripts &
+  Templates version of that flow. It writes the non-secret inputs, checks out
+  the approved revision, and invokes `setup-yimo-vps.sh` automatically on the
+  first boot.
 - `prepare-snapshot.sh` stops services, removes the database and generated
   secrets, clears the saved IP, and leaves the first-boot unit enabled. A
   provider snapshot restored to a new IP therefore configures itself on its
@@ -101,6 +105,12 @@ command. If `/etc/yimo/bootstrap.env` already exists, the script preserves it;
 edit that file first when restoring to a different IP or changing the firewall
 policy. It leaves practice rooms disabled unless
 `YIMO_ENABLE_PRACTICE_ROOMS=1` is explicitly supplied.
+
+For Cloudzy’s **Startup Scripts & Templates** area, use
+`deploy/cloudzy/cloud-init-recovery.yaml` as the Ubuntu user-data template.
+Replace `REPLACE_WITH_APPROVED_COMMIT` and
+`REPLACE_WITH_ORGANIZER_CIDR` before saving it. Do not paste the local backup,
+the organizer token, or any private key into the template.
 
 ## Build the release on Windows
 

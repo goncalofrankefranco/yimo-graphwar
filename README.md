@@ -184,9 +184,9 @@ local defaults. Supported deployment overrides are explicit flags:
 For local development, the service and Java components can be started with:
 
 ```text
-java -jar globalServer.jar --global-port 23762
-java -jar roomServer.jar --global-host 127.0.0.1 --global-port 23762
-java -jar YIMO-Graphwar-2.0.0.jar --global-host 127.0.0.1 --global-port 23762 --tournament-api http://127.0.0.1:8080
+java -jar build/local/globalServer.jar --global-port 23762
+java -jar build/local/roomServer.jar --global-host 127.0.0.1 --global-port 23762
+java -jar build/local/graphwar.jar --global-host 127.0.0.1 --global-port 23762 --tournament-api http://127.0.0.1:8080
 ```
 
 The tournament service setup and API examples are in

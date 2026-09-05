@@ -54,8 +54,13 @@ function complexity; blacklisting the named tools would be easy to evade.
 
 ## Normal Function 
 
-The Normal Function mode is the most basic mode. In this mode the function shot is simply the function you typed in, so the trajectory of your shot will be same trajectory as the function's graph. 
-However, there is a problem. The function must be shot by your soldier, but there's is no guarantee that the point where your soldier is standing belongs to the function. To solve this the function must be translated until the position of the soldier is part of the function, this is done adding a constant to the function. That means that if a function y = f(x) is typed the actual graph is actually going to be y = f(x)+c. 
+The Normal Function mode is shooter-relative. Graphwar anchors the entered
+curve at the firing soldier, so it evaluates the function at the soldier's
+x-coordinate and applies the necessary offset internally. An additive
+constant therefore cancels out: `2*x`, `2*x+3`, and `2*x-8` draw the same path
+in this mode. Change the slope, curvature, amplitude, or phase to change the
+shot. Constants can affect global graphs and differential-equation modes,
+which use different calculations.
 
 
 ## First Order Differential Equation
@@ -84,9 +89,13 @@ To have a unique solution, a second order differential equation must have two in
 
 ![cam](/../screenshots/ss2Graphwar.png?raw=true)
 
-The translation of the function have some confusing consequences. First, any constant added to your function is irrelevant to the result. For example, the functions y = 2*x + 3, y = 2*x - 8 and y = 2*x yield the exact same graph in the game.
+The shooter-relative anchoring has one important consequence: any constant
+added to a normal function is irrelevant to the result. For example, the
+functions y = 2*x + 3, y = 2*x - 8 and y = 2*x yield the exact same graph in
+the game. This does not apply to fixed-coordinate global graphs or to the
+right-hand side of differential equations.
 
-Other confusing fact is related to the fact that the x axis limits on the game are -25 and +25 and the y axis limits are -15 and 15. That means functions can get very big. For example the function y = x^2 has the value 100 when x equals 10. That means this function will hit the ceiling of the game very fast. If your soldier is positioned a a position where x is -15 this function will be very very steep, it will most likely appear as a straight line up or down. Remember that a huge constant will have to be added to this function, so the result is something very different from what you might be expecting. This problem can be solved by scaling the function appropriately, the function y = (x^2)/50 will produce a nice looking parabola.
+Other confusing fact is related to the fact that the x axis limits on the game are -25 and +25 and the y axis limits are -15 and 15. That means functions can get very big. For example the function y = x^2 has the value 100 when x equals 10. That means this function will hit the ceiling of the game very fast. If your soldier is positioned at a position where x is -15 this function will be very steep and may appear as a straight line up or down. Remember that the shooter-relative curve is anchored at the soldier, so a large nonlinear value can leave the plane quickly. This problem can be solved by scaling the function appropriately; y = (x^2)/50 produces a nicer parabola.
 
 Another thing that may confuse you is that your soldiers will always be standing on negative values for x. Your team is located to the left of the y axis, so that is expected and it means functions like y = sqrt(x) will not like you and will explode immediately. You should try something like y = sqrt(abs(x)). 
 As was just pointed out functions may explode spontaneously. That means it had an invalid value at that point, a square root of a negative number or a function that gets vertical at a point will explode. Another possible reason for a function to explode is that it is too long, a sine with a high frequency may reach the maximum function length allowed and spontaneously explode.

@@ -167,18 +167,18 @@ Expected: `CampaignStep` and the two-step accessors are missing.
 Add these keys to every lesson file:
 
 ```properties
-step.1.function=2*x+1
-step.1.instructions=Use the slope and intercept to reach the marked target.
-step.1.guide=Start with y=mx+b; choose m from the rise and run, then adjust b.
+step.1.function=2*x
+step.1.instructions=Use the slope to reach the marked target.
+step.1.guide=Start with y=m*x; in shooter-relative mode, additive constants cancel.
 step.1.hint=Compare the target's horizontal and vertical distance from the shooter.
 step.1.target.x=610
 step.1.target.y=210
 step.1.target.radius=12
 step.1.shapes=
-step.2.function=2*x+3
+step.2.function=2.2*x
 step.2.instructions=Adapt the same idea to the shifted target.
-step.2.guide=Explain exactly which constant, translation, slope, or initial condition changes.
-step.2.hint=The target moved upward; change the constant term without changing the slope.
+step.2.guide=Explain exactly which slope, phase, curvature, or differential-equation initial condition changes.
+step.2.hint=The target moved upward; change the slope rather than adding a constant.
 step.2.target.x=610
 step.2.target.y=180
 step.2.target.radius=12

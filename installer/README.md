@@ -4,7 +4,13 @@
 the self-extracting `YIMO-Graphwar-2.0.0-Setup.exe`. The installer expands a
 bundled Java 8 runtime and the three game/server JARs into
 `%LOCALAPPDATA%\YIMO Graphwar`, then creates a Start menu shortcut for the
-client.
+native `YIMO-Graphwar.exe` launcher. The launcher starts the bundled
+Java runtime, so users can search for YIMO Graphwar and click it without
+PowerShell or a separate Java installation.
+
+The setup wrapper records the installed build revision. Re-running the same
+installer reuses the existing installation instead of expanding `payload.zip`
+again; use the Start menu shortcut or `YIMO-Graphwar.exe` to launch the game.
 
 Build it from the repository root:
 
@@ -22,7 +28,8 @@ the single-file installer, a release manifest, and SHA-256 checksums under
 out of Git because they contain the selected Java runtime; attach them to the
 GitHub release instead.
 
-The client launcher uses the configured YIMO endpoint. The optional
+The client executable and fallback `launch-yimo.cmd` use the configured YIMO
+endpoint. The optional
 `launch-practice-server.cmd` and `launch-practice-client.cmd` use loopback and
 are useful for offline testing. No organizer tokens, room HMAC secrets,
 participant codes, VPS credentials, or SSH keys are packaged.

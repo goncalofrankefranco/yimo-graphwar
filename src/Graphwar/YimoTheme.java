@@ -51,6 +51,10 @@ public final class YimoTheme {
     public static final Color INPUT = new Color(255, 253, 247);
     public static final Color PLAYER_BLUE = new Color(42, 105, 214);
     public static final Color OPPONENT_RED = new Color(211, 67, 67);
+    public static final Color MENU_INK = new Color(8, 14, 20);
+    public static final Color MENU_PANEL = new Color(19, 27, 33);
+    public static final Color MENU_LINE = new Color(176, 190, 187);
+    public static final Color MENU_WHITE = new Color(248, 246, 239);
 
     public static final Font BRAND = new Font("Serif", Font.BOLD, 22);
     public static final Font DISPLAY = new Font("Serif", Font.PLAIN, 58);
@@ -117,6 +121,13 @@ public final class YimoTheme {
     public static JButton quietButton(String text) {
         return new AnimatedButton(text, CARD, new Color(248, 244, 235),
                 new Color(231, 224, 211), MUTED);
+    }
+
+    public static JButton menuButton(String text, boolean primary) {
+        if (primary) {
+            return new AnimatedButton(text, ORANGE, new Color(255, 190, 112), DARK_ORANGE, MENU_INK);
+        }
+        return new AnimatedButton(text, MENU_PANEL, new Color(39, 52, 58), ORANGE, MENU_WHITE);
     }
 
     public static void styleInput(JComponent component) {

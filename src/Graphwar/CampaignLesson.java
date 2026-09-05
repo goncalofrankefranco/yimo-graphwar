@@ -26,34 +26,19 @@ public final class CampaignLesson {
 
     private final String id;
     private final String title;
-    private final String instructions;
-    private final String guide;
-    private final String hint;
     private final int mode;
     private final int trajectory;
-    private final String function;
     private final String objective;
-    private final int targetX;
-    private final int targetY;
-    private final int targetRadius;
-    private final MapShape[] shapes;
+    private final CampaignStep[] steps;
 
-    private CampaignLesson(String id, String title, String instructions, String guide, String hint,
-            int mode, int trajectory, String function, String objective,
-            int targetX, int targetY, int targetRadius, MapShape[] shapes) {
+    private CampaignLesson(String id, String title, int mode, int trajectory, String objective,
+            CampaignStep[] steps) {
         this.id = id;
         this.title = title;
-        this.instructions = instructions;
-        this.guide = guide;
-        this.hint = hint;
         this.mode = mode;
         this.trajectory = trajectory;
-        this.function = function;
         this.objective = objective;
-        this.targetX = targetX;
-        this.targetY = targetY;
-        this.targetRadius = targetRadius;
-        this.shapes = shapes.clone();
+        this.steps = steps.clone();
     }
 
     public static CampaignLesson[] loadAll(Class<?> resourceOwner) throws IOException {
@@ -80,11 +65,33 @@ public final class CampaignLesson {
 
         String id = required(properties, "id", resource);
         String title = required(properties, "title", resource);
-        String instructions = required(properties, "instructions", resource);
-        String guide = required(properties, "guide", resource);
-        String hint = required(properties, "hint", resource);
-        String function = required(properties, "function", resource);
         String objective = required(properties, "objective", resource);
+        int mode = parseMode(required(properties, "mode", resource), resource);
+        int trajectory = parseTrajectory(required(properties, "trajectory", resource), resource);
+        CampaignStep[] steps = new CampaignStep[2];
+        steps[0] = loadStep(properties, "step.1", 1, resource,
+                required(properties, "instructions", resource), required(properties, "guide", resource),
+                required(properties, "hint", resource), required(properties, "function", resource),
+                integer(properties, "target.x", resource), integer(properties, "target.y", resource),
+                integer(properties, "target.radius", resource), parseShapes(properties.getProperty("shapes", ""), resource));
+        steps[1] = loadStep(properties, "step.2", 2, resource, null, null, null, null, 0, 0, 0, null);
+        return new CampaignLesson(id, title, mode, trajectory, objective, steps);
+    }
+
+    private static CampaignStep loadStep(Properties properties, String prefix, int number, String resource,
+            String fallbackInstructions, String fallbackGuide, String fallbackHint, String fallbackFunction,
+            int fallbackX, int fallbackY, int fallbackRadius, MapShape[] fallbackShapes) throws IOException {
+        String instructions = propertyOrFallback(properties, prefix + ".instructions", fallbackInstructions, resource);
+        String guide = propertyOrFallback(properties, prefix + ".guide", fallbackGuide, resource);
+        String hint = propertyOrFallback(properties, prefix + ".hint", fallbackHint, resource);
+        String function = propertyOrFallback(properties, prefix + ".function", fallbackFunction, resource);
+        int targetX = integerOrFallback(properties, prefix + ".target.x", fallbackX, resource);
+        int targetY = integerOrFallback(properties, prefix + ".target.y", fallbackY, resource);
+        int targetRadius = integerOrFallback(properties, prefix + ".target.radius", fallbackRadius, resource);
+        String shapesValue = properties.getProperty(prefix + ".shapes");
+        MapShape[] shapes = shapesValue == null
+                ? (fallbackShapes == null ? new MapShape[0] : fallbackShapes)
+                : parseShapes(shapesValue, resource);
         if (function.length() > Constants.MAX_FUNCTION_LENGTH) {
             throw new IOException("Campaign function is too long: " + resource);
         }
@@ -93,20 +100,37 @@ public final class CampaignLesson {
         } catch (MalformedFunction error) {
             throw new IOException("Invalid campaign function: " + resource, error);
         }
-
-        int mode = parseMode(required(properties, "mode", resource), resource);
-        int trajectory = parseTrajectory(required(properties, "trajectory", resource), resource);
-        int targetX = integer(properties, "target.x", resource);
-        int targetY = integer(properties, "target.y", resource);
-        int targetRadius = integer(properties, "target.radius", resource);
         if (targetRadius <= 0 || targetX - targetRadius < 0 || targetX + targetRadius >= Constants.PLANE_LENGTH
                 || targetY - targetRadius < 0 || targetY + targetRadius >= Constants.PLANE_HEIGHT) {
             throw new IOException("Campaign target is outside the map: " + resource);
         }
+        return new CampaignStep(number, instructions, guide, hint, function, targetX, targetY, targetRadius, shapes);
+    }
 
-        MapShape[] shapes = parseShapes(properties.getProperty("shapes", ""), resource);
-        return new CampaignLesson(id, title, instructions, guide, hint, mode, trajectory, function,
-                objective, targetX, targetY, targetRadius, shapes);
+    private static String propertyOrFallback(Properties properties, String key, String fallback, String resource)
+            throws IOException {
+        String value = properties.getProperty(key);
+        if (value == null) {
+            if (fallback == null) {
+                throw new IOException("Missing campaign property '" + key + "': " + resource);
+            }
+            return fallback;
+        }
+        if (value.trim().length() == 0) {
+            throw new IOException("Campaign property '" + key + "' is empty: " + resource);
+        }
+        return value.trim();
+    }
+
+    private static int integerOrFallback(Properties properties, String key, int fallback, String resource)
+            throws IOException {
+        if (!properties.containsKey(key)) {
+            if (fallback == 0) {
+                throw new IOException("Missing campaign integer '" + key + "': " + resource);
+            }
+            return fallback;
+        }
+        return integer(properties, key, resource);
     }
 
     private static String required(Properties properties, String key, String resource) throws IOException {
@@ -200,15 +224,15 @@ public final class CampaignLesson {
     }
 
     public String getInstructions() {
-        return instructions;
+        return steps[0].getInstructions();
     }
 
     public String getGuide() {
-        return guide;
+        return steps[0].getGuide();
     }
 
     public String getHint() {
-        return hint;
+        return steps[0].getHint();
     }
 
     public int getMode() {
@@ -220,7 +244,7 @@ public final class CampaignLesson {
     }
 
     public String getFunction() {
-        return function;
+        return steps[0].getFunction();
     }
 
     public String getObjective() {
@@ -228,18 +252,29 @@ public final class CampaignLesson {
     }
 
     public int getTargetX() {
-        return targetX;
+        return steps[0].getTargetX();
     }
 
     public int getTargetY() {
-        return targetY;
+        return steps[0].getTargetY();
     }
 
     public int getTargetRadius() {
-        return targetRadius;
+        return steps[0].getTargetRadius();
     }
 
     public MapShape[] getShapes() {
-        return shapes.clone();
+        return steps[0].getShapes();
+    }
+
+    public int getStepCount() {
+        return steps.length;
+    }
+
+    public CampaignStep getStep(int number) {
+        if (number < 1 || number > steps.length) {
+            throw new IllegalArgumentException("Campaign step must be between 1 and " + steps.length);
+        }
+        return steps[number - 1];
     }
 }

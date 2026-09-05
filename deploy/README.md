@@ -47,6 +47,15 @@ capacity limits.
   tournament secrets only when they are missing.
 - `install-release.sh` installs a locally built release atomically while
   keeping the previous release directory as a rollback copy.
+- `setup-yimo-vps.sh` is the replacement-VPS path: it checks out a pinned
+  repository revision, runs the base bootstrap, downloads and verifies the
+  pinned public release, strips Windows-only files, and starts the lobby and
+  tournament services. It creates fresh runtime secrets through
+  `first-boot.sh`; no secrets are stored in the script.
+- `cloud-init-recovery.yaml` is the paste-ready Cloudzy Startup Scripts &
+  Templates version of that flow. It writes the non-secret inputs, checks out
+  the approved revision, and invokes `setup-yimo-vps.sh` automatically on the
+  first boot.
 - `prepare-snapshot.sh` stops services, removes the database and generated
   secrets, clears the saved IP, and leaves the first-boot unit enabled. A
   provider snapshot restored to a new IP therefore configures itself on its
@@ -75,6 +84,33 @@ Cloudzy API connector enabled in this workspace. Keep the token in that file
 on the organizer computer, never in Git, a release archive, cloud-init,
 source code, or chat. The server’s generated organizer token is kept only in
 `/root/yimo-admin-token.txt` and is removed before a snapshot.
+
+## Rebuild a replacement VPS
+
+If the original VPS is terminated, create a fresh Ubuntu 24.04 VPS with the
+organizer SSH key, copy the setup script to it, and run it as root. Set the
+SSH CIDR before running; do not use a broad range unless the short-lived
+bootstrap is behind another firewall:
+
+```bash
+scp deploy/cloudzy/setup-yimo-vps.sh root@NEW_SERVER_IP:/root/
+ssh root@NEW_SERVER_IP \
+  'YIMO_SSH_CIDR=YOUR_PUBLIC_IP/32 bash /root/setup-yimo-vps.sh'
+```
+
+The script defaults to the published `v2.0.0` release and verifies its
+SHA-256 before installation. To use a later approved build, set
+`YIMO_REPO_REF`, `YIMO_RELEASE_URL`, and `YIMO_RELEASE_SHA256` in the SSH
+command. If `/etc/yimo/bootstrap.env` already exists, the script preserves it;
+edit that file first when restoring to a different IP or changing the firewall
+policy. It leaves practice rooms disabled unless
+`YIMO_ENABLE_PRACTICE_ROOMS=1` is explicitly supplied.
+
+For Cloudzy’s **Startup Scripts & Templates** area, use
+`deploy/cloudzy/cloud-init-recovery.yaml` as the Ubuntu user-data template.
+Replace `REPLACE_WITH_APPROVED_COMMIT` and
+`REPLACE_WITH_ORGANIZER_CIDR` before saving it. Do not paste the local backup,
+the organizer token, or any private key into the template.
 
 ## Build the release on Windows
 

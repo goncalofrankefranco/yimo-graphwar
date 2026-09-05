@@ -109,9 +109,9 @@ public class GameScreen extends YimoScreen implements ActionListener, StartStopP
         boardHeader.setOpaque(false);
         boardHeader.add(YimoTheme.title("Battlefield"), BorderLayout.WEST);
         boardCard.add(boardHeader, BorderLayout.NORTH);
-        JPanel boardSurface = new JPanel(new GridBagLayout());
+        JPanel boardSurface = new JPanel(new BorderLayout());
 		boardSurface.setBackground(YimoTheme.TEXT);
-        boardSurface.add(plane);
+		boardSurface.add(plane, BorderLayout.CENTER);
         boardCard.add(boardSurface, BorderLayout.CENTER);
 
         JPanel controls = YimoTheme.card();

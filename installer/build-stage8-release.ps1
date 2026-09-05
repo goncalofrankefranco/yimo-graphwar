@@ -37,6 +37,7 @@ if (-not [Uri]::TryCreate($TournamentApiBaseUrl, [UriKind]::Absolute, [ref]$apiU
 $output = [IO.Path]::GetFullPath($OutputDir)
 if (Test-Path -LiteralPath $output) { Fail "Output directory already exists: $output. Choose a new directory." }
 New-Item -ItemType Directory -Path $output -Force | Out-Null
+$revision = (& git -C $root rev-parse HEAD 2>$null) -join ''
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('yimo-stage8-' + [Guid]::NewGuid().ToString('N'))
 $stage7 = Join-Path $work 'stage7'
@@ -55,6 +56,10 @@ try {
     Copy-Item -LiteralPath (Join-Path $installerRoot 'launch-yimo.cmd') -Destination $payload -Force
     Copy-Item -LiteralPath (Join-Path $installerRoot 'launch-practice-server.cmd') -Destination $payload -Force
     Copy-Item -LiteralPath (Join-Path $installerRoot 'launch-practice-client.cmd') -Destination $payload -Force
+
+    $csc = Get-ChildItem -Path "$env:WINDIR\Microsoft.NET\Framework*\v4.0.30319\csc.exe" -File |
+        Select-Object -First 1
+    if ($null -eq $csc) { Fail 'The Windows .NET Framework C# compiler was not found.' }
 
     $yimoProperties = @"
 # YIMO Graphwar 2.0.0 default endpoint
@@ -83,7 +88,9 @@ protocol.version=2
     $installedReadme = @"
 YIMO Graphwar 2.0.0
 
-Run launch-yimo.cmd to connect to the configured YIMO endpoint.
+Double-click YIMO-Graphwar.exe to connect to the configured YIMO endpoint.
+The Start menu shortcut launches the same executable.
+Run launch-yimo.cmd only as a command-line fallback.
 Run launch-practice-server.cmd followed by launch-practice-client.cmd for a local practice server.
 
 Installed files: %~dp0
@@ -96,11 +103,32 @@ License: GPL-3.0-or-later; see COPYING and NOTICE.md.
     New-Item -ItemType Directory -Path $runtime -Force | Out-Null
     Copy-Item -Path (Join-Path $RuntimeSource '*') -Destination $runtime -Recurse -Force
 
+    $icon = Join-Path $work 'YIMO.ico'
+    $iconBuilder = Join-Path $work 'YimoIconBuilder.exe'
+    & $csc.FullName /nologo /target:exe /optimize+ /out:$iconBuilder /r:System.Drawing.dll `
+        (Join-Path $installerRoot 'YimoIconBuilder.cs')
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $iconBuilder -PathType Leaf)) {
+        Fail 'The YIMO icon builder could not be compiled.'
+    }
+    & $iconBuilder $icon
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $icon -PathType Leaf)) {
+        Fail 'The YIMO icon could not be generated.'
+    }
+
+    $launcher = Join-Path $payload 'YIMO-Graphwar.exe'
+    & $csc.FullName /nologo /target:winexe /optimize+ /out:$launcher /win32icon:$icon /r:System.Windows.Forms.dll `
+        (Join-Path $installerRoot 'YimoLauncher.cs')
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
+        Fail 'The clickable YIMO launcher could not be compiled.'
+    }
+    Copy-Item -LiteralPath $icon -Destination (Join-Path $payload 'YIMO.ico') -Force
+
     $portable = Join-Path $output 'YIMO-Graphwar-2.0.0-Portable.zip'
     Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $portable -CompressionLevel Optimal
 
     $payloadZip = Join-Path $iexpressSource 'payload.zip'
     Copy-Item -LiteralPath $portable -Destination $payloadZip -Force
+    Set-Content -LiteralPath (Join-Path $iexpressSource 'payload.version') -Value ("YIMO-Graphwar-2.0.0|$revision") -Encoding ASCII
     Copy-Item -LiteralPath (Join-Path $installerRoot 'install.cmd') -Destination $iexpressSource -Force
     Copy-Item -LiteralPath (Join-Path $installerRoot 'install.ps1') -Destination $iexpressSource -Force
 
@@ -143,12 +171,14 @@ UserQuietInstCmd=
 FILE0="install.cmd"
 FILE1="install.ps1"
 FILE2="payload.zip"
+FILE3="payload.version"
 [SourceFiles]
 SourceFiles0=$sourceFilesRoot
 [SourceFiles0]
 %FILE0%=
 %FILE1%=
 %FILE2%=
+%FILE3%=
 "@
     Set-Content -LiteralPath $sed -Value $sedContent -Encoding ASCII
 
@@ -159,7 +189,6 @@ SourceFiles0=$sourceFilesRoot
         Fail "IExpress failed with exit code $($process.ExitCode)."
     }
 
-    $revision = (& git -C $root rev-parse HEAD 2>$null) -join ''
     $manifest = @(
         'YIMO Graphwar 2.0.0 release',
         'Build ID: YIMO-Graphwar-2.0.0',

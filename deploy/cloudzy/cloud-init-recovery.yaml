@@ -21,7 +21,7 @@ runcmd:
       set -Eeuo pipefail
       export DEBIAN_FRONTEND=noninteractive
       apt-get update
-      apt-get install -y --no-install-recommends ca-certificates git
+      apt-get install -y --no-install-recommends ca-certificates curl git unzip
       . /root/yimo-recovery.env
       test "$YIMO_REPO_REF" != "REPLACE_WITH_APPROVED_COMMIT"
       test "$YIMO_SSH_CIDR" != "REPLACE_WITH_ORGANIZER_CIDR"
@@ -31,4 +31,20 @@ runcmd:
       git -C /opt/yimo-source checkout --detach FETCH_HEAD
       export YIMO_REPO_URL YIMO_REPO_REF YIMO_SSH_CIDR YIMO_PUBLIC_IP
       export YIMO_RELEASE_URL YIMO_RELEASE_SHA256 YIMO_ENABLE_PRACTICE_ROOMS YIMO_SWAP_SIZE
-      bash /opt/yimo-source/deploy/cloudzy/setup-yimo-vps.sh
+      if [[ -f /opt/yimo-source/deploy/cloudzy/setup-yimo-vps.sh ]]; then
+        bash /opt/yimo-source/deploy/cloudzy/setup-yimo-vps.sh
+      else
+        # v2.0.0 predates the wrapper, so keep this template usable with the
+        # published source while newer approved revisions use the wrapper.
+        bash /opt/yimo-source/deploy/cloudzy/bootstrap-vps.sh
+        release_archive="$(mktemp /tmp/yimo-release.XXXXXX.zip)"
+        release_stage="$(mktemp -d /tmp/yimo-release.XXXXXX)"
+        trap 'rm -f "$release_archive"; rm -rf "$release_stage"' EXIT
+        curl --fail --silent --show-error --location "$YIMO_RELEASE_URL" --output "$release_archive"
+        echo "$YIMO_RELEASE_SHA256  $release_archive" | sha256sum --check --status -
+        unzip -q "$release_archive" -d "$release_stage"
+        rm -rf "$release_stage/runtime"
+        rm -f "$release_stage/YIMO-Graphwar.exe" "$release_stage/launch-yimo.cmd"
+        rm -f "$release_stage/launch-practice-server.cmd" "$release_stage/launch-practice-client.cmd"
+        bash /opt/yimo-source/deploy/cloudzy/install-release.sh --release-dir "$release_stage"
+      fi

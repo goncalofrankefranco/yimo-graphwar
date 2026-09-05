@@ -14,6 +14,7 @@ import java.util.prefs.Preferences;
 /** Small persistent progress store for the offline campaign. */
 public final class CampaignProgress {
     private static final String COMPLETED_PREFIX = "completed.";
+    private static final String STEP_PREFIX = "completed.step.";
     private final Preferences preferences;
 
     public CampaignProgress() {
@@ -28,7 +29,8 @@ public final class CampaignProgress {
     }
 
     public boolean isComplete(String lessonId) {
-        return lessonId != null && preferences.getBoolean(COMPLETED_PREFIX + lessonId, false);
+        return lessonId != null && (preferences.getBoolean(COMPLETED_PREFIX + lessonId, false)
+                || (isStepComplete(lessonId, 1) && isStepComplete(lessonId, 2)));
     }
 
     public void markComplete(String lessonId) {
@@ -36,6 +38,25 @@ public final class CampaignProgress {
             return;
         }
         preferences.putBoolean(COMPLETED_PREFIX + lessonId, true);
+        preferences.putBoolean(stepKey(lessonId, 1), true);
+        preferences.putBoolean(stepKey(lessonId, 2), true);
+        flush();
+    }
+
+    public boolean isStepComplete(String lessonId, int stepNumber) {
+        return lessonId != null && stepNumber >= 1 && stepNumber <= 2
+                && (preferences.getBoolean(stepKey(lessonId, stepNumber), false)
+                        || (stepNumber == 1 && preferences.getBoolean(COMPLETED_PREFIX + lessonId, false)));
+    }
+
+    public void markStepComplete(String lessonId, int stepNumber) {
+        if (lessonId == null || lessonId.trim().length() == 0 || stepNumber < 1 || stepNumber > 2) {
+            return;
+        }
+        preferences.putBoolean(stepKey(lessonId, stepNumber), true);
+        if (isStepComplete(lessonId, 1) && isStepComplete(lessonId, 2)) {
+            preferences.putBoolean(COMPLETED_PREFIX + lessonId, true);
+        }
         flush();
     }
 
@@ -63,7 +84,7 @@ public final class CampaignProgress {
         try {
             String[] keys = preferences.keys();
             for (String key : keys) {
-                if (key.startsWith(COMPLETED_PREFIX)) {
+                if (key.startsWith(COMPLETED_PREFIX) || key.startsWith(STEP_PREFIX)) {
                     preferences.remove(key);
                 }
             }
@@ -79,5 +100,9 @@ public final class CampaignProgress {
         } catch (BackingStoreException error) {
             throw new IllegalStateException("Could not save campaign progress", error);
         }
+    }
+
+    private String stepKey(String lessonId, int stepNumber) {
+        return STEP_PREFIX + lessonId + "." + stepNumber;
     }
 }

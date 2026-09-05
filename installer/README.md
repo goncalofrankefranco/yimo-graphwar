@@ -8,6 +8,10 @@ native `YIMO-Graphwar.exe` launcher. The launcher starts the bundled
 Java runtime, so users can search for YIMO Graphwar and click it without
 PowerShell or a separate Java installation.
 
+The setup wrapper records the installed build revision. Re-running the same
+installer reuses the existing installation instead of expanding `payload.zip`
+again; use the Start menu shortcut or `YIMO-Graphwar.exe` to launch the game.
+
 Build it from the repository root:
 
 ```powershell

@@ -22,7 +22,7 @@ import GraphServer.MapShape;
 /** Immutable, validated data for one offline campaign lesson. */
 public final class CampaignLesson {
     private static final String RESOURCE_ROOT = "/rsc/campaign/";
-    public static final int COUNT = 10;
+    public static final int COUNT = 20;
 
     private final String id;
     private final String title;

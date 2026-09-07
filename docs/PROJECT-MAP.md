@@ -4,7 +4,7 @@
 
 - `src/` — Java 8 client, room server, global lobby, protocol, rendering, and
   campaign code.
-- `rsc/` — runtime images, sounds, UI resources, and the ten campaign files.
+- `rsc/` — runtime images, sounds, UI resources, and the twenty campaign files.
 - `test/` — runnable assertion-based Java regression checks.
 - `tournament/` — Node.js 24 tournament control service and tests.
 
@@ -18,6 +18,7 @@
   runbook.
 - `docs/STAGES-5-6.md` — tournament service and signed-room design.
 - `docs/STAGE-8-RELEASE.md` — reproducible Windows release process.
+- `docs/CAMPAIGN.md` — offline lesson curriculum and normal-function coverage.
 - `docs/superpowers/` — approved implementation specs and plans.
 - `docs/archive/superseded/` — historical plans replaced by the current
   resizable-window and YIMO redesign approach.

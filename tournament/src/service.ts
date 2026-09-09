@@ -8,7 +8,7 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { applyTournamentMigrations } from './migrations.ts';
-import { assertTransition } from './lifecycle.ts';
+import { assertTransition, canStart, dueTransition } from './lifecycle.ts';
 
 export interface ServiceOptions {
   dbPath?: string;
@@ -564,6 +564,9 @@ export class TournamentService {
   registerParticipant(sessionToken: string, tournamentId: string): Record<string, unknown> {
     const participant = this.participantForSession(sessionToken);
     const tournament = this.tournamentRow(tournamentId);
+    if (tournament.roster_frozen_at !== null) {
+      throw new ServiceError(409, 'ROSTER_FROZEN', 'Tournament registration is frozen.');
+    }
     if (tournament.status !== 'REGISTRATION_OPEN') {
       throw new ServiceError(409, tournament.status === 'DRAFT' ? 'REGISTRATION_NOT_OPEN' : 'REGISTRATION_CLOSED',
         'Registration is not open.');
@@ -634,7 +637,8 @@ export class TournamentService {
     for (const row of countsRows) {
       const count = Number(row.count);
       counts.total += count;
-      if (row.entry_status === 'REGISTERED' || row.entry_status === 'CHECKED_IN') counts.registered += count;
+      if (row.entry_status === 'REGISTERED' || row.entry_status === 'CHECKED_IN'
+        || row.entry_status === 'ELIGIBLE') counts.registered += count;
       if (row.entry_status === 'CHECKED_IN') counts.checkedIn += count;
       if (row.entry_status === 'ELIGIBLE') counts.eligible += count;
     }
@@ -788,30 +792,10 @@ export class TournamentService {
     };
   }
 
-  seedBracket(adminToken: string | undefined, input: SeedInput): { tournamentId: string; matches: Record<string, unknown>[] } {
-    this.requireAdmin(adminToken);
-    const tournamentId = validateIdentifier(input?.tournamentId, 'tournamentId');
-    const participantIds = input?.participantIds;
-    if (!Array.isArray(participantIds) || participantIds.length < 2 || participantIds.length > 5000) {
-      throw new ServiceError(400, 'INVALID_INPUT', 'Two to 5000 participant IDs are required.');
-    }
-    const ids = participantIds.map((id) => validateIdentifier(id, 'participantId'));
-    if (new Set(ids).size !== ids.length) throw new ServiceError(400, 'DUPLICATE_PARTICIPANT', 'Participant IDs must be unique.');
-    const tournament = this.db.prepare('SELECT * FROM tournaments WHERE tournament_id = ?').get(tournamentId) as any;
-    if (!tournament) throw new ServiceError(404, 'TOURNAMENT_NOT_FOUND', 'Tournament not found.');
-    if (tournament.status !== 'CREATED' && tournament.status !== 'DRAFT') {
-      throw new ServiceError(409, 'BRACKET_EXISTS', 'Tournament bracket already seeded.');
-    }
-    for (const id of ids) {
-      if (!this.db.prepare("SELECT 1 FROM participants WHERE participant_id = ? AND status = 'ACTIVE'").get(id)) {
-        throw new ServiceError(400, 'INVALID_PARTICIPANT', `Participant ${id} is not active.`);
-      }
-    }
-
+  private bracketNodes(tournamentId: string, ids: string[]): any[][] {
     const size = nextPowerOfTwo(ids.length);
     const rounds = Math.log2(size);
-    const nodes: any[][] = [];
-    nodes[0] = [];
+    const nodes: any[][] = [[]];
     for (let position = 0; position < size / 2; position += 1) {
       nodes[0].push(this.buildMatchNode(tournamentId, 1, position, ids[position * 2] ?? null,
         ids[position * 2 + 1] ?? null, position * 2 < ids.length, position * 2 + 1 < ids.length));
@@ -826,32 +810,187 @@ export class TournamentService {
           left.winner, right.winner, left.possibleA || left.possibleB, right.possibleA || right.possibleB));
       }
     }
+    return nodes;
+  }
 
-    this.transaction(() => {
-      const insertMatch = this.db.prepare(`
-        INSERT INTO matches(match_id, tournament_id, round, position, player_a_id, player_b_id,
-          possible_a, possible_b, winner_id, loser_id, status, match_code_hash,
-          match_code_expires_at, room_slot, result_reason, server_nonce, result_signature, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?)
+  private insertBracket(tournament: any, ids: string[]): Record<string, unknown>[] {
+    const nodes = this.bracketNodes(tournament.tournament_id, ids);
+    const insertMatch = this.db.prepare(`
+      INSERT INTO matches(match_id, tournament_id, round, position, player_a_id, player_b_id,
+        possible_a, possible_b, winner_id, loser_id, status, match_code_hash,
+        match_code_expires_at, room_slot, result_reason, server_nonce, result_signature, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?)
+    `);
+    const insertPlayer = this.db.prepare(
+      'INSERT OR IGNORE INTO match_players(match_id, participant_id, seed, side) VALUES (?, ?, ?, ?)',
+    );
+    for (const round of nodes) {
+      for (const match of round) {
+        const now = this.timestamp();
+        const expires = match.status === 'OPEN' ? now + Number(tournament.match_timeout_seconds) : null;
+        insertMatch.run(match.matchId, tournament.tournament_id, match.round, match.position,
+          match.playerA, match.playerB, match.possibleA ? 1 : 0, match.possibleB ? 1 : 0,
+          match.winner, match.status, match.matchCodeHash, expires, now, now);
+        if (match.playerA) insertPlayer.run(match.matchId, match.playerA, ids.indexOf(match.playerA) + 1, 'A');
+        if (match.playerB) insertPlayer.run(match.matchId, match.playerB, ids.indexOf(match.playerB) + 1, 'B');
+      }
+    }
+    return nodes.flat().map((match) => this.publicMatch(match));
+  }
+
+  seedBracket(adminToken: string | undefined, input: SeedInput): { tournamentId: string; matches: Record<string, unknown>[] } {
+    this.requireAdmin(adminToken);
+    const tournamentId = validateIdentifier(input?.tournamentId, 'tournamentId');
+    const participantIds = input?.participantIds;
+    if (!Array.isArray(participantIds) || participantIds.length < 2 || participantIds.length > 5000) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'Two to 5000 participant IDs are required.');
+    }
+    const ids = participantIds.map((id) => validateIdentifier(id, 'participantId'));
+    if (new Set(ids).size !== ids.length) throw new ServiceError(400, 'DUPLICATE_PARTICIPANT', 'Participant IDs must be unique.');
+    const tournament = this.tournamentRow(tournamentId);
+    if (!tournament) throw new ServiceError(404, 'TOURNAMENT_NOT_FOUND', 'Tournament not found.');
+    if (tournament.status !== 'CREATED' && tournament.status !== 'DRAFT') {
+      throw new ServiceError(409, 'BRACKET_EXISTS', 'Tournament bracket already seeded.');
+    }
+    for (const id of ids) {
+      if (!this.db.prepare("SELECT 1 FROM participants WHERE participant_id = ? AND status = 'ACTIVE'").get(id)) {
+        throw new ServiceError(400, 'INVALID_PARTICIPANT', `Participant ${id} is not active.`);
+      }
+    }
+
+    const size = nextPowerOfTwo(ids.length);
+    const matches = this.transaction(() => {
+      const current = this.tournamentRow(tournamentId);
+      if (current.status !== 'CREATED' && current.status !== 'DRAFT') {
+        throw new ServiceError(409, 'BRACKET_EXISTS', 'Tournament bracket already seeded.');
+      }
+      const inserted = this.insertBracket(current, ids);
+      const now = this.timestamp();
+      this.db.prepare("UPDATE tournaments SET status = 'SEEDED', updated_at = ? WHERE tournament_id = ?")
+        .run(now, tournamentId);
+      this.audit('BRACKET_SEEDED', tournamentId, { participantCount: ids.length, bracketSize: size });
+      return inserted;
+    });
+    return { tournamentId, matches };
+  }
+
+  private startTournamentInternal(tournamentId: string, startedBy: 'admin' | 'scheduler'):
+    { status: 'RUNNING' | 'START_BLOCKED' } {
+    const id = validateIdentifier(tournamentId, 'tournamentId');
+    return this.transaction(() => {
+      const tournament = this.tournamentRow(id);
+      if (tournament.status === 'RUNNING' || tournament.status === 'COMPLETED') {
+        return { status: tournament.status as 'RUNNING' };
+      }
+      if (!canStart(tournament.status)) {
+        throw new ServiceError(409, 'TOURNAMENT_NOT_READY', 'Tournament is not ready to start.');
+      }
+      const eligibleStatus = Number(tournament.require_check_in) === 1
+        ? "entry_status = 'CHECKED_IN'"
+        : "entry_status IN ('REGISTERED', 'CHECKED_IN')";
+      const entries = this.db.prepare(`
+        SELECT * FROM tournament_entries WHERE tournament_id = ? AND ${eligibleStatus}
+        ORDER BY registered_at, participant_id
+      `).all(id) as any[];
+      if (entries.length < 2) {
+        if (tournament.status !== 'START_BLOCKED') {
+          const now = this.timestamp();
+          assertTransition(tournament.status, 'START_BLOCKED');
+          this.db.prepare('UPDATE tournaments SET status = ?, updated_at = ? WHERE tournament_id = ?')
+            .run('START_BLOCKED', now, id);
+          this.audit('TOURNAMENT_START_BLOCKED', id, { eligibleCount: entries.length });
+        }
+        return { status: 'START_BLOCKED' };
+      }
+      if (this.db.prepare('SELECT 1 FROM matches WHERE tournament_id = ? LIMIT 1').get(id)) {
+        throw new ServiceError(409, 'BRACKET_EXISTS', 'Tournament bracket already seeded.');
+      }
+      const ids = entries.map((entry) => String(entry.participant_id));
+      const inserted = this.insertBracket(tournament, ids);
+      const now = this.timestamp();
+      const updateEntry = this.db.prepare(`
+        UPDATE tournament_entries SET entry_status = 'ELIGIBLE', seed = ?
+        WHERE tournament_id = ? AND participant_id = ?
       `);
-      const insertPlayer = this.db.prepare(
-        'INSERT OR IGNORE INTO match_players(match_id, participant_id, seed, side) VALUES (?, ?, ?, ?)',
-      );
-      for (const round of nodes) {
-        for (const match of round) {
-          const expires = match.status === 'OPEN' ? this.timestamp() + Number(tournament.match_timeout_seconds) : null;
-          insertMatch.run(match.matchId, tournamentId, match.round, match.position, match.playerA, match.playerB,
-            match.possibleA ? 1 : 0, match.possibleB ? 1 : 0, match.winner, match.status,
-            match.matchCodeHash, expires, this.timestamp(), this.timestamp());
-          if (match.playerA) insertPlayer.run(match.matchId, match.playerA, ids.indexOf(match.playerA) + 1, 'A');
-          if (match.playerB) insertPlayer.run(match.matchId, match.playerB, ids.indexOf(match.playerB) + 1, 'B');
+      entries.forEach((entry, index) => updateEntry.run(index + 1, id, entry.participant_id));
+      this.db.prepare(`
+        UPDATE tournaments SET status = 'RUNNING', started_at = ?, started_by = ?,
+          roster_frozen_at = ?, updated_at = ? WHERE tournament_id = ?
+      `).run(now, startedBy, now, now, id);
+      this.audit('TOURNAMENT_STARTED', id, {
+        participantCount: entries.length, bracketMatchCount: inserted.length, startedBy,
+      });
+      return { status: 'RUNNING' };
+    });
+  }
+
+  startTournament(adminToken: string | undefined, tournamentId: string): Record<string, unknown> {
+    this.requireAdmin(adminToken);
+    const id = validateIdentifier(tournamentId, 'tournamentId');
+    this.startTournamentInternal(id, 'admin');
+    return this.adminTournament(adminToken, id);
+  }
+
+  processScheduledEvents(): number {
+    let changes = 0;
+    const blockedThisRun = new Set<string>();
+    let progress = true;
+    while (progress) {
+      progress = false;
+      const now = this.timestamp();
+      const rows = this.db.prepare(`
+        SELECT * FROM tournaments
+        WHERE status IN ('DRAFT', 'REGISTRATION_OPEN', 'CHECK_IN', 'READY', 'START_BLOCKED')
+        ORDER BY tournament_id
+      `).all() as any[];
+      for (const row of rows) {
+        const id = String(row.tournament_id);
+        if (blockedThisRun.has(id)) continue;
+        const target = dueTransition({
+          status: row.status,
+          requireCheckIn: Number(row.require_check_in) === 1,
+          autoStart: Number(row.auto_start) === 1,
+          registrationOpenAt: row.registration_open_at === null ? null : Number(row.registration_open_at),
+          registrationCloseAt: row.registration_close_at === null ? null : Number(row.registration_close_at),
+          checkInOpenAt: row.check_in_open_at === null ? null : Number(row.check_in_open_at),
+          checkInCloseAt: row.check_in_close_at === null ? null : Number(row.check_in_close_at),
+          startAt: row.start_at === null ? null : Number(row.start_at),
+        }, now);
+        if (!target) continue;
+        if (target === 'RUNNING') {
+          const result = this.startTournamentInternal(id, 'scheduler');
+          changes += 1;
+          if (result.status === 'START_BLOCKED') blockedThisRun.add(id);
+          else progress = true;
+          continue;
+        }
+        const changed = this.transaction(() => {
+          const current = this.tournamentRow(id);
+          const currentTarget = dueTransition({
+            status: current.status,
+            requireCheckIn: Number(current.require_check_in) === 1,
+            autoStart: Number(current.auto_start) === 1,
+            registrationOpenAt: current.registration_open_at === null ? null : Number(current.registration_open_at),
+            registrationCloseAt: current.registration_close_at === null ? null : Number(current.registration_close_at),
+            checkInOpenAt: current.check_in_open_at === null ? null : Number(current.check_in_open_at),
+            checkInCloseAt: current.check_in_close_at === null ? null : Number(current.check_in_close_at),
+            startAt: current.start_at === null ? null : Number(current.start_at),
+          }, this.timestamp());
+          if (currentTarget !== target) return false;
+          assertTransition(current.status, target);
+          const changedAt = this.timestamp();
+          this.db.prepare('UPDATE tournaments SET status = ?, updated_at = ? WHERE tournament_id = ?')
+            .run(target, changedAt, id);
+          this.audit(`TOURNAMENT_${target}`, id, { from: current.status, to: target, source: 'scheduler' });
+          return true;
+        });
+        if (changed) {
+          changes += 1;
+          progress = true;
         }
       }
-      this.db.prepare("UPDATE tournaments SET status = 'SEEDED', updated_at = ? WHERE tournament_id = ?")
-        .run(this.timestamp(), tournamentId);
-      this.audit('BRACKET_SEEDED', tournamentId, { participantCount: ids.length, bracketSize: size });
-    });
-    return { tournamentId, matches: nodes.flat().map((match) => this.publicMatch(match)) };
+    }
+    return changes;
   }
 
   createParticipantSession(input: SessionInput, clientKey = 'local'): { sessionToken: string; participantId: string; expiresAt: number } {

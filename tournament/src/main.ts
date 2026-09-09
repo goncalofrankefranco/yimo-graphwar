@@ -20,7 +20,24 @@ if (!adminToken || !roomSecret) {
   });
   const port = Number(process.env.PORT ?? 8080);
   const host = process.env.HOST ?? '127.0.0.1';
-  createTournamentHttpServer(service).listen(port, host, () => {
+  const server = createTournamentHttpServer(service);
+  const stop = () => {
+    clearInterval(scheduler);
+    server.close();
+    service.close();
+  };
+  const scheduler = setInterval(() => {
+    try {
+      const changes = service.processScheduledEvents();
+      if (changes > 0) console.log(`Tournament scheduler applied ${changes} change(s).`);
+    } catch (error) {
+      console.error('Tournament scheduler failed.', error);
+    }
+  }, 5000);
+  scheduler.unref();
+  process.once('SIGINT', stop);
+  process.once('SIGTERM', stop);
+  server.listen(port, host, () => {
     console.log(`YIMO tournament service listening on http://${host}:${port}`);
   });
 }

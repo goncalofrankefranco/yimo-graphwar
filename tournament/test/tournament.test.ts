@@ -271,3 +271,54 @@ test('rejects malformed tournament schedule values', () => {
   }), (error: any) => error?.code === 'INVALID_INPUT');
   app.close();
 });
+
+test('starts a ready tournament once, freezes its roster, and blocks late entries', () => {
+  const app = service();
+  addParticipants(app, 4);
+  app.createTournament('admin-test-token', {
+    tournamentId: 'manual-start-test', name: 'Manual Start Test',
+    buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+  });
+  app.openRegistration('admin-test-token', 'manual-start-test');
+  for (let index = 1; index <= 4; index += 1) {
+    const session = app.createParticipantSession({
+      participantCode: `PARTICIPANT-${index}`, buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+    });
+    app.registerParticipant(session.sessionToken, 'manual-start-test');
+  }
+  app.closeRegistration('admin-test-token', 'manual-start-test');
+  const started: any = app.startTournament('admin-test-token', 'manual-start-test');
+  assert.equal(started.status, 'RUNNING');
+  assert.equal(started.schedule.rosterFrozenAt, clock);
+  assert.equal(started.bracket.matches.length, 3);
+  const repeated: any = app.startTournament('admin-test-token', 'manual-start-test');
+  assert.equal(repeated.status, 'RUNNING');
+  assert.equal(repeated.bracket.matches.length, 3);
+  const lateSession = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+  });
+  throwsCode(() => app.registerParticipant(lateSession.sessionToken, 'manual-start-test'), 'ROSTER_FROZEN');
+  app.close();
+});
+
+test('blocks a manual start with fewer than two eligible entries', () => {
+  const app = service();
+  addParticipants(app, 1);
+  app.createTournament('admin-test-token', {
+    tournamentId: 'blocked-start-test', name: 'Blocked Start Test',
+    buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+  });
+  app.openRegistration('admin-test-token', 'blocked-start-test');
+  const session = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+  });
+  app.registerParticipant(session.sessionToken, 'blocked-start-test');
+  app.closeRegistration('admin-test-token', 'blocked-start-test');
+  const first: any = app.startTournament('admin-test-token', 'blocked-start-test');
+  const second: any = app.startTournament('admin-test-token', 'blocked-start-test');
+  assert.equal(first.status, 'START_BLOCKED');
+  assert.equal(second.status, 'START_BLOCKED');
+  assert.equal(first.bracket.matches.length, 0);
+  assert.equal(second.bracket.matches.length, 0);
+  app.close();
+});

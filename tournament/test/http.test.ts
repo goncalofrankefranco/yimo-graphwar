@@ -100,3 +100,66 @@ test('serves health, admin, participant, match, room, and result routes', async 
     app.close();
   }
 });
+
+test('serves authenticated admin lifecycle controls and status projections', async () => {
+  const app = new TournamentService({
+    dbPath: ':memory:',
+    adminToken: 'admin-test-token',
+    roomSecret: 'room-test-secret',
+    buildId: 'YIMO-Graphwar-2.0.0',
+    protocolVersion: 2,
+    now: () => 1_700_000_000,
+    participantScryptCost: 256,
+    rateLimitMax: 1000,
+  });
+  const server = createTournamentHttpServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address: any = server.address();
+  const base = `http://127.0.0.1:${address.port}`;
+  const request = async (path: string, init: any = {}) => {
+    const response = await fetch(`${base}${path}`, {
+      ...init,
+      headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+    });
+    const contentType = response.headers.get('content-type') ?? '';
+    const body = contentType.includes('json') ? await response.json() : await response.text();
+    return { response, body };
+  };
+  const post = (path: string, body: unknown, headers: Record<string, string> = {}) => request(path, {
+    method: 'POST', headers, body: JSON.stringify(body),
+  });
+  const adminHeaders = { Authorization: 'Bearer admin-test-token' };
+
+  try {
+    const page = await request('/admin');
+    assert.equal(page.response.status, 200);
+    assert.match(page.body as string, /Start tournament/);
+    assert.match(page.body as string, /Open registration/);
+    assert.match(page.body as string, /registrationOpenAt/);
+
+    const created = await post('/api/v1/admin/tournaments', {
+      tournamentId: 'admin-lifecycle', name: 'Admin Lifecycle',
+      buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+    }, adminHeaders);
+    assert.equal(created.response.status, 201);
+    const unauthorized = await request('/api/v1/admin/tournaments/admin-lifecycle', {
+      headers: { Authorization: 'Bearer wrong-token' },
+    });
+    assert.equal(unauthorized.response.status, 401);
+    const opened = await post('/api/v1/admin/tournaments/admin-lifecycle/registration/open', {}, adminHeaders);
+    assert.equal(opened.response.status, 200);
+    assert.equal((opened.body as any).status, 'REGISTRATION_OPEN');
+    const closed = await post('/api/v1/admin/tournaments/admin-lifecycle/registration/close', {}, adminHeaders);
+    assert.equal(closed.response.status, 200);
+    assert.equal((closed.body as any).status, 'READY');
+    const started = await post('/api/v1/admin/tournaments/admin-lifecycle/start', {}, adminHeaders);
+    assert.equal(started.response.status, 200);
+    assert.equal((started.body as any).status, 'START_BLOCKED');
+    const details = await request('/api/v1/admin/tournaments/admin-lifecycle', { headers: adminHeaders });
+    assert.equal(details.response.status, 200);
+    assert.equal((details.body as any).counts.total, 0);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    app.close();
+  }
+});

@@ -28,9 +28,10 @@ the lobby host, lobby port, and tournament API per Windows user; command-line
 flags remain available for deployment and testing.
 
 The package also includes the responsive battlefield viewport, explicit
-room-mode selection, two-step guided/adaptation campaign lessons, and the
-YIMO Olympiad main-menu redesign. These changes preserve Java 8 compatibility
-and the existing logical game coordinates.
+room-mode selection, two-step guided/adaptation campaign lessons, the
+YIMO Olympiad main-menu redesign, and the Java lobby link to the competitor
+portal. These changes preserve Java 8 compatibility and the existing logical
+game coordinates.
 
 The default IP is a deployment input. Change `-GlobalHost` and
 `-TournamentApiBaseUrl` for a restored snapshot with a different public IP;
@@ -52,12 +53,42 @@ Before publishing a new binary:
 2. Run the Java regression suite, tournament tests, deployment checks, and
    Stage 8 installer smoke check.
 3. Install on a clean Windows account and verify the offline campaign, YIMO
-   endpoint configuration, and practice launchers.
+   endpoint configuration, competitor-portal link, and practice launchers.
 4. Send an old-build handshake to a YIMO room and verify `VERSION_MISMATCH`.
-5. Inspect the bundled runtime's legal files and review every `rsc/` asset.
-6. Verify `SHA256SUMS.txt`, the Git tag, and the GitHub release assets.
-7. Confirm no secret-like values are present in the source tree or artifacts.
+5. Run the local scheduled tournament demo and the VPS disposable tournament
+   check before publishing the online endpoint.
+6. Inspect the bundled runtime's legal files and review every `rsc/` asset.
+7. Verify `SHA256SUMS.txt`, the Git tag, and the GitHub release assets.
+8. Confirm no secret-like values are present in the source tree or artifacts.
 
 The source release keeps `COPYING`, `NOTICE.md`, and
 `THIRD-PARTY-LICENSES.md` next to the build scripts. This project remains
 GPL-3.0-or-later; see the root `COPYING` file for redistribution obligations.
+
+## Staging evidence
+
+The disposable Stage 8 check was run on the replacement 1 GB VPS at
+`172.86.81.18` from source revision `3fea3ab`. It created four temporary
+participants, exercised scheduled registration/start, assigned a room,
+submitted one signed result, and verified public-bracket advancement. The
+pre-test SQLite backup was restored afterward; the service returned healthy
+on `/healthz` and all four YIMO services remained active. This is a wiring
+check, not a 100-player capacity result.
+
+When uploading deployment scripts directly from a Windows checkout, normalize
+shell line endings before executing them on Linux:
+
+```bash
+find /root/yimo-source/deploy/cloudzy -type f \
+  \( -name '*.sh' -o -name '*.service' \) -exec sed -i 's/\r$//' {} +
+```
+
+## Tournament release boundary
+
+The Windows client does not start the Node tournament service and does not
+contain organizer credentials, participant codes, room HMAC secrets, database
+files, or VPS keys. The server release includes `tournament/src`, its tests,
+the migration, and the same-origin `/admin` and `/participant` pages. Deploy
+that service separately behind the configured HTTP(S) endpoint. A public
+bracket is read-only; assigned room tokens are issued only after an
+authenticated competitor request.

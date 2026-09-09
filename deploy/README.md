@@ -178,6 +178,19 @@ Do not paste that token into GitHub or commit it. Because this staging setup
 uses an IP and HTTP, do not use real participant credentials or expose the
 admin page publicly. Add a domain and HTTPS before the event.
 
+### Scheduled-tournament staging check
+
+Run `staging-tournament-smoke.mjs` only after saving the existing SQLite
+database. It reads the organizer token from `/root/yimo-admin-token.txt` on
+the VPS and prints pass/fail labels only. The disposable flow creates four
+temporary participants, creates a short `autoStart` tournament, opens
+registration, registers the participants, waits for scheduled close/start,
+joins one assigned match, submits one signed result, and checks public-bracket
+advancement. Remove the helper after the run and restore the pre-test database.
+
+This check proves lifecycle and wiring, not final capacity. It must not use
+real participant credentials.
+
 ## Capture and restore the golden snapshot
 
 After the health check and a local smoke match pass:
@@ -202,6 +215,29 @@ first-boot unit detects the new IP, regenerates the tournament environment,
 and starts the installed services. The provider’s cloud-init behavior can
 vary for cloned snapshots; the systemd first-boot unit is the reliable
 restore hook.
+
+## Database migration and rollback
+
+The tournament service applies its idempotent SQLite migration before serving
+requests. Back up the database before installing a release that changes the
+schema:
+
+```bash
+stamp=$(date +%Y%m%d%H%M%S)
+systemctl stop yimo-tournament.service
+install -o root -g root -m 600 /var/lib/yimo/tournament.sqlite \
+  "/root/tournament.sqlite.before-$stamp"
+sha256sum "/root/tournament.sqlite.before-$stamp"
+systemctl start yimo-tournament.service
+```
+
+If migration or staging fails, stop only the tournament service, restore the
+verified backup, remove any `tournament.sqlite-wal` and
+`tournament.sqlite-shm` files left by the failed run, restart the service,
+and re-run `/healthz`. The release installer keeps the previous release in a
+timestamped `current.previous.*` directory; restore that symlink when the
+application code also needs to roll back. Use the actual printed timestamp,
+never the literal `STAMP` placeholder.
 
 ## Smoke-game mode on the 1 GB VM
 

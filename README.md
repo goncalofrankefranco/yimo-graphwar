@@ -22,6 +22,8 @@ The client scales the battlefield to the available resizable window while
 preserving its logical game coordinates. Room hosts select Normal functions,
 First-order ODE, or Second-order ODE directly. The offline campaign has two
 steps per lesson: a guided model shot followed by an adapted target challenge.
+While typing in a lesson, a dashed orange aim preview uses the same trajectory
+engine as the eventual shot; previewing does not change progress.
 
 Graphwar is an artillery game in which you must hit your enemies using mathematical functions. The trajectory of your shot is determined by the function you wrote, and your goal is to avoid the obstacles and your teammates and hit your enemies. The game takes place in a Cartesian Plane.
 
@@ -193,3 +195,14 @@ The tournament service setup and API examples are in
 [`tournament/README.md`](tournament/README.md). Do not use a positional server
 address; the YIMO client intentionally does not expose the official Graphwar
 server selector.
+
+For a disposable local bracket demonstration:
+
+```powershell
+Push-Location tournament
+npm run demo
+Pop-Location
+```
+
+Open the printed participant URL to see the seeded rounds, byes, and match
+states. The demo uses in-memory data and is not a production tournament.

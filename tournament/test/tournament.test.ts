@@ -60,6 +60,20 @@ test('seeds a non-power-of-two bracket with automatic byes', () => {
   app.close();
 });
 
+test('returns a public bracket without exposing match codes', () => {
+  const app = service();
+  tournament(app, 5);
+  const bracket: any = app.publicBracket('tournament-1');
+  assert.equal(bracket.tournamentId, 'tournament-1');
+  assert.equal(bracket.name, 'YIMO Test Cup');
+  assert.equal(bracket.matches.length, 7);
+  assert.equal(bracket.matches[0].playerA, 'Player 1');
+  assert.equal(bracket.matches[0].playerB, 'Player 2');
+  assert.ok(bracket.matches.some((match: any) => match.status === 'BYE'));
+  assert.ok(bracket.matches.every((match: any) => !('matchCode' in match)));
+  app.close();
+});
+
 test('rejects wrong-build and wrong-participant joins and assigns a signed room', () => {
   const app = service();
   const bracket = tournament(app, 3);

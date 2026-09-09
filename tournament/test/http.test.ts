@@ -63,6 +63,12 @@ test('serves health, admin, participant, match, room, and result routes', async 
     const openMatch: any = (seeded.body as any).matches.find((match: any) => match.status === 'OPEN');
     assert.ok(openMatch?.matchCode);
 
+    const bracket = await request('/api/v1/tournaments/http-test/bracket');
+    assert.equal(bracket.response.status, 200);
+    assert.equal((bracket.body as any).matches[0].playerA, 'Player 1');
+    assert.equal((bracket.body as any).matches[0].playerB, 'Player 2');
+    assert.ok(!(Object.prototype.hasOwnProperty.call((bracket.body as any).matches[0], 'matchCode')));
+
     const session = await post('/api/v1/participant-sessions', {
       participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
     });

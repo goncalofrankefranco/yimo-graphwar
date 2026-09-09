@@ -13,6 +13,9 @@ authoritative Java room server.
 - `npm test` runs the service and HTTP smoke tests.
 - `npm start` starts the HTTP service. The required environment variables are
   listed below.
+- `npm run demo` starts an isolated in-memory bracket with eight sample
+  participants for local testing. It never opens a database or uses production
+  secrets.
 
 Node's SQLite API is marked experimental in Node 24, so the expected warning
 may appear during tests and startup. The test suite must still finish with all
@@ -58,6 +61,7 @@ Organizer routes require `Authorization: Bearer <YIMO_ADMIN_TOKEN>`.
 | `GET /healthz` | none | Build and protocol health check |
 | `GET /admin` | none | Small operator landing page |
 | `GET /participant` | none | Small participant landing page |
+| `GET /api/v1/tournaments/{id}/bracket` | none | Public bracket data without match codes |
 | `POST /api/v1/admin/participants` | admin | Add an organizer-issued participant code |
 | `POST /api/v1/admin/tournaments` | admin | Create a tournament and its room slots |
 | `POST /api/v1/admin/bracket/seed` | admin | Seed the single-elimination bracket |
@@ -79,6 +83,25 @@ The core request sequence is:
 5. The Java room server validates that token before exposing any room state.
 6. The room sends heartbeats and submits exactly one result. An identical
    retry is idempotent; a conflicting retry is rejected.
+
+## Local bracket demo
+
+From this directory, run:
+
+```powershell
+npm run demo
+```
+
+Open the printed `/participant?tournament=yimo-demo-2026` URL. The page loads
+the public bracket and groups matches into round columns. The demo prints its
+disposable admin token, room secret, participant codes, and open match codes
+to the terminal so the complete session/join/result flow can be exercised
+with PowerShell or another HTTP client. Stop it with `Ctrl+C`; all data then
+disappears.
+
+The public bracket intentionally returns participant display names, statuses,
+rounds, winners, and byes only. Match codes and signed room tokens remain in
+the protected join flow.
 
 Example organizer requests (use test values only):
 
@@ -156,6 +179,7 @@ The tests cover:
 - 5,000 participant records without raw participant-code storage;
 - 100 concurrent session/join calls;
 - every HTTP route used by the local operator/participant flow.
+- public bracket rendering and the disposable eight-player demo seed.
 
 Run them with:
 

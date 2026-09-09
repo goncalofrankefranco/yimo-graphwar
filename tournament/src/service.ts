@@ -481,6 +481,43 @@ export class TournamentService {
     };
   }
 
+  publicBracket(tournamentId: string): {
+    tournamentId: string;
+    name: string;
+    status: string;
+    matches: Record<string, unknown>[];
+  } {
+    const id = validateIdentifier(tournamentId, 'tournamentId');
+    const tournament = this.db.prepare(
+      'SELECT tournament_id, name, status FROM tournaments WHERE tournament_id = ?',
+    ).get(id) as any;
+    if (!tournament) throw new ServiceError(404, 'TOURNAMENT_NOT_FOUND', 'Tournament not found.');
+    const rows = this.db.prepare(`
+      SELECT m.match_id, m.round, m.position, m.status,
+        pa.display_name AS player_a_name, pb.display_name AS player_b_name,
+        pw.display_name AS winner_name
+      FROM matches m
+      LEFT JOIN participants pa ON pa.participant_id = m.player_a_id
+      LEFT JOIN participants pb ON pb.participant_id = m.player_b_id
+      LEFT JOIN participants pw ON pw.participant_id = m.winner_id
+      WHERE m.tournament_id = ? ORDER BY m.round, m.position
+    `).all(id) as any[];
+    return {
+      tournamentId: id,
+      name: tournament.name,
+      status: tournament.status,
+      matches: rows.map((match) => ({
+        matchId: match.match_id,
+        round: Number(match.round),
+        position: Number(match.position),
+        playerA: match.player_a_name ?? null,
+        playerB: match.player_b_name ?? null,
+        winner: match.winner_name ?? null,
+        status: match.status,
+      })),
+    };
+  }
+
   seedBracket(adminToken: string | undefined, input: SeedInput): { tournamentId: string; matches: Record<string, unknown>[] } {
     this.requireAdmin(adminToken);
     const tournamentId = validateIdentifier(input?.tournamentId, 'tournamentId');

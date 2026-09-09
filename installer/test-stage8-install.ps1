@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$ReleaseDir
+    [string]$ReleaseDir,
+    [string]$ExpectedGlobalHost = '153.75.82.155',
+    [string]$ExpectedTournamentApiBaseUrl = 'http://153.75.82.155'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -58,7 +60,8 @@ try {
     }
 
     $properties = Get-Content -Raw (Join-Path $target 'yimo.properties')
-    Assert-True ($properties -match 'global\.host=153\.75\.82\.155') 'installed endpoint is incorrect.'
+    Assert-True ($properties -match ('global\.host=' + [regex]::Escape($ExpectedGlobalHost))) 'installed global endpoint is incorrect.'
+    Assert-True ($properties -match ('tournament\.api\.baseUrl=' + [regex]::Escape($ExpectedTournamentApiBaseUrl))) 'installed tournament endpoint is incorrect.'
     Assert-True ($properties -notmatch '(?i)(YIMO_ADMIN_TOKEN|ROOM_HMAC_SECRET|BEGIN (RSA|OPENSSH) PRIVATE KEY)') 'secret-like value was installed.'
     $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\YIMO Graphwar\YIMO Graphwar.lnk'
     Assert-True (Test-Path -LiteralPath $shortcut -PathType Leaf) 'Start menu shortcut is missing.'

@@ -11,6 +11,11 @@ in `rsc/campaign/lesson-01.properties` through
 `rsc/campaign/lesson-20.properties` and are loaded by
 `Graphwar.CampaignLesson`.
 
+While a lesson is open, the function field updates the board immediately. A
+valid expression is rendered as an orange dashed `AIM PREVIEW / NOT FIRED`
+path; pressing Fire switches to the existing animated shot and sound effects.
+Previewing never advances lesson progress.
+
 ## Curriculum
 
 | Lessons | Topic | Function families |

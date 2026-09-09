@@ -37,6 +37,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.Timer;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 import GraphServer.Constants;
 import GraphServer.MapShape;
@@ -74,6 +76,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
     private final JLabel lessonModeLabel;
     private final JLabel lessonStatusLabel;
     private final JLabel hintLabel;
+    private final JLabel aimPreviewLabel;
     private final JTextArea instructionsArea;
     private final JTextArea stepInstructionsArea;
     private final JTextArea lessonGuideArea;
@@ -122,6 +125,8 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         lessonModeLabel = YimoTheme.mutedLabel("");
         lessonStatusLabel = YimoTheme.mutedLabel("");
         hintLabel = YimoTheme.mutedLabel("");
+        aimPreviewLabel = YimoTheme.mutedLabel("TYPE A FUNCTION TO PREVIEW AIM");
+        aimPreviewLabel.setForeground(YimoTheme.ORANGE);
         instructionsArea = textArea();
         stepInstructionsArea = textArea();
         lessonGuideArea = textArea();
@@ -154,6 +159,22 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         previousButton.addActionListener(this);
         nextButton.addActionListener(this);
         hintButton.addActionListener(this);
+        functionField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent event) {
+                updateTrajectory(false);
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent event) {
+                updateTrajectory(false);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent event) {
+                updateTrajectory(false);
+            }
+        });
         stepBackButton.setVisible(false);
         stepContinueButton.setVisible(false);
 
@@ -278,6 +299,8 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         controlStack.add(YimoTheme.sectionTitle("Function"));
         controlStack.add(Box.createVerticalStrut(7));
         controlStack.add(functionField);
+        controlStack.add(Box.createVerticalStrut(6));
+        controlStack.add(aimPreviewLabel);
         controlStack.add(Box.createVerticalStrut(9));
         controlStack.add(fireButton);
         controlStack.add(Box.createVerticalStrut(18));
@@ -367,6 +390,22 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
 
     static String startingExpression(CampaignLesson lesson) {
         return "";
+    }
+
+    static Function previewStep(CampaignLesson lesson, int stepNumber, String expression)
+            throws MalformedFunction {
+        if (expression == null || expression.trim().length() == 0) {
+            return null;
+        }
+        return simulateStep(lesson, stepNumber, expression);
+    }
+
+    static int visibleTrajectorySteps(Function function, boolean fired) {
+        return function == null ? 0 : (fired ? 0 : function.getNumSteps());
+    }
+
+    static String aimPreviewText(boolean fired) {
+        return fired ? "SHOT ANIMATING" : "AIM PREVIEW";
     }
 
     private static String modelExpression(CampaignStep step) {
@@ -479,6 +518,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
         String expression = functionField.getText();
         if (expression == null || expression.trim().length() == 0) {
             canvas.setFunction(null, false);
+            aimPreviewLabel.setText("TYPE A FUNCTION TO PREVIEW AIM");
             if (!fired) {
                 lessonStatusLabel.setText("Build your function, then Fire");
                 lessonStatusLabel.setForeground(YimoTheme.MUTED);
@@ -489,8 +529,9 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
             return;
         }
         try {
-            Function trajectory = simulateStep(selectedLesson, selectedStepNumber, expression);
+            Function trajectory = previewStep(selectedLesson, selectedStepNumber, expression);
             canvas.setFunction(trajectory, fired);
+            aimPreviewLabel.setText(fired ? aimPreviewText(true) : aimPreviewText(false) + "  /  DASHED PATH NOT FIRED");
             if (fired) {
                 if (trajectory.getNumPlayersHit() > 0) {
                     progress.markStepComplete(selectedLesson.getId(), selectedStepNumber);
@@ -510,6 +551,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
             }
         } catch (MalformedFunction error) {
             canvas.setFunction(null, fired);
+            aimPreviewLabel.setText("AIM PREVIEW UNAVAILABLE");
             lessonStatusLabel.setText("Enter a valid function");
             lessonStatusLabel.setForeground(YimoTheme.DANGER);
         }
@@ -656,7 +698,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
             this.fired = fired;
             this.impact = false;
             this.targetEliminated = false;
-            this.visibleSteps = function == null ? 0 : (fired ? 0 : function.getNumSteps());
+            this.visibleSteps = visibleTrajectorySteps(function, fired);
             if (fired && function != null && function.getNumSteps() > 0) {
                 animationStartedAt = System.currentTimeMillis();
                 SoundEffects.playShot();
@@ -772,6 +814,7 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
 
                 drawLegend(g);
                 drawFunction(g);
+                drawAimPreviewLabel(g);
                 boolean complete = function != null && function.getNumPlayersHit() > 0;
                 int targetRadius = step.getTargetRadius();
                 if (targetEliminated) {
@@ -873,6 +916,15 @@ public final class CampaignScreen extends YimoScreen implements ActionListener {
                 }
             }
             g.draw(path);
+        }
+
+        private void drawAimPreviewLabel(Graphics2D g) {
+            if (function == null || fired) {
+                return;
+            }
+            g.setFont(YimoTheme.SMALL);
+            g.setColor(YimoTheme.ORANGE);
+            g.drawString("AIM PREVIEW  /  NOT FIRED", 18, Constants.PLANE_HEIGHT - 18);
         }
 
         private void drawExplosion(Graphics2D g) {

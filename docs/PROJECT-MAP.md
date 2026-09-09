@@ -6,7 +6,8 @@
   campaign code.
 - `rsc/` — runtime images, sounds, UI resources, and the twenty campaign files.
 - `test/` — runnable assertion-based Java regression checks.
-- `tournament/` — Node.js 24 tournament control service and tests.
+- `tournament/` — Node.js 24 tournament control service, public bracket view,
+  disposable demo, and tests.
 
 ## Operations and packaging
 

@@ -9,7 +9,7 @@ receiving any private deployment material.
 
 | Stage | Delivered | Gate |
 | --- | --- | --- |
-| 5 — tournament control | Node 24 service, SQLite schema, bracket seeding, sessions, joins, room slots, heartbeats, results, HTML landing pages, tests | Local service test suite passes |
+| 5 — tournament control | Node 24 service, SQLite schema, bracket seeding, sessions, joins, room slots, heartbeats, results, public bracket view, disposable demo, tests | Local service test suite passes |
 | 6 — signed room access | Java HMAC token verifier, replay protection, required room policy, bounded 20/50 room pool, protocol messages, tests | Java suite and two-sided token check pass |
 
 Stage 7 (Cloudzy staging and load testing) remains separate. No public VPS,
@@ -72,6 +72,8 @@ The complete route table and request sequence are in
 [`tournament/README.md`](../tournament/README.md). In short:
 
 - organizer endpoints require the configured bearer token;
+- `GET /api/v1/tournaments/{id}/bracket` returns a public, match-code-free
+  bracket view for spectators and the participant page;
 - participant session and join calls check build ID and protocol version;
 - join checks participant membership before allocating a slot;
 - a transaction prevents two simultaneous joins from taking the same room;
@@ -173,6 +175,12 @@ Push-Location tournament
 npm test
 Pop-Location
 ```
+
+To exercise the UI and the full local request flow without a database or VPS,
+run `npm run demo` from `tournament/`. It seeds eight disposable participants,
+prints the short-lived test values, and serves the bracket at
+`/participant?tournament=yimo-demo-2026`. The public route deliberately omits
+match codes and room tokens.
 
 Compile the Java source and tests with the Java 8 toolchain, then run:
 

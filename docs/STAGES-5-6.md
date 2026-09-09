@@ -9,7 +9,7 @@ receiving any private deployment material.
 
 | Stage | Delivered | Gate |
 | --- | --- | --- |
-| 5 — tournament control | Node 24 service, SQLite schema, bracket seeding, sessions, joins, room slots, heartbeats, results, public bracket view, disposable demo, tests | Local service test suite passes |
+| 5 — tournament control | Node 24 service, SQLite schema/migration, scheduled lifecycle, registration, optional check-in, admin console, competitor portal, bracket seeding, sessions, joins, room slots, heartbeats, results, disposable demo, tests | Local service test suite passes |
 | 6 — signed room access | Java HMAC token verifier, replay protection, required room policy, bounded 20/50 room pool, protocol messages, tests | Java suite and two-sided token check pass |
 
 Stage 7 (Cloudzy staging and load testing) remains separate. No public VPS,
@@ -19,9 +19,10 @@ repository.
 ## Runtime flow
 
 ```text
-organizer -> tournament API -> match code + bracket
-participant -> session API -> participant session
-participant -> join API -> room slot + signed room token
+organizer -> /admin -> schedule + lifecycle action
+participant -> /participant -> session + register/check-in
+scheduler/admin -> frozen roster -> bracket + assigned match
+participant -> assigned-join API -> room slot + signed room token
 Java client -> HELLO -> Java room server
 Java client -> TOURNAMENT_JOIN(token) -> token gate -> room state
 Java room server -> heartbeat/result API -> bracket advancement + room release
@@ -45,7 +46,8 @@ The SQLite schema creates these records:
 | --- | --- |
 | `participants` | Active participant identity, keyed code lookup, and salted verification hash |
 | `participant_sessions` | Expiring session-token hashes |
-| `tournaments` | Build/protocol and room-port settings |
+| `tournaments` | Build/protocol, room-port settings, lifecycle, and schedule |
+| `tournament_entries` | Registration, check-in, seed, and eligibility state |
 | `matches` | Bracket nodes, codes, assignment, and result signature |
 | `match_players` | Participant-to-match membership and side |
 | `room_slots` | Bounded `AVAILABLE`/`ASSIGNED`/`IN_PROGRESS` slot state |
@@ -66,12 +68,34 @@ verification; session tokens are stored as SHA-256 hashes. The lookup hash
 keeps participant login bounded by an indexed lookup instead of scanning all
 5,000 records.
 
+### Lifecycle and scheduling
+
+New tournaments start in `DRAFT`. The admin can open/close registration,
+open enabled check-in, or start manually from `/admin`. A scheduled tournament
+uses `registrationOpenAt`, `registrationCloseAt`, optional
+`checkInOpenAt`/`checkInCloseAt`, `startAt`, `autoStart`, and
+`requireCheckIn`. Epoch seconds are stored in SQLite; the web forms accept
+local `datetime-local` values and send converted epoch seconds.
+
+At start, the service selects registered entries (or checked-in entries when
+required) in deterministic registration order, assigns seeds, freezes the
+roster, writes one bracket in the same SQLite transaction, and records an
+audit event. A roster with fewer than two eligible entries becomes
+`START_BLOCKED` and can be retried after an organizer corrects the roster.
+The five-second scheduler is process-local but restart-safe because status and
+bracket writes are persisted transactionally. Existing `SEEDED` tournaments
+continue to use the legacy seed/match-code path.
+
 ### API contract
 
 The complete route table and request sequence are in
 [`tournament/README.md`](../tournament/README.md). In short:
 
 - organizer endpoints require the configured bearer token;
+- `/admin` provides schedule, lifecycle, roster, counts, and bracket controls;
+  the organizer token is kept in browser `sessionStorage` only;
+- `/participant` supports participant-code login, registration, check-in,
+  private schedule, and assigned-match joining;
 - `GET /api/v1/tournaments/{id}/bracket` returns a public, match-code-free
   bracket view for spectators and the participant page;
 - participant session and join calls check build ID and protocol version;
@@ -177,8 +201,9 @@ Pop-Location
 ```
 
 To exercise the UI and the full local request flow without a database or VPS,
-run `npm run demo` from `tournament/`. It seeds eight disposable participants,
-prints the short-lived test values, and serves the bracket at
+run `npm run demo` from `tournament/`. It schedules four disposable
+participants through registration, prints the short-lived demo values, and
+serves the bracket at
 `/participant?tournament=yimo-demo-2026`. The public route deliberately omits
 match codes and room tokens.
 

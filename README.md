@@ -173,6 +173,22 @@ procedure.
 The hosting choice, load-test thresholds, and event runbook are in
 [`docs/SCALING-PLAN.md`](docs/SCALING-PLAN.md).
 
+## Tournament management
+
+The tournament control service has a real organizer console at `/admin` and
+a competitor portal at `/participant`. New tournaments start as `DRAFT`, can
+open scheduled registration and optional check-in, and can be started manually
+or automatically. Starting freezes the eligible roster and creates one seeded
+single-elimination bracket. Competitors log in with organizer-issued codes,
+register/check in, view their private next-match schedule, and join an assigned
+room without receiving a public match code. The public bracket never exposes
+participant codes, match codes, room tokens, or organizer secrets.
+
+The Java lobby’s room list remains a practice-room list; it is not the
+tournament bracket. The local disposable implementation and API contract are
+documented in [`tournament/README.md`](tournament/README.md) and
+[`docs/STAGES-5-6.md`](docs/STAGES-5-6.md).
+
 ## Running Local Servers
 
 The Java programs read `yimo.properties` beside the JAR, then the packaged

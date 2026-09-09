@@ -1,10 +1,10 @@
 # YIMO tournament control service
 
-This directory contains the Stage 5 tournament control service for YIMO
-Graphwar 2.0. It handles organizer registration, seeded single-elimination
-brackets, expiring match codes, participant sessions, bounded room allocation,
-room heartbeats, and signed result records. Gameplay still belongs to the
-authoritative Java room server.
+This directory contains the tournament control service for YIMO Graphwar 2.0.
+It handles organizer registration, scheduled seeded single-elimination
+tournaments, optional check-in, expiring match codes, participant sessions,
+bounded room allocation, assigned joins, room heartbeats, and signed result
+records. Gameplay still belongs to the authoritative Java room server.
 
 ## Requirements and commands
 
@@ -13,9 +13,9 @@ authoritative Java room server.
 - `npm test` runs the service and HTTP smoke tests.
 - `npm start` starts the HTTP service. The required environment variables are
   listed below.
-- `npm run demo` starts an isolated in-memory bracket with eight sample
-  participants for local testing. It never opens a database or uses production
-  secrets.
+- `npm run demo` starts an isolated in-memory scheduled tournament with four
+  sample participants for local testing. It never opens a database or uses
+  production secrets.
 
 Node's SQLite API is marked experimental in Node 24, so the expected warning
 may appear during tests and startup. The test suite must still finish with all
@@ -59,28 +59,55 @@ Organizer routes require `Authorization: Bearer <YIMO_ADMIN_TOKEN>`.
 | Method and path | Auth | Purpose |
 | --- | --- | --- |
 | `GET /healthz` | none | Build and protocol health check |
-| `GET /admin` | none | Small operator landing page |
-| `GET /participant` | none | Small participant landing page |
+| `GET /admin` | none | Organizer console with schedule and lifecycle controls |
+| `GET /participant` | none | Competitor login, entry, assigned join, and public bracket |
 | `GET /api/v1/tournaments/{id}/bracket` | none | Public bracket data without match codes |
 | `POST /api/v1/admin/participants` | admin | Add an organizer-issued participant code |
-| `POST /api/v1/admin/tournaments` | admin | Create a tournament and its room slots |
+| `POST /api/v1/admin/tournaments` | admin | Create a scheduled tournament and its room slots |
 | `POST /api/v1/admin/bracket/seed` | admin | Seed the single-elimination bracket |
+| `GET /api/v1/admin/tournaments/{id}` | admin | Read status, schedule, counts, roster, and bracket |
+| `POST /api/v1/admin/tournaments/{id}/registration/open` | admin | Open registration immediately |
+| `POST /api/v1/admin/tournaments/{id}/registration/close` | admin | Close registration or enter check-in |
+| `POST /api/v1/admin/tournaments/{id}/check-in/open` | admin | Open an enabled check-in window |
+| `POST /api/v1/admin/tournaments/{id}/start` | admin | Freeze the eligible roster and start the bracket |
 | `POST /api/v1/participant-sessions` | none | Exchange a participant code for a short-lived session |
+| `POST /api/v1/tournaments/{id}/register` | session | Register the authenticated competitor |
+| `POST /api/v1/tournaments/{id}/check-in` | session | Check in the authenticated competitor |
+| `GET /api/v1/player/tournaments/{id}` | session | Read private entry and next-match schedule |
 | `POST /api/v1/matches/join` | session | Validate a match code and receive room access |
+| `POST /api/v1/matches/{matchId}/join-assigned` | session | Join the authenticated competitor’s assigned match |
 | `POST /api/v1/rooms/heartbeat` | room token | Keep an assigned room alive |
 | `POST /api/v1/matches/{matchId}/result` | room token | Record the authoritative room result |
 | `GET /api/v1/player/matches` | session bearer | List the participant's matches |
 
+### Lifecycle
+
+New tournaments use this state sequence:
+
+```text
+DRAFT -> REGISTRATION_OPEN -> READY -> RUNNING -> COMPLETED
+                         \-> CHECK_IN -/
+                         \-> START_BLOCKED (too few eligible entrants)
+```
+
+When `requireCheckIn` is enabled, registration closes into `CHECK_IN` and only
+checked-in entries are eligible. Otherwise, registered entries are eligible
+directly. `autoStart` plus `startAt` lets the in-process scheduler advance the
+tournament without an organizer request. Manual `/start` and scheduled start
+share the same transaction, so a retry cannot create a second bracket.
+
 The core request sequence is:
 
-1. The organizer creates participants, a tournament, and a seeded bracket.
-2. The organizer distributes the returned match code to the assigned players.
-3. A participant exchanges the organizer-issued participant code for a
-   one-hour session.
-4. The participant submits the match code and build information. The service
-   allocates one available room slot and returns a per-participant signed room
-   token.
-5. The Java room server validates that token before exposing any room state.
+1. The organizer opens `/admin`, creates a tournament schedule, and adds
+   organizer-issued participant codes through the admin API.
+2. Competitors open `/participant`, exchange their participant code for a
+   one-hour session, register, and optionally check in.
+3. The scheduler or organizer starts the tournament, freezes the eligible
+   roster, and creates the bracket.
+4. A competitor loads their private schedule and joins the assigned match;
+   the legacy match-code endpoint remains available for compatibility.
+5. The service allocates one room slot and returns a per-participant signed
+   room token. The Java room server validates it before exposing room state.
 6. The room sends heartbeats and submits exactly one result. An identical
    retry is idempotent; a conflicting retry is rejected.
 
@@ -93,11 +120,12 @@ npm run demo
 ```
 
 Open the printed `/participant?tournament=yimo-demo-2026` URL. The page loads
-the public bracket and groups matches into round columns. The demo prints its
-disposable admin token, room secret, participant codes, and open match codes
-to the terminal so the complete session/join/result flow can be exercised
-with PowerShell or another HTTP client. Stop it with `Ctrl+C`; all data then
-disappears.
+the public bracket and groups matches into round columns. The demo starts with
+four scheduled sample entrants, advances them through registration, and then
+starts the bracket. It prints only demo-local admin and participant values to
+the terminal so the complete session/register/assigned-join/result flow can be
+exercised with PowerShell or another HTTP client. Stop it with `Ctrl+C`; all
+data then disappears.
 
 The public bracket intentionally returns participant display names, statuses,
 rounds, winners, and byes only. Match codes and signed room tokens remain in
@@ -151,7 +179,7 @@ SQLite enables foreign keys, a five-second busy timeout, and WAL mode for file
 databases. The tables are:
 
 - `participants` and `participant_sessions`
-- `tournaments`, `matches`, and `match_players`
+- `tournaments`, `tournament_entries`, `matches`, and `match_players`
 - `room_slots`
 - `audit_events`
 
@@ -178,8 +206,9 @@ The tests cover:
 - signed room allocation and result idempotency;
 - 5,000 participant records without raw participant-code storage;
 - 100 concurrent session/join calls;
+- scheduled transitions, restart recovery, roster freezing, and assigned joins;
 - every HTTP route used by the local operator/participant flow.
-- public bracket rendering and the disposable eight-player demo seed.
+- public bracket rendering and the disposable scheduled demo.
 
 Run them with:
 
@@ -187,6 +216,8 @@ Run them with:
 npm test
 ```
 
-Cloud/VPS deployment, Nginx, process supervision, backups, and load testing
-are deliberately Stage 7 work. This service is not a production endpoint
-until that staging gate passes.
+The Java lobby’s public-room list is not the tournament bracket. Public rooms
+are practice rooms visible to everyone; tournament matches are created from
+the frozen roster, assigned to private room slots, and reached through the
+competitor portal. Cloud/VPS deployment, Nginx, process supervision, backups,
+and load testing remain a separate staging gate.

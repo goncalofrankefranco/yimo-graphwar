@@ -6,8 +6,9 @@
   campaign code.
 - `rsc/` — runtime images, sounds, UI resources, and the twenty campaign files.
 - `test/` — runnable assertion-based Java regression checks.
-- `tournament/` — Node.js 24 tournament control service, public bracket view,
-  disposable demo, and tests.
+- `tournament/` — Node.js 24 tournament control service, lifecycle/scheduling,
+  admin console, competitor portal, public bracket view, disposable demo, and
+  tests.
 
 ## Operations and packaging
 
@@ -34,3 +35,15 @@
 
 The repository does not keep generated JARs or installer EXEs at the root.
 Use the build scripts when a fresh artifact is needed.
+
+## Tournament source map
+
+- `tournament/src/lifecycle.ts` — pure status transitions and due-event rules.
+- `tournament/src/migrations.ts` — idempotent SQLite migration for existing
+  tournament databases.
+- `tournament/src/service.ts` — registration, check-in, scheduling, brackets,
+  room assignments, and authoritative result records.
+- `tournament/src/server.ts` — HTTP route/auth boundary.
+- `tournament/src/pages.ts` — same-origin admin and competitor HTML pages.
+- `tournament/test/` — lifecycle, migration, scheduler, HTTP, security,
+  concurrency, and demo checks.

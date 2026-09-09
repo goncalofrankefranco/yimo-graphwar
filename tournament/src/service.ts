@@ -7,6 +7,7 @@ import {
   scryptSync,
   timingSafeEqual,
 } from 'node:crypto';
+import { applyTournamentMigrations } from './migrations.ts';
 
 export interface ServiceOptions {
   dbPath?: string;
@@ -325,6 +326,7 @@ export class TournamentService {
     this.db.exec('PRAGMA busy_timeout = 5000;');
     if ((options.dbPath ?? ':memory:') !== ':memory:') this.db.exec('PRAGMA journal_mode = WAL;');
     this.db.exec(SCHEMA);
+    applyTournamentMigrations(this.db);
   }
 
   close(): void {

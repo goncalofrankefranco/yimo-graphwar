@@ -98,7 +98,7 @@ export function createTournamentHttpServer(service: TournamentService): any {
         else if (parts[5] === 'check-in') send(response, 200, service.checkInParticipant(sessionToken, tournamentId));
         else throw new ServiceError(404, 'NOT_FOUND', 'Route not found.');
       } else if (isPlayerTournamentRoute) {
-        send(response, 200, service.playerTournament(bearer(request) ?? url.searchParams.get('sessionToken') ?? '', url.pathname.split('/')[4]));
+        send(response, 200, service.playerTournament(bearer(request) ?? url.searchParams.get('sessionToken') ?? '', url.pathname.split('/')[5]));
       } else if (isAssignedJoinRoute) {
         send(response, 200, service.joinAssignedMatch({
           ...body,

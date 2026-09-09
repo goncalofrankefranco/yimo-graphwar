@@ -191,3 +191,83 @@ test('handles 100 concurrent session and join requests under the configured limi
   assert.ok(joins.every((entry) => entry.roomSlot === 30000));
   app.close();
 });
+
+test('registers participants idempotently and closes registration without check-in', () => {
+  const app = service();
+  addParticipants(app, 2);
+  app.createTournament('admin-test-token', {
+    tournamentId: 'registration-test',
+    name: 'Registration Test',
+    buildId: 'YIMO-Graphwar-2.0.0',
+    protocolVersion: 2,
+  });
+  const session = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+  });
+  throwsCode(() => app.registerParticipant(session.sessionToken, 'registration-test'), 'REGISTRATION_NOT_OPEN');
+  app.openRegistration('admin-test-token', 'registration-test');
+  const first = app.registerParticipant(session.sessionToken, 'registration-test');
+  const duplicate = app.registerParticipant(session.sessionToken, 'registration-test');
+  assert.deepEqual(duplicate, first);
+  app.closeRegistration('admin-test-token', 'registration-test');
+  throwsCode(() => app.registerParticipant(session.sessionToken, 'registration-test'), 'REGISTRATION_CLOSED');
+  throwsCode(() => app.checkInParticipant(session.sessionToken, 'registration-test'), 'CHECK_IN_DISABLED');
+  app.close();
+});
+
+test('supports an enabled check-in window and returns safe admin/player projections', () => {
+  const app = service();
+  addParticipants(app, 2);
+  app.createTournament('admin-test-token', {
+    tournamentId: 'check-in-test',
+    name: 'Check-in Test',
+    buildId: 'YIMO-Graphwar-2.0.0',
+    protocolVersion: 2,
+    requireCheckIn: true,
+    registrationOpenAt: clock,
+    registrationCloseAt: clock + 100,
+    checkInOpenAt: clock + 10,
+    checkInCloseAt: clock + 200,
+    startAt: clock + 300,
+  });
+  const session = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+  });
+  app.openRegistration('admin-test-token', 'check-in-test');
+  const registered = app.registerParticipant(session.sessionToken, 'check-in-test');
+  assert.equal(registered.entryStatus, 'REGISTERED');
+  app.openCheckIn('admin-test-token', 'check-in-test');
+  const checkedIn = app.checkInParticipant(session.sessionToken, 'check-in-test');
+  assert.equal(checkedIn.entryStatus, 'CHECKED_IN');
+  assert.deepEqual(app.checkInParticipant(session.sessionToken, 'check-in-test'), checkedIn);
+  const admin: any = app.adminTournament('admin-test-token', 'check-in-test');
+  assert.equal(admin.status, 'CHECK_IN');
+  assert.equal(admin.counts.registered, 1);
+  assert.equal(admin.counts.checkedIn, 1);
+  assert.equal(admin.roster[0].participantId, 'p-1');
+  const player: any = app.playerTournament(session.sessionToken, 'check-in-test');
+  assert.equal(player.entry.entryStatus, 'CHECKED_IN');
+  assert.equal(player.nextMatch, null);
+  assert.ok(!JSON.stringify(player).includes('PARTICIPANT-1'));
+  app.close();
+});
+
+test('rejects malformed tournament schedule values', () => {
+  const app = service();
+  assert.throws(() => app.createTournament('admin-test-token', {
+    tournamentId: 'bad-schedule-1', name: 'Bad Schedule',
+    buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+    registrationOpenAt: 100.5,
+  }), (error: any) => error?.code === 'INVALID_INPUT');
+  assert.throws(() => app.createTournament('admin-test-token', {
+    tournamentId: 'bad-schedule-2', name: 'Bad Schedule',
+    buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+    registrationOpenAt: 200, registrationCloseAt: 100,
+  }), (error: any) => error?.code === 'INVALID_INPUT');
+  assert.throws(() => app.createTournament('admin-test-token', {
+    tournamentId: 'bad-schedule-3', name: 'Bad Schedule',
+    buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+    autoStart: true,
+  }), (error: any) => error?.code === 'INVALID_INPUT');
+  app.close();
+});

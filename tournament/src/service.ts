@@ -8,6 +8,7 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { applyTournamentMigrations } from './migrations.ts';
+import { assertTransition } from './lifecycle.ts';
 
 export interface ServiceOptions {
   dbPath?: string;
@@ -34,6 +35,13 @@ export interface TournamentInput {
   matchTimeoutSeconds?: number;
   roomPortStart?: number;
   roomPortEnd?: number;
+  registrationOpenAt?: number;
+  registrationCloseAt?: number;
+  checkInOpenAt?: number;
+  checkInCloseAt?: number;
+  startAt?: number;
+  autoStart?: boolean;
+  requireCheckIn?: boolean;
 }
 
 export interface SeedInput {
@@ -220,6 +228,14 @@ function requiredText(value: unknown, field: string, maxLength: number): string 
     throw new ServiceError(400, 'INVALID_INPUT', `${field} contains unsupported characters.`);
   }
   return value.trim();
+}
+
+function optionalTimestamp(value: unknown, field: string): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new ServiceError(400, 'INVALID_INPUT', `${field} must be an integer timestamp.`);
+  }
+  return value;
 }
 
 function nextPowerOfTwo(value: number): number {
@@ -410,6 +426,38 @@ export class TournamentService {
       || roomStart < 1 || roomEnd > 65535 || roomStart > roomEnd || roomEnd - roomStart + 1 > 50) {
       throw new ServiceError(400, 'INVALID_INPUT', 'Tournament timeout or room-port range is invalid.');
     }
+    const requireCheckIn = input?.requireCheckIn === true;
+    const autoStart = input?.autoStart === true;
+    const registrationOpenAt = optionalTimestamp(input?.registrationOpenAt, 'registrationOpenAt');
+    const registrationCloseAt = optionalTimestamp(input?.registrationCloseAt, 'registrationCloseAt');
+    const checkInOpenAt = optionalTimestamp(input?.checkInOpenAt, 'checkInOpenAt');
+    const checkInCloseAt = optionalTimestamp(input?.checkInCloseAt, 'checkInCloseAt');
+    const startAt = optionalTimestamp(input?.startAt, 'startAt');
+    if (registrationCloseAt !== null && registrationOpenAt === null) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'registrationOpenAt is required with registrationCloseAt.');
+    }
+    if (registrationOpenAt !== null && registrationCloseAt !== null
+      && registrationCloseAt < registrationOpenAt) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'Registration window is inverted.');
+    }
+    if (!requireCheckIn && (checkInOpenAt !== null || checkInCloseAt !== null)) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'Check-in timestamps require requireCheckIn=true.');
+    }
+    if (checkInCloseAt !== null && checkInOpenAt === null) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'checkInOpenAt is required with checkInCloseAt.');
+    }
+    if (checkInOpenAt !== null && checkInCloseAt !== null && checkInCloseAt < checkInOpenAt) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'Check-in window is inverted.');
+    }
+    if (autoStart && startAt === null) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'autoStart requires startAt.');
+    }
+    if (startAt !== null && registrationCloseAt !== null && startAt < registrationCloseAt) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'startAt must be after registration closes.');
+    }
+    if (startAt !== null && checkInCloseAt !== null && startAt < checkInCloseAt) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'startAt must be after check-in closes.');
+    }
     if (this.db.prepare('SELECT 1 FROM tournaments WHERE tournament_id = ?').get(tournamentId)) {
       throw new ServiceError(409, 'TOURNAMENT_EXISTS', 'Tournament already exists.');
     }
@@ -417,9 +465,14 @@ export class TournamentService {
     this.transaction(() => {
       this.db.prepare(`
         INSERT INTO tournaments(tournament_id, name, build_id, protocol_version, status,
-          match_timeout_seconds, room_port_start, room_port_end, created_at)
-        VALUES (?, ?, ?, ?, 'CREATED', ?, ?, ?, ?)
-      `).run(tournamentId, name, this.buildId, this.protocolVersion, timeout, roomStart, roomEnd, now);
+          match_timeout_seconds, room_port_start, room_port_end, created_at,
+          require_check_in, registration_open_at, registration_close_at,
+          check_in_open_at, check_in_close_at, start_at, auto_start,
+          started_at, started_by, roster_frozen_at, updated_at)
+        VALUES (?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?)
+      `).run(tournamentId, name, this.buildId, this.protocolVersion, timeout, roomStart, roomEnd, now,
+        requireCheckIn ? 1 : 0, registrationOpenAt, registrationCloseAt, checkInOpenAt,
+        checkInCloseAt, startAt, autoStart ? 1 : 0, now);
       const insertSlot = this.db.prepare(`
         INSERT INTO room_slots(tournament_id, room_slot, port, warm, state)
         VALUES (?, ?, ?, ?, ?)
@@ -428,9 +481,224 @@ export class TournamentService {
         insertSlot.run(tournamentId, port, port, port - roomStart < 20 ? 1 : 0,
           port - roomStart < 20 ? 'AVAILABLE' : 'OFFLINE');
       }
-      this.audit('TOURNAMENT_CREATED', tournamentId, { name, roomStart, roomEnd });
+      this.audit('TOURNAMENT_CREATED', tournamentId, {
+        name, roomStart, roomEnd, requireCheckIn, autoStart,
+        registrationOpenAt, registrationCloseAt, checkInOpenAt, checkInCloseAt, startAt,
+      });
     });
-    return { tournamentId, status: 'CREATED' };
+    return { tournamentId, status: 'DRAFT' };
+  }
+
+  private tournamentRow(tournamentId: string): any {
+    const id = validateIdentifier(tournamentId, 'tournamentId');
+    const tournament = this.db.prepare('SELECT * FROM tournaments WHERE tournament_id = ?').get(id) as any;
+    if (!tournament) throw new ServiceError(404, 'TOURNAMENT_NOT_FOUND', 'Tournament not found.');
+    return tournament;
+  }
+
+  private schedule(tournament: any): Record<string, unknown> {
+    return {
+      registrationOpenAt: tournament.registration_open_at === null ? null : Number(tournament.registration_open_at),
+      registrationCloseAt: tournament.registration_close_at === null ? null : Number(tournament.registration_close_at),
+      checkInOpenAt: tournament.check_in_open_at === null ? null : Number(tournament.check_in_open_at),
+      checkInCloseAt: tournament.check_in_close_at === null ? null : Number(tournament.check_in_close_at),
+      startAt: tournament.start_at === null ? null : Number(tournament.start_at),
+      autoStart: Number(tournament.auto_start) === 1,
+      requireCheckIn: Number(tournament.require_check_in) === 1,
+      startedAt: tournament.started_at === null ? null : Number(tournament.started_at),
+      startedBy: tournament.started_by ?? null,
+      rosterFrozenAt: tournament.roster_frozen_at === null ? null : Number(tournament.roster_frozen_at),
+    };
+  }
+
+  private changeTournamentStatus(adminToken: string | undefined, tournamentId: string,
+    to: 'REGISTRATION_OPEN' | 'CHECK_IN' | 'READY', eventType: string): Record<string, unknown> {
+    this.requireAdmin(adminToken);
+    const id = validateIdentifier(tournamentId, 'tournamentId');
+    this.transaction(() => {
+      const tournament = this.tournamentRow(id);
+      if (tournament.status !== to) {
+        assertTransition(tournament.status, to);
+        const now = this.timestamp();
+        this.db.prepare('UPDATE tournaments SET status = ?, updated_at = ? WHERE tournament_id = ?')
+          .run(to, now, id);
+        this.audit(eventType, id, { from: tournament.status, to });
+      }
+    });
+    return this.adminTournament(adminToken, id);
+  }
+
+  openRegistration(adminToken: string | undefined, tournamentId: string): Record<string, unknown> {
+    return this.changeTournamentStatus(adminToken, tournamentId, 'REGISTRATION_OPEN', 'REGISTRATION_OPENED');
+  }
+
+  closeRegistration(adminToken: string | undefined, tournamentId: string): Record<string, unknown> {
+    this.requireAdmin(adminToken);
+    const id = validateIdentifier(tournamentId, 'tournamentId');
+    const tournament = this.tournamentRow(id);
+    return this.changeTournamentStatus(adminToken, id,
+      Number(tournament.require_check_in) === 1 ? 'CHECK_IN' : 'READY',
+      'REGISTRATION_CLOSED');
+  }
+
+  openCheckIn(adminToken: string | undefined, tournamentId: string): Record<string, unknown> {
+    this.requireAdmin(adminToken);
+    const tournament = this.tournamentRow(tournamentId);
+    if (Number(tournament.require_check_in) !== 1) {
+      throw new ServiceError(409, 'CHECK_IN_DISABLED', 'Check-in is disabled for this tournament.');
+    }
+    return this.changeTournamentStatus(adminToken, tournamentId, 'CHECK_IN', 'CHECK_IN_OPENED');
+  }
+
+  private entryView(entry: any): Record<string, unknown> {
+    return {
+      tournamentId: entry.tournament_id,
+      participantId: entry.participant_id,
+      entryStatus: entry.entry_status,
+      registeredAt: Number(entry.registered_at),
+      checkedInAt: entry.checked_in_at === null ? null : Number(entry.checked_in_at),
+      seed: entry.seed === null ? null : Number(entry.seed),
+    };
+  }
+
+  registerParticipant(sessionToken: string, tournamentId: string): Record<string, unknown> {
+    const participant = this.participantForSession(sessionToken);
+    const tournament = this.tournamentRow(tournamentId);
+    if (tournament.status !== 'REGISTRATION_OPEN') {
+      throw new ServiceError(409, tournament.status === 'DRAFT' ? 'REGISTRATION_NOT_OPEN' : 'REGISTRATION_CLOSED',
+        'Registration is not open.');
+    }
+    const now = this.timestamp();
+    if (tournament.registration_close_at !== null && now >= Number(tournament.registration_close_at)) {
+      throw new ServiceError(409, 'REGISTRATION_CLOSED', 'Registration has closed.');
+    }
+    return this.transaction(() => {
+      this.db.prepare(`
+        INSERT OR IGNORE INTO tournament_entries(tournament_id, participant_id, entry_status, registered_at)
+        VALUES (?, ?, 'REGISTERED', ?)
+      `).run(tournament.tournament_id, participant.participant_id, now);
+      const entry = this.db.prepare(
+        'SELECT * FROM tournament_entries WHERE tournament_id = ? AND participant_id = ?',
+      ).get(tournament.tournament_id, participant.participant_id) as any;
+      this.audit('PARTICIPANT_REGISTERED', tournament.tournament_id, {
+        participantId: participant.participant_id,
+      });
+      return this.entryView(entry);
+    });
+  }
+
+  checkInParticipant(sessionToken: string, tournamentId: string): Record<string, unknown> {
+    const participant = this.participantForSession(sessionToken);
+    const tournament = this.tournamentRow(tournamentId);
+    if (Number(tournament.require_check_in) !== 1) {
+      throw new ServiceError(409, 'CHECK_IN_DISABLED', 'Check-in is disabled for this tournament.');
+    }
+    if (tournament.status !== 'CHECK_IN') {
+      throw new ServiceError(409, 'CHECK_IN_NOT_OPEN', 'Check-in is not open.');
+    }
+    const now = this.timestamp();
+    if (tournament.check_in_close_at !== null && now >= Number(tournament.check_in_close_at)) {
+      throw new ServiceError(409, 'CHECK_IN_CLOSED', 'Check-in has closed.');
+    }
+    return this.transaction(() => {
+      const entry = this.db.prepare(
+        'SELECT * FROM tournament_entries WHERE tournament_id = ? AND participant_id = ?',
+      ).get(tournament.tournament_id, participant.participant_id) as any;
+      if (!entry) throw new ServiceError(409, 'NOT_REGISTERED', 'Participant is not registered.');
+      if (entry.entry_status === 'CHECKED_IN') return this.entryView(entry);
+      if (entry.entry_status !== 'REGISTERED') {
+        throw new ServiceError(409, 'CHECK_IN_CLOSED', 'Participant cannot check in.');
+      }
+      this.db.prepare(`
+        UPDATE tournament_entries SET entry_status = 'CHECKED_IN', checked_in_at = ?
+        WHERE tournament_id = ? AND participant_id = ? AND entry_status = 'REGISTERED'
+      `).run(now, tournament.tournament_id, participant.participant_id);
+      const updated = this.db.prepare(
+        'SELECT * FROM tournament_entries WHERE tournament_id = ? AND participant_id = ?',
+      ).get(tournament.tournament_id, participant.participant_id) as any;
+      this.audit('PARTICIPANT_CHECKED_IN', tournament.tournament_id, {
+        participantId: participant.participant_id,
+      });
+      return this.entryView(updated);
+    });
+  }
+
+  adminTournament(adminToken: string | undefined, tournamentId: string): Record<string, unknown> {
+    this.requireAdmin(adminToken);
+    const tournament = this.tournamentRow(tournamentId);
+    const countsRows = this.db.prepare(`
+      SELECT entry_status, COUNT(*) AS count FROM tournament_entries
+      WHERE tournament_id = ? GROUP BY entry_status
+    `).all(tournament.tournament_id) as any[];
+    const counts: Record<string, number> = { registered: 0, checkedIn: 0, eligible: 0, total: 0 };
+    for (const row of countsRows) {
+      const count = Number(row.count);
+      counts.total += count;
+      if (row.entry_status === 'REGISTERED' || row.entry_status === 'CHECKED_IN') counts.registered += count;
+      if (row.entry_status === 'CHECKED_IN') counts.checkedIn += count;
+      if (row.entry_status === 'ELIGIBLE') counts.eligible += count;
+    }
+    const roster = (this.db.prepare(`
+      SELECT e.participant_id AS participantId, p.display_name AS displayName,
+        e.entry_status AS entryStatus, e.registered_at AS registeredAt,
+        e.checked_in_at AS checkedInAt, e.seed AS seed
+      FROM tournament_entries e JOIN participants p ON p.participant_id = e.participant_id
+      WHERE e.tournament_id = ? ORDER BY e.registered_at, e.participant_id
+    `).all(tournament.tournament_id) as any[]).map((row) => ({
+      participantId: row.participantId,
+      displayName: row.displayName,
+      entryStatus: row.entryStatus,
+      registeredAt: Number(row.registeredAt),
+      checkedInAt: row.checkedInAt === null ? null : Number(row.checkedInAt),
+      seed: row.seed === null ? null : Number(row.seed),
+    }));
+    return {
+      tournamentId: tournament.tournament_id,
+      name: tournament.name,
+      status: tournament.status,
+      buildId: tournament.build_id,
+      protocolVersion: Number(tournament.protocol_version),
+      schedule: this.schedule(tournament),
+      counts,
+      roster,
+      bracket: this.publicBracket(tournament.tournament_id),
+    };
+  }
+
+  playerTournament(sessionToken: string, tournamentId: string): Record<string, unknown> {
+    const participant = this.participantForSession(sessionToken);
+    const tournament = this.tournamentRow(tournamentId);
+    const entry = this.db.prepare(
+      'SELECT * FROM tournament_entries WHERE tournament_id = ? AND participant_id = ?',
+    ).get(tournament.tournament_id, participant.participant_id) as any;
+    const match = this.db.prepare(`
+      SELECT m.match_id AS matchId, m.round, m.position, m.status,
+        pa.display_name AS playerA, pb.display_name AS playerB, pw.display_name AS winner
+      FROM matches m
+      LEFT JOIN participants pa ON pa.participant_id = m.player_a_id
+      LEFT JOIN participants pb ON pb.participant_id = m.player_b_id
+      LEFT JOIN participants pw ON pw.participant_id = m.winner_id
+      WHERE m.tournament_id = ? AND (m.player_a_id = ? OR m.player_b_id = ?)
+        AND m.status <> 'COMPLETED' ORDER BY m.round, m.position LIMIT 1
+    `).get(tournament.tournament_id, participant.participant_id, participant.participant_id) as any;
+    return {
+      tournamentId: tournament.tournament_id,
+      name: tournament.name,
+      status: tournament.status,
+      participant: { participantId: participant.participant_id, displayName: participant.display_name },
+      entry: entry ? this.entryView(entry) : null,
+      schedule: this.schedule(tournament),
+      nextMatch: match ? {
+        matchId: match.matchId,
+        round: Number(match.round),
+        position: Number(match.position),
+        status: match.status,
+        playerA: match.playerA ?? null,
+        playerB: match.playerB ?? null,
+        winner: match.winner ?? null,
+      } : null,
+      bracket: this.publicBracket(tournament.tournament_id),
+    };
   }
 
   private newMatchCode(): { code: string; hash: string } {
@@ -531,7 +799,9 @@ export class TournamentService {
     if (new Set(ids).size !== ids.length) throw new ServiceError(400, 'DUPLICATE_PARTICIPANT', 'Participant IDs must be unique.');
     const tournament = this.db.prepare('SELECT * FROM tournaments WHERE tournament_id = ?').get(tournamentId) as any;
     if (!tournament) throw new ServiceError(404, 'TOURNAMENT_NOT_FOUND', 'Tournament not found.');
-    if (tournament.status !== 'CREATED') throw new ServiceError(409, 'BRACKET_EXISTS', 'Tournament bracket already seeded.');
+    if (tournament.status !== 'CREATED' && tournament.status !== 'DRAFT') {
+      throw new ServiceError(409, 'BRACKET_EXISTS', 'Tournament bracket already seeded.');
+    }
     for (const id of ids) {
       if (!this.db.prepare("SELECT 1 FROM participants WHERE participant_id = ? AND status = 'ACTIVE'").get(id)) {
         throw new ServiceError(400, 'INVALID_PARTICIPANT', `Participant ${id} is not active.`);
@@ -577,7 +847,8 @@ export class TournamentService {
           if (match.playerB) insertPlayer.run(match.matchId, match.playerB, ids.indexOf(match.playerB) + 1, 'B');
         }
       }
-      this.db.prepare("UPDATE tournaments SET status = 'SEEDED' WHERE tournament_id = ?").run(tournamentId);
+      this.db.prepare("UPDATE tournaments SET status = 'SEEDED', updated_at = ? WHERE tournament_id = ?")
+        .run(this.timestamp(), tournamentId);
       this.audit('BRACKET_SEEDED', tournamentId, { participantCount: ids.length, bracketSize: size });
     });
     return { tournamentId, matches: nodes.flat().map((match) => this.publicMatch(match)) };

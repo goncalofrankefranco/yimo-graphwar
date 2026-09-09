@@ -10,6 +10,7 @@ package Graphwar;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
@@ -19,6 +20,9 @@ import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
+import java.net.URI;
+import java.util.Arrays;
+import java.util.List;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -34,6 +38,7 @@ import GraphServer.Constants;
 /** Responsive YIMO lobby screen. */
 public class GlobalScreen extends YimoScreen implements ActionListener, StartStopPanel {
     private final JButton createButton;
+    private final JButton tournamentButton;
     private final JButton gameRoomButton;
     private final JButton backButton;
     private final JTextField chatField;
@@ -58,6 +63,7 @@ public class GlobalScreen extends YimoScreen implements ActionListener, StartSto
         setLayout(new BorderLayout(16, 16));
 
         createButton = YimoTheme.accentButton("Create Room");
+        tournamentButton = YimoTheme.button("Tournament");
         gameRoomButton = YimoTheme.button("Open Room");
         backButton = YimoTheme.quietButton("Back");
         chatField = YimoTheme.textField(24);
@@ -93,6 +99,7 @@ public class GlobalScreen extends YimoScreen implements ActionListener, StartSto
         add(footer, BorderLayout.SOUTH);
 
         createButton.addActionListener(this);
+        tournamentButton.addActionListener(this);
         gameRoomButton.addActionListener(this);
         backButton.addActionListener(this);
         chatField.addActionListener(this);
@@ -160,6 +167,10 @@ public class GlobalScreen extends YimoScreen implements ActionListener, StartSto
         createButton.setAlignmentX(LEFT_ALIGNMENT);
         createButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
         actionButtons.add(createButton);
+        actionButtons.add(Box.createVerticalStrut(8));
+        tournamentButton.setAlignmentX(LEFT_ALIGNMENT);
+        tournamentButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
+        actionButtons.add(tournamentButton);
         actionButtons.add(Box.createVerticalStrut(8));
         gameRoomButton.setAlignmentX(LEFT_ALIGNMENT);
         gameRoomButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 52));
@@ -291,6 +302,33 @@ public class GlobalScreen extends YimoScreen implements ActionListener, StartSto
         chatBox.addText(playerName, Color.WHITE, chatMessage);
     }
 
+    static String tournamentPortalUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.trim().length() == 0) {
+            throw new IllegalArgumentException("Tournament portal URL is missing");
+        }
+        String normalized = baseUrl.trim();
+        while (normalized.endsWith("/")) normalized = normalized.substring(0, normalized.length() - 1);
+        return normalized + "/participant";
+    }
+
+    static List<String> menuLabels() {
+        return Arrays.asList("Create Room", "Tournament", "Open Room");
+    }
+
+    private void openTournamentPortal() {
+        String url = tournamentPortalUrl(Constants.TOURNAMENT_API_BASE_URL);
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            try {
+                Desktop.getDesktop().browse(URI.create(url));
+                status("Tournament portal opened in your browser.", false);
+                return;
+            } catch (Exception error) {
+                // Fall through to the visible URL so headless or restricted desktops remain usable.
+            }
+        }
+        status("Tournament portal: " + url, false);
+    }
+
     @Override
     public void actionPerformed(ActionEvent event) {
         Object source = event.getSource();
@@ -340,6 +378,8 @@ public class GlobalScreen extends YimoScreen implements ActionListener, StartSto
                 }
             } else if (source == createButton && graphwar.getGameData().getGameState() == Constants.NONE) {
                 showCreateGame(true);
+            } else if (source == tournamentButton) {
+                openTournamentPortal();
             } else if (source == backButton) {
                 graphwar.getGlobalClient().stop();
                 if (graphwar.getGameData().getGameState() != Constants.NONE) {

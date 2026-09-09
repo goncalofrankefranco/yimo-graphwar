@@ -322,3 +322,39 @@ test('blocks a manual start with fewer than two eligible entries', () => {
   assert.equal(second.bracket.matches.length, 0);
   app.close();
 });
+
+test('shows the next assigned match and joins it without exposing a match code', () => {
+  const app = service();
+  addParticipants(app, 3);
+  app.createTournament('admin-test-token', {
+    tournamentId: 'assigned-join-test', name: 'Assigned Join Test',
+    buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+  });
+  app.openRegistration('admin-test-token', 'assigned-join-test');
+  const sessions = [1, 2, 3].map((index) => app.createParticipantSession({
+    participantCode: `PARTICIPANT-${index}`, buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+  }));
+  app.registerParticipant(sessions[0].sessionToken, 'assigned-join-test');
+  app.registerParticipant(sessions[1].sessionToken, 'assigned-join-test');
+  app.closeRegistration('admin-test-token', 'assigned-join-test');
+  app.startTournament('admin-test-token', 'assigned-join-test');
+  const player: any = app.playerTournament(sessions[0].sessionToken, 'assigned-join-test');
+  assert.ok(player.nextMatch?.matchId);
+  assert.ok(!JSON.stringify(player).includes('matchCode'));
+  const input = {
+    matchId: player.nextMatch.matchId,
+    buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+  };
+  const first = app.joinAssignedMatch({ ...input, sessionToken: sessions[0].sessionToken });
+  const second = app.joinAssignedMatch({ ...input, sessionToken: sessions[1].sessionToken });
+  assert.equal(second.roomSlot, first.roomSlot);
+  assert.equal(second.matchId, first.matchId);
+  assert.ok(first.roomToken);
+  assert.throws(() => app.joinAssignedMatch({
+    ...input, sessionToken: sessions[2].sessionToken,
+  }), (error: any) => error?.code === 'PARTICIPANT_NOT_IN_MATCH');
+  assert.throws(() => app.joinAssignedMatch({
+    ...input, sessionToken: sessions[0].sessionToken, buildId: 'Graphwar-1.1', protocolVersion: 1,
+  }), (error: any) => error?.code === 'VERSION_MISMATCH');
+  app.close();
+});

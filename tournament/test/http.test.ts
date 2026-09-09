@@ -40,6 +40,8 @@ test('serves health, admin, participant, match, room, and result routes', async 
     assert.equal((health.body as any).buildId, 'YIMO-Graphwar-2.0.0');
     assert.match(await (await request('/admin')).body as string, /YIMO Tournament Admin/);
     assert.match(await (await request('/participant')).body as string, /YIMO Tournament/);
+    assert.match(await (await request('/participant')).body as string, /Participant code/);
+    assert.match(await (await request('/participant')).body as string, /Join assigned match/);
 
     const adminHeaders = { Authorization: 'Bearer admin-test-token' };
     const participantOne = await post('/api/v1/admin/participants', {

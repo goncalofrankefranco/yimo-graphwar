@@ -63,6 +63,14 @@ export interface JoinInput {
   clientKey?: string;
 }
 
+export interface AssignedJoinInput {
+  sessionToken: string;
+  matchId: string;
+  buildId: string;
+  protocolVersion: number;
+  clientKey?: string;
+}
+
 export interface HeartbeatInput {
   roomToken: string;
   state?: 'ASSIGNED' | 'IN_PROGRESS';
@@ -1046,14 +1054,9 @@ export class TournamentService {
     return match;
   }
 
-  joinMatch(input: JoinInput): { matchId: string; roomSlot: number; port: number; roomToken: string; expiresAt: number } {
-    this.rateLimiter.check(`join:${input?.clientKey ?? 'local'}`, this.timestamp());
-    this.requireBuild(input?.buildId, input?.protocolVersion);
-    const participant = this.participantForSession(input?.sessionToken);
-    const match = this.verifyMatchCode(input?.matchCode);
-    if (match.player_a_id !== participant.participant_id && match.player_b_id !== participant.participant_id) {
-      throw new ServiceError(403, 'PARTICIPANT_NOT_IN_MATCH', 'Participant is not assigned to this match.');
-    }
+  private joinMatchForParticipant(match: MatchRow, participant: any): {
+    matchId: string; roomSlot: number; port: number; roomToken: string; expiresAt: number;
+  } {
     const now = this.timestamp();
     return this.transaction(() => {
       let room = this.db.prepare(
@@ -1065,14 +1068,20 @@ export class TournamentService {
           ORDER BY room_slot LIMIT 1
         `).get(match.tournament_id) as any;
         if (!room) throw new ServiceError(503, 'ROOM_POOL_EXHAUSTED', 'No tournament room is available.');
+        const roomExpiry = match.match_code_expires_at === null
+          ? now + Number(match.match_timeout_seconds ?? 900)
+          : Number(match.match_code_expires_at);
         this.db.prepare(`
           UPDATE room_slots SET state = 'ASSIGNED', match_id = ?, assigned_at = ?, heartbeat_at = ?,
             expires_at = ? WHERE tournament_id = ? AND room_slot = ?
-        `).run(match.match_id, now, now, match.match_code_expires_at, match.tournament_id, room.room_slot);
+        `).run(match.match_id, now, now, roomExpiry, match.tournament_id, room.room_slot);
         this.db.prepare("UPDATE matches SET room_slot = ?, status = 'ASSIGNED', updated_at = ? WHERE match_id = ?")
           .run(room.room_slot, now, match.match_id);
       }
-      const expiryMillis = Math.min(Number(match.match_code_expires_at) * 1000, (now + 900) * 1000);
+      const expirySeconds = match.match_code_expires_at === null
+        ? now + 900
+        : Math.min(Number(match.match_code_expires_at), now + 900);
+      const expiryMillis = expirySeconds * 1000;
       const token = issueRoomToken({
         protocolVersion: this.protocolVersion,
         buildId: this.buildId,
@@ -1088,9 +1097,45 @@ export class TournamentService {
         roomSlot: Number(room.room_slot),
         port: Number(room.port),
         roomToken: token,
-        expiresAt: Math.floor(expiryMillis / 1000),
+        expiresAt: expirySeconds,
       };
     });
+  }
+
+  joinMatch(input: JoinInput): { matchId: string; roomSlot: number; port: number; roomToken: string; expiresAt: number } {
+    this.rateLimiter.check(`join:${input?.clientKey ?? 'local'}`, this.timestamp());
+    this.requireBuild(input?.buildId, input?.protocolVersion);
+    const participant = this.participantForSession(input?.sessionToken);
+    const match = this.verifyMatchCode(input?.matchCode);
+    if (match.player_a_id !== participant.participant_id && match.player_b_id !== participant.participant_id) {
+      throw new ServiceError(403, 'PARTICIPANT_NOT_IN_MATCH', 'Participant is not assigned to this match.');
+    }
+    return this.joinMatchForParticipant(match, participant);
+  }
+
+  joinAssignedMatch(input: AssignedJoinInput): {
+    matchId: string; roomSlot: number; port: number; roomToken: string; expiresAt: number;
+  } {
+    this.rateLimiter.check(`join:${input?.clientKey ?? 'local'}`, this.timestamp());
+    this.requireBuild(input?.buildId, input?.protocolVersion);
+    const participant = this.participantForSession(input?.sessionToken);
+    const matchId = validateIdentifier(input?.matchId, 'matchId');
+    const match = this.db.prepare(`
+      SELECT m.*, t.build_id, t.protocol_version, t.match_timeout_seconds, t.status AS tournament_status
+      FROM matches m JOIN tournaments t ON t.tournament_id = m.tournament_id
+      WHERE m.match_id = ?
+    `).get(matchId) as MatchRow | undefined;
+    if (!match) throw new ServiceError(404, 'MATCH_NOT_FOUND', 'Match not found.');
+    if (match.status !== 'OPEN' && match.status !== 'ASSIGNED' && match.status !== 'IN_PROGRESS') {
+      throw new ServiceError(409, 'MATCH_CLOSED', 'Match is not accepting players.');
+    }
+    if (match.match_code_expires_at !== null && Number(match.match_code_expires_at) <= this.timestamp()) {
+      throw new ServiceError(410, 'MATCH_EXPIRED', 'This assigned match has expired.');
+    }
+    if (match.player_a_id !== participant.participant_id && match.player_b_id !== participant.participant_id) {
+      throw new ServiceError(403, 'PARTICIPANT_NOT_IN_MATCH', 'Participant is not assigned to this match.');
+    }
+    return this.joinMatchForParticipant(match, participant);
   }
 
   heartbeat(input: HeartbeatInput): { matchId: string; roomSlot: number; state: string } {

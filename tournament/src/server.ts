@@ -60,8 +60,14 @@ export function createTournamentHttpServer(service: TournamentService): any {
       const isBracketRoute = request.method === 'GET' && new RegExp(`^/api/v1/tournaments/${idPattern}/bracket$`).test(url.pathname);
       const isAdminTournamentRoute = new RegExp(`^/api/v1/admin/tournaments/${idPattern}$`).test(url.pathname);
       const isAdminLifecycleRoute = new RegExp(`^/api/v1/admin/tournaments/${idPattern}/(registration/open|registration/close|check-in/open|start)$`).test(url.pathname);
+      const isParticipantActionRoute = request.method === 'POST'
+        && new RegExp(`^/api/v1/tournaments/${idPattern}/(register|check-in)$`).test(url.pathname);
+      const isPlayerTournamentRoute = request.method === 'GET'
+        && new RegExp(`^/api/v1/player/tournaments/${idPattern}$`).test(url.pathname);
+      const isAssignedJoinRoute = request.method === 'POST'
+        && new RegExp(`^/api/v1/matches/${idPattern}/join-assigned$`).test(url.pathname);
       if (request.method !== 'POST' && !(request.method === 'GET' && url.pathname === '/api/v1/player/matches')
-        && !isBracketRoute && !(request.method === 'GET' && isAdminTournamentRoute)) {
+        && !isBracketRoute && !(request.method === 'GET' && isAdminTournamentRoute) && !isPlayerTournamentRoute) {
         throw new ServiceError(404, 'NOT_FOUND', 'Route not found.');
       }
 
@@ -84,6 +90,22 @@ export function createTournamentHttpServer(service: TournamentService): any {
         else if (action === 'check-in/open') send(response, 200, service.openCheckIn(bearer(request), tournamentId));
         else if (action === 'start') send(response, 200, service.startTournament(bearer(request), tournamentId));
         else throw new ServiceError(404, 'NOT_FOUND', 'Route not found.');
+      } else if (isParticipantActionRoute) {
+        const parts = url.pathname.split('/');
+        const tournamentId = parts[4];
+        const sessionToken = bearer(request) ?? body.sessionToken ?? '';
+        if (parts[5] === 'register') send(response, 200, service.registerParticipant(sessionToken, tournamentId));
+        else if (parts[5] === 'check-in') send(response, 200, service.checkInParticipant(sessionToken, tournamentId));
+        else throw new ServiceError(404, 'NOT_FOUND', 'Route not found.');
+      } else if (isPlayerTournamentRoute) {
+        send(response, 200, service.playerTournament(bearer(request) ?? url.searchParams.get('sessionToken') ?? '', url.pathname.split('/')[4]));
+      } else if (isAssignedJoinRoute) {
+        send(response, 200, service.joinAssignedMatch({
+          ...body,
+          sessionToken: bearer(request) ?? body.sessionToken ?? '',
+          matchId: url.pathname.split('/')[4],
+          clientKey,
+        }));
       } else if (request.method === 'POST' && url.pathname === '/api/v1/participant-sessions') {
         send(response, 200, service.createParticipantSession(body, clientKey));
       } else if (request.method === 'POST' && url.pathname === '/api/v1/matches/join') {

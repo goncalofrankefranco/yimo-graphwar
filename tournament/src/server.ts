@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { ADMIN_PAGE } from './pages.ts';
+import { ADMIN_PAGE } from './admin-page.ts';
 import { PARTICIPANT_PAGE } from './participant-page.ts';
 import { ServiceError, TournamentService } from './service.ts';
 

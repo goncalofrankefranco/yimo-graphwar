@@ -146,6 +146,8 @@ test('serves authenticated admin lifecycle controls and status projections', asy
     assert.match(page.body as string, /Start tournament/);
     assert.match(page.body as string, /Open registration/);
     assert.match(page.body as string, /registrationOpenAt/);
+    assert.match(page.body as string, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+    assert.match(page.body as string, /\.form-grid \.field\{min-width:0\}/);
 
     const created = await post('/api/v1/admin/tournaments', {
       tournamentId: 'admin-lifecycle', name: 'Admin Lifecycle',

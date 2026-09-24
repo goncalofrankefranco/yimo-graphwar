@@ -7,7 +7,7 @@ write_files:
     permissions: '0600'
     content: |
       YIMO_REPO_URL=https://github.com/goncalofrankefranco/yimo-graphwar.git
-      YIMO_REPO_REF=c71ef098a3e6e3c711cc0edaedad389554c91b9e
+      YIMO_REPO_REF=92c6e5c90af19e09f03db22b75d27f028d9ceb9f
       YIMO_SSH_CIDR=auto
       YIMO_PUBLIC_IP=172.86.118.184
       YIMO_ENABLE_PRACTICE_ROOMS=1

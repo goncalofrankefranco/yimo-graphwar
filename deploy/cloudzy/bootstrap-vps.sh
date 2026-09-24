@@ -23,14 +23,11 @@ apt-get update
 apt-get install -y --no-install-recommends ca-certificates curl git nginx openssl tar ufw xz-utils
 
 if [[ -z "$YIMO_SSH_CIDR" || "$YIMO_SSH_CIDR" == 'auto' ]]; then
-  detected_ssh_ip="$(curl --fail --silent --show-error --max-time 10 https://api.ipify.org)"
-  [[ "$detected_ssh_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || {
-    echo 'Could not detect the organizer public IP for SSH restriction.' >&2
-    exit 1
-  }
-  YIMO_SSH_CIDR="$detected_ssh_ip/32"
+  # A VPS cannot discover the organizer's source IP; auto means safe-to-boot,
+  # temporary world-open SSH with an explicit warning for immediate restriction.
+  YIMO_SSH_CIDR='0.0.0.0/0'
 fi
-if [[ ! "$YIMO_SSH_CIDR" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/32$ ]]; then
+if [[ "$YIMO_SSH_CIDR" != '0.0.0.0/0' && ! "$YIMO_SSH_CIDR" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/32$ ]]; then
   echo 'YIMO_SSH_CIDR must be an IPv4 /32 or auto.' >&2
   exit 1
 fi

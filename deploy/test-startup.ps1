@@ -14,6 +14,12 @@ foreach ($required in @('YIMO_PUBLIC_IP', 'YIMO_SSH_CIDR', 'YIMO_RELEASE_URL', '
 foreach ($required in @('YIMO_PUBLIC_IP', 'YIMO_SSH_CIDR', 'ufw', 'systemctl', 'nginx')) {
     if ($bootstrap -notmatch [regex]::Escape($required)) { throw "bootstrap script is missing $required" }
 }
+if ($bootstrap -notmatch "YIMO_SSH_CIDR.*auto" -or $bootstrap -notmatch "SSH is open to the world") {
+    throw 'bootstrap must handle auto SSH mode without guessing the organizer IP.'
+}
+if ($bootstrap -match 'detected_ssh_ip|api\.ipify\.org') {
+    throw 'bootstrap must not mistake the VPS public IP for the organizer IP.'
+}
 if ($firstBoot -notmatch 'YIMO_ADMIN_PASSWORD|YIMO_ADMIN_TOKEN') {
     throw 'first-boot must create the single organizer credential.'
 }

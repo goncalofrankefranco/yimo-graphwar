@@ -19,12 +19,21 @@ YIMO_JAVA8_SHA256="${YIMO_JAVA8_SHA256:-}"
 YIMO_SWAP_SIZE="${YIMO_SWAP_SIZE:-512M}"
 
 export DEBIAN_FRONTEND=noninteractive
-if [[ -z "$YIMO_SSH_CIDR" ]]; then
-  echo 'Set YIMO_SSH_CIDR before running bootstrap-vps.sh.' >&2
-  exit 1
-fi
 apt-get update
 apt-get install -y --no-install-recommends ca-certificates curl git nginx openssl tar ufw xz-utils
+
+if [[ -z "$YIMO_SSH_CIDR" || "$YIMO_SSH_CIDR" == 'auto' ]]; then
+  detected_ssh_ip="$(curl --fail --silent --show-error --max-time 10 https://api.ipify.org)"
+  [[ "$detected_ssh_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || {
+    echo 'Could not detect the organizer public IP for SSH restriction.' >&2
+    exit 1
+  }
+  YIMO_SSH_CIDR="$detected_ssh_ip/32"
+fi
+if [[ ! "$YIMO_SSH_CIDR" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/32$ ]]; then
+  echo 'YIMO_SSH_CIDR must be an IPv4 /32 or auto.' >&2
+  exit 1
+fi
 
 # NodeSource is used only to install the pinned Node 24 major line required by the
 # tournament service. The service itself uses Node's built-in modules only.
@@ -88,6 +97,12 @@ YIMO_SSH_CIDR=0.0.0.0/0
 YIMO_ENABLE_PRACTICE_ROOMS=0
 YIMO_SWAP_SIZE=512M
 EOF
+else
+  if grep -q '^YIMO_SSH_CIDR=' "$ENV_FILE"; then
+    sed -i "s#^YIMO_SSH_CIDR=.*#YIMO_SSH_CIDR=$YIMO_SSH_CIDR#" "$ENV_FILE"
+  else
+    printf 'YIMO_SSH_CIDR=%s\n' "$YIMO_SSH_CIDR" >> "$ENV_FILE"
+  fi
 fi
 chmod 600 "$ENV_FILE"
 

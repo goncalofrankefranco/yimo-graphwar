@@ -6,11 +6,10 @@ if [[ "$(id -u)" -ne 0 ]]; then
   echo 'Run YIMO VPS setup as root.' >&2
   exit 1
 fi
-: "${YIMO_SSH_CIDR:?Set YIMO_SSH_CIDR to the organizer IP in CIDR form.}"
-
 YIMO_REPO_URL="${YIMO_REPO_URL:-https://github.com/goncalofrankefranco/yimo-graphwar.git}"
 YIMO_REPO_REF="${YIMO_REPO_REF:-7cce143}"
 YIMO_PUBLIC_IP="${YIMO_PUBLIC_IP:-}"
+YIMO_SSH_CIDR="${YIMO_SSH_CIDR:-auto}"
 YIMO_RELEASE_URL="${YIMO_RELEASE_URL:-}"
 YIMO_RELEASE_SHA256="${YIMO_RELEASE_SHA256:-}"
 YIMO_ENABLE_PRACTICE_ROOMS="${YIMO_ENABLE_PRACTICE_ROOMS:-0}"

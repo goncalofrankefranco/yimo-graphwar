@@ -8,7 +8,7 @@ write_files:
     content: |
       YIMO_REPO_URL=https://github.com/goncalofrankefranco/yimo-graphwar.git
       YIMO_REPO_REF=7cce143
-      YIMO_SSH_CIDR=REPLACE_WITH_ORGANIZER_CIDR
+      YIMO_SSH_CIDR=auto
       YIMO_PUBLIC_IP=172.86.118.184
       YIMO_ENABLE_PRACTICE_ROOMS=0
       YIMO_SWAP_SIZE=512M
@@ -23,7 +23,6 @@ runcmd:
       apt-get install -y --no-install-recommends ca-certificates curl git
       . /root/yimo-recovery.env
       test "$YIMO_REPO_REF" != "REPLACE_WITH_APPROVED_COMMIT"
-      test "$YIMO_SSH_CIDR" != "REPLACE_WITH_ORGANIZER_CIDR"
       rm -rf /opt/yimo-source
       git clone --no-checkout "$YIMO_REPO_URL" /opt/yimo-source
       git -C /opt/yimo-source fetch --depth 1 origin "$YIMO_REPO_REF"

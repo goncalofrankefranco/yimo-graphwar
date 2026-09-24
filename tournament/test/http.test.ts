@@ -38,6 +38,9 @@ test('serves health, admin, participant, match, room, and result routes', async 
     const health = await request('/healthz');
     assert.equal(health.response.status, 200);
     assert.equal((health.body as any).buildId, 'YIMO-Graphwar-2.0.0');
+    const home = await request('/', { redirect: 'manual' });
+    assert.equal(home.response.status, 302);
+    assert.equal(home.response.headers.get('location'), '/participant');
     assert.match(await (await request('/admin')).body as string, /YIMO Tournament Admin/);
     assert.match(await (await request('/participant')).body as string, /YIMO Tournament/);
     assert.match(await (await request('/participant')).body as string, /Participant code/);

@@ -11,6 +11,11 @@ function send(response: any, status: number, body: unknown, contentType = 'appli
   response.end(contentType.startsWith('application/json') ? JSON.stringify(body) : String(body));
 }
 
+function redirect(response: any, location: string): void {
+  response.writeHead(302, { Location: location, 'Cache-Control': 'no-store' });
+  response.end();
+}
+
 function bearer(request: any): string | undefined {
   const value = request.headers.authorization;
   return typeof value === 'string' && value.startsWith('Bearer ') ? value.slice(7) : undefined;
@@ -48,6 +53,10 @@ export function createTournamentHttpServer(service: TournamentService): any {
     try {
       if (request.method === 'GET' && url.pathname === '/healthz') {
         send(response, 200, { ok: true, buildId: service.buildId, protocolVersion: service.protocolVersion });
+        return;
+      }
+      if (request.method === 'GET' && url.pathname === '/') {
+        redirect(response, '/participant');
         return;
       }
       if (request.method === 'GET' && url.pathname === '/admin') {

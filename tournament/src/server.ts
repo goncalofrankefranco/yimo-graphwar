@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
-import { ADMIN_PAGE, PARTICIPANT_PAGE } from './pages.ts';
+import { ADMIN_PAGE } from './pages.ts';
+import { PARTICIPANT_PAGE } from './participant-page.ts';
 import { ServiceError, TournamentService } from './service.ts';
 
 function send(response: any, status: number, body: unknown, contentType = 'application/json; charset=utf-8'): void {
@@ -61,7 +62,7 @@ export function createTournamentHttpServer(service: TournamentService): any {
       const isAdminTournamentRoute = new RegExp(`^/api/v1/admin/tournaments/${idPattern}$`).test(url.pathname);
       const isAdminLifecycleRoute = new RegExp(`^/api/v1/admin/tournaments/${idPattern}/(registration/open|registration/close|check-in/open|start)$`).test(url.pathname);
       const isParticipantActionRoute = request.method === 'POST'
-        && new RegExp(`^/api/v1/tournaments/${idPattern}/(register|check-in)$`).test(url.pathname);
+        && new RegExp(`^/api/v1/tournaments/${idPattern}/(register|check-in|self-register)$`).test(url.pathname);
       const isPlayerTournamentRoute = request.method === 'GET'
         && new RegExp(`^/api/v1/player/tournaments/${idPattern}$`).test(url.pathname);
       const isAssignedJoinRoute = request.method === 'POST'
@@ -96,6 +97,7 @@ export function createTournamentHttpServer(service: TournamentService): any {
         const sessionToken = bearer(request) ?? body.sessionToken ?? '';
         if (parts[5] === 'register') send(response, 200, service.registerParticipant(sessionToken, tournamentId));
         else if (parts[5] === 'check-in') send(response, 200, service.checkInParticipant(sessionToken, tournamentId));
+        else if (parts[5] === 'self-register') send(response, 200, service.selfRegisterParticipant(tournamentId, { ...body, clientKey }));
         else throw new ServiceError(404, 'NOT_FOUND', 'Route not found.');
       } else if (isPlayerTournamentRoute) {
         send(response, 200, service.playerTournament(bearer(request) ?? url.searchParams.get('sessionToken') ?? '', url.pathname.split('/')[5]));

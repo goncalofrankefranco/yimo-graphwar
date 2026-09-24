@@ -14,11 +14,15 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 YIMO_SSH_CIDR="${YIMO_SSH_CIDR:-}"
-YIMO_JAVA8_URL="${YIMO_JAVA8_URL:-https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jre/hotspot/normal/eclipse}"
+YIMO_JAVA8_URL="${YIMO_JAVA8_URL:-https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jdk/hotspot/normal/eclipse}"
 YIMO_JAVA8_SHA256="${YIMO_JAVA8_SHA256:-}"
 YIMO_SWAP_SIZE="${YIMO_SWAP_SIZE:-512M}"
 
 export DEBIAN_FRONTEND=noninteractive
+if [[ -z "$YIMO_SSH_CIDR" ]]; then
+  echo 'Set YIMO_SSH_CIDR before running bootstrap-vps.sh.' >&2
+  exit 1
+fi
 apt-get update
 apt-get install -y --no-install-recommends ca-certificates curl git nginx openssl tar ufw xz-utils
 

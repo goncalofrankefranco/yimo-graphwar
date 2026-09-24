@@ -9,20 +9,19 @@ write_files:
     owner: root:root
     permissions: '0600'
     content: |
-      # Replace these values before using this template.
+      # Replace the SSH CIDR before using this template. The permanent YIMO IP is explicit.
       YIMO_REPO_URL=https://github.com/goncalofrankefranco/yimo-graphwar.git
-      YIMO_REPO_REF=REPLACE_WITH_APPROVED_COMMIT
-      YIMO_PUBLIC_IP=
+      YIMO_REPO_REF=7cce143
+      YIMO_PUBLIC_IP=172.86.118.184
       YIMO_SSH_CIDR=REPLACE_WITH_ORGANIZER_CIDR
-      YIMO_JAVA8_URL=https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jre/hotspot/normal/eclipse
+      YIMO_JAVA8_URL=https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jdk/hotspot/normal/eclipse
       YIMO_JAVA8_SHA256=
       YIMO_ENABLE_PRACTICE_ROOMS=0
       YIMO_SWAP_SIZE=512M
 
 runcmd:
   - >-
-    bash -lc 'set -Eeuo pipefail; . /etc/yimo/bootstrap.env;
-    test "$YIMO_REPO_REF" != "REPLACE_WITH_APPROVED_COMMIT";
+    bash -lc 'set -Eeuo pipefail; exec > >(tee -a /var/log/yimo-cloud-init.log) 2>&1; . /etc/yimo/bootstrap.env;
     test "$YIMO_SSH_CIDR" != "REPLACE_WITH_ORGANIZER_CIDR";
     rm -rf /opt/yimo-source;
     git clone --no-checkout "$YIMO_REPO_URL" /opt/yimo-source;

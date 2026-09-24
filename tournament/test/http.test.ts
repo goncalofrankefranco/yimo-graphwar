@@ -42,6 +42,11 @@ test('serves health, admin, participant, match, room, and result routes', async 
     assert.match(await (await request('/participant')).body as string, /YIMO Tournament/);
     assert.match(await (await request('/participant')).body as string, /Participant code/);
     assert.match(await (await request('/participant')).body as string, /Join assigned match/);
+    assert.match(await (await request('/participant')).body as string, /Generate player ID/);
+    assert.match(await (await request('/participant')).body as string, /Register with player ID/);
+    assert.match(await (await request('/participant')).body as string, /await loadPlayer\(\);portalMessage\(message\)/);
+    assert.doesNotMatch(await (await request('/participant')).body as string,
+      /showPlayer\(await portalApi\(path\.replace/);
 
     const adminHeaders = { Authorization: 'Bearer admin-test-token' };
     const participantOne = await post('/api/v1/admin/participants', {
@@ -160,6 +165,55 @@ test('serves authenticated admin lifecycle controls and status projections', asy
     const details = await request('/api/v1/admin/tournaments/admin-lifecycle', { headers: adminHeaders });
     assert.equal(details.response.status, 200);
     assert.equal((details.body as any).counts.total, 0);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    app.close();
+  }
+});
+
+test('supports player-ID self-registration through the portal API', async () => {
+  const app = new TournamentService({
+    dbPath: ':memory:',
+    adminToken: 'admin-test-token',
+    roomSecret: 'room-test-secret',
+    buildId: 'YIMO-Graphwar-2.0.0',
+    protocolVersion: 2,
+    now: () => 1_700_000_000,
+    participantScryptCost: 256,
+    rateLimitMax: 1000,
+  });
+  const server = createTournamentHttpServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address: any = server.address();
+  const base = `http://127.0.0.1:${address.port}`;
+  const request = async (path: string, init: any = {}) => {
+    const response = await fetch(`${base}${path}`, {
+      ...init,
+      headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+    });
+    const body = await response.json();
+    return { response, body };
+  };
+  const post = (path: string, body: unknown, headers: Record<string, string> = {}) => request(path, {
+    method: 'POST', headers, body: JSON.stringify(body),
+  });
+  const admin = { Authorization: 'Bearer admin-test-token' };
+  try {
+    await post('/api/v1/admin/tournaments', {
+      tournamentId: 'self-http', name: 'Self HTTP', buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+    }, admin);
+    await post('/api/v1/admin/tournaments/self-http/registration/open', {}, admin);
+    const registered = await post('/api/v1/tournaments/self-http/self-register', {
+      playerId: 'yimo-local-http-1234567890', displayName: 'HTTP Player',
+      buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+    });
+    assert.equal(registered.response.status, 200);
+    assert.equal((registered.body as any).entry.entryStatus, 'REGISTERED');
+    const player = await request('/api/v1/player/tournaments/self-http', {
+      headers: { Authorization: `Bearer ${(registered.body as any).sessionToken}` },
+    });
+    assert.equal(player.response.status, 200);
+    assert.equal((player.body as any).participant.participantId, 'yimo-local-http-1234567890');
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     app.close();

@@ -14,6 +14,8 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -30,9 +32,11 @@ public final class SettingsScreen extends YimoScreen implements ActionListener {
     private final JTextField hostField = YimoTheme.textField(24);
     private final JTextField portField = YimoTheme.textField(8);
     private final JTextField apiField = YimoTheme.textField(24);
+    private final JTextField playerIdField = YimoTheme.textField(24);
     private final JButton saveButton = YimoTheme.accentButton("Save settings");
     private final JButton resetButton = YimoTheme.button("Reset defaults");
     private final JButton backButton = YimoTheme.quietButton("Back");
+    private final JButton copyPlayerIdButton = YimoTheme.button("Copy player ID");
     private final JLabel statusLabel = YimoTheme.mutedLabel("");
 
     public SettingsScreen(Graphwar graphwar) {
@@ -64,19 +68,23 @@ public final class SettingsScreen extends YimoScreen implements ActionListener {
         addRow(content, 2, "Lobby host", hostField);
         addRow(content, 3, "Lobby port", portField);
         addRow(content, 4, "Tournament API", apiField);
+        addRow(content, 5, "Local player ID", playerIdField);
+        playerIdField.setEditable(false);
 
         GridBagConstraints build = new GridBagConstraints();
         build.gridx = 0;
-        build.gridy = 5;
+        build.gridy = 6;
         build.gridwidth = 2;
         build.anchor = GridBagConstraints.WEST;
         build.insets = new Insets(12, 0, 0, 0);
-        content.add(YimoTheme.mutedLabel("Build " + Constants.BUILD_ID + "  •  Protocol " + Constants.PROTOCOL_VERSION), build);
+        content.add(YimoTheme.mutedLabel("Generate this ID once, then use it in the tournament portal. Build "
+                + Constants.BUILD_ID + "  •  Protocol " + Constants.PROTOCOL_VERSION), build);
 
         card.add(content, BorderLayout.NORTH);
         JPanel actions = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
         actions.add(backButton);
+        actions.add(copyPlayerIdButton);
         actions.add(resetButton);
         actions.add(saveButton);
         card.add(actions, BorderLayout.SOUTH);
@@ -87,6 +95,7 @@ public final class SettingsScreen extends YimoScreen implements ActionListener {
         saveButton.addActionListener(this);
         resetButton.addActionListener(this);
         backButton.addActionListener(this);
+        copyPlayerIdButton.addActionListener(this);
         refresh();
     }
 
@@ -111,6 +120,7 @@ public final class SettingsScreen extends YimoScreen implements ActionListener {
         hostField.setText(Constants.GLOBAL_IP);
         portField.setText(Integer.toString(Constants.GLOBAL_PORT));
         apiField.setText(Constants.TOURNAMENT_API_BASE_URL);
+        playerIdField.setText(PlayerIdentity.loadOrCreate(PlayerIdentity.userNode()));
     }
 
     private void status(String message, boolean error) {
@@ -123,6 +133,12 @@ public final class SettingsScreen extends YimoScreen implements ActionListener {
         Object source = event.getSource();
         if (source == backButton) {
             graphwar.getUI().setScreen(Constants.MAIN_MENU_SCREEN);
+            return;
+        }
+        if (source == copyPlayerIdButton) {
+            Toolkit.getDefaultToolkit().getSystemClipboard()
+                    .setContents(new StringSelection(playerIdField.getText()), null);
+            status("Player ID copied. Paste it into the tournament portal.", false);
             return;
         }
         try {

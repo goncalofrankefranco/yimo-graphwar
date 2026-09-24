@@ -55,6 +55,14 @@ export interface SessionInput {
   protocolVersion: number;
 }
 
+export interface SelfRegistrationInput {
+  playerId: string;
+  displayName: string;
+  buildId: string;
+  protocolVersion: number;
+  clientKey?: string;
+}
+
 export interface JoinInput {
   sessionToken: string;
   matchCode: string;
@@ -336,7 +344,7 @@ export class TournamentService {
 
   constructor(options: ServiceOptions) {
     if (!options?.adminToken || !options.roomSecret) {
-      throw new Error('YIMO_ADMIN_TOKEN and YIMO_ROOM_HMAC_SECRET are required.');
+      throw new Error('YIMO_ADMIN_PASSWORD and YIMO_ROOM_HMAC_SECRET are required.');
     }
     this.adminToken = options.adminToken;
     this.roomSecret = options.roomSecret;
@@ -495,6 +503,73 @@ export class TournamentService {
       });
     });
     return { tournamentId, status: 'DRAFT' };
+  }
+
+  private issueParticipantSession(participantId: string): { sessionToken: string; participantId: string; expiresAt: number } {
+    const participant = this.db.prepare(
+      "SELECT participant_id FROM participants WHERE participant_id = ? AND status = 'ACTIVE'",
+    ).get(participantId) as any;
+    if (!participant) throw new ServiceError(404, 'PARTICIPANT_NOT_FOUND', 'Participant not found.');
+    const sessionToken = randomBytes(32).toString('base64url');
+    const expiresAt = this.timestamp() + 3600;
+    this.db.prepare(`
+      INSERT INTO participant_sessions(session_token_hash, participant_id, expires_at, created_at)
+      VALUES (?, ?, ?, ?)
+    `).run(sha256(sessionToken), participant.participant_id, expiresAt, this.timestamp());
+    this.audit('PARTICIPANT_SESSION_CREATED', participant.participant_id, { expiresAt });
+    return { sessionToken, participantId: participant.participant_id, expiresAt };
+  }
+
+  selfRegisterParticipant(tournamentId: string, input: SelfRegistrationInput): Record<string, unknown> {
+    this.rateLimiter.check(`self-register:${input?.clientKey ?? 'local'}`, this.timestamp());
+    this.requireBuild(input?.buildId, input?.protocolVersion);
+    const id = validateIdentifier(input?.playerId, 'playerId');
+    if (!/^yimo-[A-Za-z0-9-]{16,100}$/.test(id)) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'playerId must be a generated YIMO local identity.');
+    }
+    const displayName = requiredText(input?.displayName, 'displayName', 80);
+    const tournament = this.tournamentRow(tournamentId);
+    if (tournament.status !== 'REGISTRATION_OPEN') {
+      throw new ServiceError(409, tournament.status === 'DRAFT' ? 'REGISTRATION_NOT_OPEN' : 'REGISTRATION_CLOSED',
+        'Registration is not open.');
+    }
+    if (tournament.roster_frozen_at !== null) {
+      throw new ServiceError(409, 'ROSTER_FROZEN', 'Tournament registration is frozen.');
+    }
+    const now = this.timestamp();
+    this.transaction(() => {
+      let participant = this.db.prepare('SELECT * FROM participants WHERE participant_id = ?').get(id) as any;
+      if (!participant) {
+        const internalCode = randomBytes(32).toString('base64url');
+        const salt = randomBytes(16).toString('hex');
+        const lookupHash = hmac(internalCode, this.roomSecret);
+        this.db.prepare(`
+          INSERT INTO participants(participant_id, display_name, participant_code_salt, participant_code_hash,
+            participant_code_lookup_hash, session_token_hash, created_at, status)
+          VALUES (?, ?, ?, ?, ?, NULL, ?, 'ACTIVE')
+        `).run(id, displayName, salt, this.participantHash(internalCode, salt), lookupHash, now);
+      } else if (participant.status !== 'ACTIVE') {
+        throw new ServiceError(409, 'PARTICIPANT_INACTIVE', 'This local player identity is inactive.');
+      }
+      this.db.prepare('UPDATE participants SET display_name = ? WHERE participant_id = ?')
+        .run(displayName, id);
+      this.db.prepare(`
+        INSERT OR IGNORE INTO tournament_entries(tournament_id, participant_id, entry_status, registered_at)
+        VALUES (?, ?, 'REGISTERED', ?)
+      `).run(tournament.tournament_id, id, now);
+      this.audit('PARTICIPANT_SELF_REGISTERED', tournament.tournament_id, {
+        participantId: id,
+      });
+    });
+    const session = this.issueParticipantSession(id);
+    const entry = this.db.prepare(
+      'SELECT * FROM tournament_entries WHERE tournament_id = ? AND participant_id = ?',
+    ).get(tournament.tournament_id, id) as any;
+    return {
+      ...session,
+      displayName,
+      entry: this.entryView(entry),
+    };
   }
 
   private tournamentRow(tournamentId: string): any {
@@ -1014,14 +1089,7 @@ export class TournamentService {
     )) {
       throw new ServiceError(401, 'INVALID_PARTICIPANT_CODE', 'Participant code is invalid.');
     }
-    const sessionToken = randomBytes(32).toString('base64url');
-    const expiresAt = this.timestamp() + 3600;
-    this.db.prepare(`
-      INSERT INTO participant_sessions(session_token_hash, participant_id, expires_at, created_at)
-      VALUES (?, ?, ?, ?)
-    `).run(sha256(sessionToken), participant.participant_id, expiresAt, this.timestamp());
-    this.audit('PARTICIPANT_SESSION_CREATED', participant.participant_id, { expiresAt });
-    return { sessionToken, participantId: participant.participant_id, expiresAt };
+    return this.issueParticipantSession(participant.participant_id);
   }
 
   private participantForSession(sessionToken: string): any {

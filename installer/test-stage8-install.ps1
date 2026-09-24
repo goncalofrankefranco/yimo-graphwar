@@ -2,8 +2,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$ReleaseDir,
-    [string]$ExpectedGlobalHost = '153.75.82.155',
-    [string]$ExpectedTournamentApiBaseUrl = 'http://153.75.82.155'
+    [string]$ExpectedGlobalHost = '172.86.118.184',
+    [string]$ExpectedTournamentApiBaseUrl = 'http://172.86.118.184'
 )
 
 $ErrorActionPreference = 'Stop'

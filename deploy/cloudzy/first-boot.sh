@@ -41,11 +41,11 @@ mv -f "$properties_tmp" "$CONFIG_DIR/yimo.properties"
 
 tournament_env="$CONFIG_DIR/tournament.env"
 if [[ ! -f "$tournament_env" ]]; then
-  admin_token="$(openssl rand -hex 32)"
+  admin_password="$(openssl rand -hex 32)"
   room_secret="$(openssl rand -hex 32)"
   env_tmp="$(mktemp /etc/yimo/tournament.env.XXXXXX)"
   cat > "$env_tmp" <<EOF
-YIMO_ADMIN_TOKEN=$admin_token
+YIMO_ADMIN_PASSWORD=$admin_password
 YIMO_ROOM_HMAC_SECRET=$room_secret
 YIMO_TOURNAMENT_DB=/var/lib/yimo/tournament.sqlite
 YIMO_BUILD_ID=YIMO-Graphwar-2.0.0
@@ -55,16 +55,31 @@ PORT=8080
 EOF
   chmod 600 "$env_tmp"
   mv -f "$env_tmp" "$tournament_env"
-  printf '%s\n' "$admin_token" > /root/yimo-admin-token.txt
-  chmod 600 /root/yimo-admin-token.txt
-elif [[ ! -f /root/yimo-admin-token.txt ]]; then
-  admin_token="$(sed -n 's/^YIMO_ADMIN_TOKEN=//p' "$tournament_env" | head -n 1)"
-  if [[ -z "$admin_token" ]]; then
-    echo 'Existing tournament.env has no YIMO_ADMIN_TOKEN.' >&2
+  printf '%s\n' "$admin_password" > /root/yimo-admin-password.txt
+  rm -f /root/yimo-admin-token.txt
+  chmod 600 /root/yimo-admin-password.txt
+elif ! grep -q '^YIMO_ADMIN_PASSWORD=' "$tournament_env"; then
+  admin_password="$(sed -n 's/^YIMO_ADMIN_TOKEN=//p' "$tournament_env" | head -n 1)"
+  if [[ -z "$admin_password" ]]; then
+    echo 'Existing tournament.env has no organizer password.' >&2
     exit 1
   fi
-  printf '%s\n' "$admin_token" > /root/yimo-admin-token.txt
-  chmod 600 /root/yimo-admin-token.txt
+  sed -i '/^YIMO_ADMIN_TOKEN=/d' "$tournament_env"
+  printf 'YIMO_ADMIN_PASSWORD=%s\n' "$admin_password" >> "$tournament_env"
+  printf '%s\n' "$admin_password" > /root/yimo-admin-password.txt
+  rm -f /root/yimo-admin-token.txt
+  chmod 600 /root/yimo-admin-password.txt
+elif [[ ! -f /root/yimo-admin-password.txt ]]; then
+  admin_password="$(sed -n 's/^YIMO_ADMIN_PASSWORD=//p' "$tournament_env" | head -n 1)"
+  if [[ -z "$admin_password" ]]; then
+    echo 'Existing tournament.env has an empty organizer password.' >&2
+    exit 1
+  fi
+  printf '%s\n' "$admin_password" > /root/yimo-admin-password.txt
+  chmod 600 /root/yimo-admin-password.txt
+fi
+if [[ -f /root/yimo-admin-password.txt ]]; then
+  chmod 600 /root/yimo-admin-password.txt
 fi
 
 chown -R yimo:yimo /var/lib/yimo /var/log/yimo

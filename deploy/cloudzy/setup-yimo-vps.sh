@@ -6,26 +6,25 @@ if [[ "$(id -u)" -ne 0 ]]; then
   echo 'Run YIMO VPS setup as root.' >&2
   exit 1
 fi
-
-: "${YIMO_SSH_CIDR:?Set YIMO_SSH_CIDR to the organizer IP in CIDR form, such as 203.0.113.42/32.}"
+: "${YIMO_SSH_CIDR:?Set YIMO_SSH_CIDR to the organizer IP in CIDR form.}"
 
 YIMO_REPO_URL="${YIMO_REPO_URL:-https://github.com/goncalofrankefranco/yimo-graphwar.git}"
-YIMO_REPO_REF="${YIMO_REPO_REF:-v2.0.0}"
-YIMO_RELEASE_URL="${YIMO_RELEASE_URL:-https://github.com/goncalofrankefranco/yimo-graphwar/releases/download/v2.0.0/YIMO-Graphwar-2.0.0-Portable.zip}"
-YIMO_RELEASE_SHA256="${YIMO_RELEASE_SHA256:-087638A79D946C419903749689A8BC9D4DB75C1DB1733A530C57365E4CC93064}"
+YIMO_REPO_REF="${YIMO_REPO_REF:-7cce143}"
 YIMO_PUBLIC_IP="${YIMO_PUBLIC_IP:-}"
+YIMO_RELEASE_URL="${YIMO_RELEASE_URL:-}"
+YIMO_RELEASE_SHA256="${YIMO_RELEASE_SHA256:-}"
 YIMO_ENABLE_PRACTICE_ROOMS="${YIMO_ENABLE_PRACTICE_ROOMS:-0}"
 YIMO_SWAP_SIZE="${YIMO_SWAP_SIZE:-512M}"
+export YIMO_PUBLIC_IP YIMO_SSH_CIDR YIMO_ENABLE_PRACTICE_ROOMS YIMO_SWAP_SIZE
 
-if [[ "$YIMO_REPO_REF" == 'REPLACE_WITH_APPROVED_COMMIT' ]]; then
-  echo 'YIMO_REPO_REF must name an approved tag or commit.' >&2
-  exit 1
-fi
+log_file=/var/log/yimo-bootstrap.log
+install -d -m 0750 /var/log
+exec > >(tee -a "$log_file") 2>&1
+trap 'echo "YIMO setup failed at line $LINENO. See $log_file." >&2' ERR
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends ca-certificates curl git unzip
-
 source_dir=/opt/yimo-source
 if [[ -d "$source_dir/.git" ]]; then
   git -C "$source_dir" remote set-url origin "$YIMO_REPO_URL"
@@ -39,43 +38,37 @@ else
 fi
 
 install -d -m 0700 /etc/yimo
-bootstrap_env=/etc/yimo/bootstrap.env
-if [[ ! -f "$bootstrap_env" ]]; then
-  cat > "$bootstrap_env" <<EOF
-# Non-secret settings for this YIMO instance.
+cat > /etc/yimo/bootstrap.env <<EOF
 YIMO_PUBLIC_IP=$YIMO_PUBLIC_IP
 YIMO_SSH_CIDR=$YIMO_SSH_CIDR
 YIMO_ENABLE_PRACTICE_ROOMS=$YIMO_ENABLE_PRACTICE_ROOMS
 YIMO_SWAP_SIZE=$YIMO_SWAP_SIZE
 EOF
-  chmod 600 "$bootstrap_env"
-else
-  echo "Keeping existing $bootstrap_env; edit it before rerunning if the IP or SSH range changed."
-fi
-
+chmod 600 /etc/yimo/bootstrap.env
 bash "$source_dir/deploy/cloudzy/bootstrap-vps.sh"
 
-release_archive="$(mktemp /tmp/yimo-release.XXXXXX.zip)"
 release_stage="$(mktemp -d /tmp/yimo-release.XXXXXX)"
-cleanup() {
-  rm -f "$release_archive"
-  rm -rf "$release_stage"
-}
+cleanup() { rm -rf "$release_stage"; }
 trap cleanup EXIT
-
-curl --fail --silent --show-error --location "$YIMO_RELEASE_URL" --output "$release_archive"
-if [[ -n "$YIMO_RELEASE_SHA256" ]]; then
-  echo "$YIMO_RELEASE_SHA256  $release_archive" | sha256sum --check --status -
+if [[ -n "$YIMO_RELEASE_URL" ]]; then
+  [[ -n "$YIMO_RELEASE_SHA256" ]] || { echo 'YIMO_RELEASE_SHA256 is required with YIMO_RELEASE_URL.' >&2; exit 1; }
+  archive="$(mktemp /tmp/yimo-release.XXXXXX.zip)"
+  curl --fail --silent --show-error --location "$YIMO_RELEASE_URL" --output "$archive"
+  echo "$YIMO_RELEASE_SHA256  $archive" | sha256sum --check --status
+  unzip -q "$archive" -d "$release_stage"
+  rm -f "$archive"
+  rm -rf "$release_stage/runtime"
+  rm -f "$release_stage/YIMO-Graphwar.exe" "$release_stage/launch-yimo.cmd"
+  rm -f "$release_stage/launch-practice-server.cmd" "$release_stage/launch-practice-client.cmd"
+else
+  bash "$source_dir/deploy/cloudzy/build-linux-release.sh" --output-dir "$release_stage"
 fi
-unzip -q "$release_archive" -d "$release_stage"
-
-# The portable package contains the Windows client runtime too. The Linux
-# server needs only the Java server JARs, resources, and tournament service.
-rm -rf "$release_stage/runtime"
-rm -f "$release_stage/YIMO-Graphwar.exe" "$release_stage/launch-yimo.cmd"
-rm -f "$release_stage/launch-practice-server.cmd" "$release_stage/launch-practice-client.cmd"
 
 bash "$source_dir/deploy/cloudzy/install-release.sh" --release-dir "$release_stage"
-systemctl is-active --quiet yimo-global.service
-systemctl is-active --quiet yimo-tournament.service
-echo 'YIMO VPS setup complete. The lobby and tournament services are active.'
+for unit in yimo-global.service yimo-tournament.service nginx.service; do
+  systemctl is-active --quiet "$unit"
+done
+curl --fail --retry 10 --retry-delay 1 --silent http://127.0.0.1/healthz
+ss -ltn | grep -Eq '0\.0\.0\.0:80|\*:80'
+ss -ltn | grep -Eq '\*:23762|0\.0\.0\.0:23762'
+echo 'YIMO VPS setup complete and health-checked.'

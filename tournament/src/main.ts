@@ -3,10 +3,10 @@ import { dirname } from 'node:path';
 import { createTournamentHttpServer } from './server.ts';
 import { TournamentService } from './service.ts';
 
-const adminToken = process.env.YIMO_ADMIN_TOKEN;
+const adminToken = process.env.YIMO_ADMIN_PASSWORD ?? process.env.YIMO_ADMIN_TOKEN;
 const roomSecret = process.env.YIMO_ROOM_HMAC_SECRET;
 if (!adminToken || !roomSecret) {
-  console.error('Set YIMO_ADMIN_TOKEN and YIMO_ROOM_HMAC_SECRET before starting the tournament service.');
+  console.error('Set YIMO_ADMIN_PASSWORD and YIMO_ROOM_HMAC_SECRET before starting the tournament service.');
   process.exitCode = 1;
 } else {
   const dbPath = process.env.YIMO_TOURNAMENT_DB ?? './data/tournament.sqlite';

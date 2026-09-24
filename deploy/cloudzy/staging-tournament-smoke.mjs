@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 const base = process.env.YIMO_STAGING_BASE ?? 'http://127.0.0.1';
-const admin = readFileSync('/root/yimo-admin-token.txt', 'utf8').trim();
+const admin = readFileSync('/root/yimo-admin-password.txt', 'utf8').trim();
 const buildId = 'YIMO-Graphwar-2.0.0';
 const protocolVersion = 2;
 const adminHeaders = { Authorization: `Bearer ${admin}` };

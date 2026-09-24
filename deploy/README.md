@@ -44,13 +44,15 @@ capacity limits.
   swapfile and applies bounded Java/Node memory profiles for the 1 GB plan.
 - `first-boot.sh` runs on every restored instance. It detects the current
   IPv4 address, writes a fresh `yimo.properties`, and creates runtime
-  tournament secrets only when they are missing.
+  tournament secrets only when they are missing. It exposes one organizer
+  password at `/root/yimo-admin-password.txt`; the room HMAC key remains
+  internal.
 - `install-release.sh` installs a locally built release atomically while
   keeping the previous release directory as a rollback copy.
 - `setup-yimo-vps.sh` is the replacement-VPS path: it checks out a pinned
-  repository revision, runs the base bootstrap, downloads and verifies the
-  pinned public release, strips Windows-only files, and starts the lobby and
-  tournament services. It creates fresh runtime secrets through
+  repository revision, runs the base bootstrap, builds a Linux server release
+  from source when no verified archive is supplied, and health-checks the
+  lobby/API/listeners. It creates fresh runtime secrets through
   `first-boot.sh`; no secrets are stored in the script.
 - `cloud-init-recovery.yaml` is the paste-ready Cloudzy Startup Scripts &
   Templates version of that flow. It writes the non-secret inputs, checks out
@@ -82,8 +84,8 @@ YIMO_SSH_CIDR=
 The current Stage 7 scripts do not consume `CLOUDZY_API_TOKEN`; there is no
 Cloudzy API connector enabled in this workspace. Keep the token in that file
 on the organizer computer, never in Git, a release archive, cloud-init,
-source code, or chat. The server’s generated organizer token is kept only in
-`/root/yimo-admin-token.txt` and is removed before a snapshot.
+source code, or chat. The server’s generated organizer password is kept only
+in `/root/yimo-admin-password.txt` and is removed before a snapshot.
 
 ## Rebuild a replacement VPS
 
@@ -98,10 +100,10 @@ ssh root@NEW_SERVER_IP \
   'YIMO_SSH_CIDR=YOUR_PUBLIC_IP/32 bash /root/setup-yimo-vps.sh'
 ```
 
-The script defaults to the published `v2.0.0` release and verifies its
-SHA-256 before installation. To use a later approved build, set
-`YIMO_REPO_REF`, `YIMO_RELEASE_URL`, and `YIMO_RELEASE_SHA256` in the SSH
-command. If `/etc/yimo/bootstrap.env` already exists, the script preserves it;
+The script defaults to the approved source revision and builds the Linux
+server artifacts locally. To use a prebuilt archive, set `YIMO_RELEASE_URL`
+and `YIMO_RELEASE_SHA256` in the environment. If `/etc/yimo/bootstrap.env`
+already exists, the script preserves it;
 edit that file first when restoring to a different IP or changing the firewall
 policy. It leaves practice rooms disabled unless
 `YIMO_ENABLE_PRACTICE_ROOMS=1` is explicitly supplied.
@@ -167,21 +169,21 @@ sudo systemctl status yimo-global.service yimo-tournament.service --no-pager
 sudo journalctl -u yimo-tournament.service -n 80 --no-pager
 ```
 
-Retrieve the generated organizer token over the protected SSH connection
+Retrieve the generated organizer password over the protected SSH connection
 only when configuring the local tournament admin:
 
 ```bash
-ssh root@SERVER_IP 'cat /root/yimo-admin-token.txt'
+ssh root@SERVER_IP 'cat /root/yimo-admin-password.txt'
 ```
 
-Do not paste that token into GitHub or commit it. Because this staging setup
+Do not paste that password into GitHub or commit it. Because this staging setup
 uses an IP and HTTP, do not use real participant credentials or expose the
 admin page publicly. Add a domain and HTTPS before the event.
 
 ### Scheduled-tournament staging check
 
 Run `staging-tournament-smoke.mjs` only after saving the existing SQLite
-database. It reads the organizer token from `/root/yimo-admin-token.txt` on
+database. It reads the organizer password from `/root/yimo-admin-password.txt` on
 the VPS and prints pass/fail labels only. The disposable flow creates four
 temporary participants, creates a short `autoStart` tournament, opens
 registration, registers the participants, waits for scheduled close/start,

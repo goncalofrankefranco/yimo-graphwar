@@ -18,8 +18,8 @@ Build it from the repository root:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\test-stage8.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\build-stage8-release.ps1 `
   -JavaHome 'C:\Program Files\Eclipse Adoptium\jdk-8.0.492.9-hotspot' `
-  -GlobalHost '153.75.82.155' `
-  -TournamentApiBaseUrl 'http://153.75.82.155'
+  -GlobalHost '172.86.118.184' `
+  -TournamentApiBaseUrl 'http://172.86.118.184'
 ```
 
 The build uses the Windows-native IExpress tool and emits a portable ZIP,

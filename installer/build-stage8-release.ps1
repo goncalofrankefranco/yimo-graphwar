@@ -2,8 +2,8 @@
 param(
     [string]$JavaHome = 'C:\Program Files\Eclipse Adoptium\jdk-8.0.492.9-hotspot',
     [string]$RuntimeSource = '',
-    [string]$GlobalHost = '153.75.82.155',
-    [string]$TournamentApiBaseUrl = 'http://153.75.82.155',
+    [string]$GlobalHost = '172.86.118.184',
+    [string]$TournamentApiBaseUrl = 'http://172.86.118.184',
     [string]$OutputDir = ''
 )
 

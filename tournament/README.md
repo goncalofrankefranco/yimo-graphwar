@@ -28,7 +28,7 @@ environment file or a secret manager:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `YIMO_ADMIN_TOKEN` | required | Bearer token for organizer endpoints |
+| `YIMO_ADMIN_PASSWORD` | required | Single bearer password for organizer endpoints |
 | `YIMO_ROOM_HMAC_SECRET` | required | Secret shared with YIMO tournament room processes |
 | `YIMO_TOURNAMENT_DB` | `./data/tournament.sqlite` | SQLite database path |
 | `YIMO_BUILD_ID` | `YIMO-Graphwar-2.0.0` | Accepted client/server build |
@@ -42,7 +42,7 @@ The repository ignores the default database directory and local `.env` file.
 Example local start from PowerShell:
 
 ```powershell
-$env:YIMO_ADMIN_TOKEN = 'replace-with-a-local-secret'
+$env:YIMO_ADMIN_PASSWORD = 'replace-with-a-local-secret'
 $env:YIMO_ROOM_HMAC_SECRET = 'replace-with-a-different-local-secret'
 $env:YIMO_TOURNAMENT_DB = './data/tournament.sqlite'
 npm start
@@ -54,7 +54,9 @@ proxy in front of it. Do not expose SQLite or the HMAC secret to clients.
 ## API
 
 All JSON errors have the form `{ "error": "CODE", "message": "..." }`.
-Organizer routes require `Authorization: Bearer <YIMO_ADMIN_TOKEN>`.
+Organizer routes require `Authorization: Bearer <YIMO_ADMIN_PASSWORD>`. The
+room HMAC secret is an internal server secret and is never shared with the
+organizer or players.
 
 | Method and path | Auth | Purpose |
 | --- | --- | --- |
@@ -71,6 +73,7 @@ Organizer routes require `Authorization: Bearer <YIMO_ADMIN_TOKEN>`.
 | `POST /api/v1/admin/tournaments/{id}/check-in/open` | admin | Open an enabled check-in window |
 | `POST /api/v1/admin/tournaments/{id}/start` | admin | Freeze the eligible roster and start the bracket |
 | `POST /api/v1/participant-sessions` | none | Exchange a participant code for a short-lived session |
+| `POST /api/v1/tournaments/{id}/self-register` | none | Register a locally generated player ID and receive a session |
 | `POST /api/v1/tournaments/{id}/register` | session | Register the authenticated competitor |
 | `POST /api/v1/tournaments/{id}/check-in` | session | Check in the authenticated competitor |
 | `GET /api/v1/player/tournaments/{id}` | session | Read private entry and next-match schedule |
@@ -100,8 +103,8 @@ The core request sequence is:
 
 1. The organizer opens `/admin`, creates a tournament schedule, and adds
    organizer-issued participant codes through the admin API.
-2. Competitors open `/participant`, exchange their participant code for a
-   one-hour session, register, and optionally check in.
+2. Competitors open `/participant`, generate/use a local player ID, self-register,
+   and optionally check in. Organizer-issued participant codes remain supported.
 3. The scheduler or organizer starts the tournament, freezes the eligible
    roster, and creates the bracket.
 4. A competitor loads their private schedule and joins the assigned match;

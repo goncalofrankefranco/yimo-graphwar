@@ -14,7 +14,7 @@ systemctl disable yimo-public-rooms.service >/dev/null 2>&1 || true
 
 # Runtime state and secrets are intentionally excluded from the golden image.
 rm -f /var/lib/yimo/tournament.sqlite /var/lib/yimo/tournament.sqlite-shm /var/lib/yimo/tournament.sqlite-wal
-rm -f /etc/yimo/tournament.env /root/yimo-admin-token.txt
+rm -f /etc/yimo/tournament.env /root/yimo-admin-token.txt /root/yimo-admin-password.txt
 rm -f /etc/yimo/yimo.properties
 
 bootstrap_env=/etc/yimo/bootstrap.env

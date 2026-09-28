@@ -6,6 +6,7 @@ $firstBoot = Get-Content -Raw (Join-Path $root 'deploy\cloudzy\first-boot.sh')
 $snapshot = Get-Content -Raw (Join-Path $root 'deploy\cloudzy\prepare-snapshot.sh')
 $firstBootUnit = Get-Content -Raw (Join-Path $root 'deploy\cloudzy\yimo-first-boot.service')
 $recovery = Get-Content -Raw (Join-Path $root 'deploy\cloudzy\cloud-init-recovery.yaml')
+$bootstrapTemplate = Get-Content -Raw (Join-Path $root 'deploy\cloudzy\cloud-init.yaml')
 $domainSetupPath = Join-Path $root 'deploy\cloudzy\enable-domain.sh'
 $nginxDomainPath = Join-Path $root 'deploy\cloudzy\nginx-yimo-domain.conf'
 if (-not (Test-Path $domainSetupPath) -or -not (Test-Path $nginxDomainPath)) {
@@ -23,6 +24,12 @@ foreach ($required in @('YIMO_PUBLIC_IP', 'YIMO_SSH_CIDR', 'YIMO_RELEASE_URL', '
 }
 foreach ($required in @('YIMO_PUBLIC_HOST', '127.0.0.1:8080/healthz')) {
     if ($setup -notmatch [regex]::Escape($required)) { throw "setup script is missing $required" }
+}
+if ($setup -notmatch 'YIMO_REPO_REF="\$\{YIMO_REPO_REF:-[0-9a-f]{40}\}"') {
+    throw 'setup script must pin its default source checkout to a full commit hash.'
+}
+if ($recovery -notmatch 'YIMO_REPO_REF=[0-9a-f]{40}' -or $bootstrapTemplate -notmatch 'YIMO_REPO_REF=[0-9a-f]{40}') {
+    throw 'Cloudzy templates must pin source checkout to a full commit hash.'
 }
 foreach ($required in @('YIMO_PUBLIC_IP', 'YIMO_SSH_CIDR', 'ufw', 'systemctl', 'nginx')) {
     if ($bootstrap -notmatch [regex]::Escape($required)) { throw "bootstrap script is missing $required" }

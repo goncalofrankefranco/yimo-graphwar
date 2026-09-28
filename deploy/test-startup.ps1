@@ -25,6 +25,9 @@ foreach ($required in @('YIMO_PUBLIC_IP', 'YIMO_SSH_CIDR', 'YIMO_RELEASE_URL', '
 foreach ($required in @('YIMO_PUBLIC_HOST', '127.0.0.1:8080/healthz')) {
     if ($setup -notmatch [regex]::Escape($required)) { throw "setup script is missing $required" }
 }
+if ($setup -notmatch 'curl --fail --retry 10 --retry-connrefused.*127\.0\.0\.1:8080/healthz') {
+    throw 'setup health check must retry while the local tournament service is starting.'
+}
 if ($setup -notmatch 'YIMO_REPO_REF="\$\{YIMO_REPO_REF:-[0-9a-f]{40}\}"') {
     throw 'setup script must pin its default source checkout to a full commit hash.'
 }

@@ -69,7 +69,7 @@ bash "$source_dir/deploy/cloudzy/install-release.sh" --release-dir "$release_sta
 for unit in yimo-global.service yimo-tournament.service nginx.service; do
   systemctl is-active --quiet "$unit"
 done
-curl --fail --retry 10 --retry-delay 1 --silent http://127.0.0.1:8080/healthz
+curl --fail --retry 10 --retry-connrefused --retry-delay 1 --silent --show-error --output /dev/null http://127.0.0.1:8080/healthz
 ss -ltn | grep -Eq '0\.0\.0\.0:80|\*:80'
 ss -ltn | grep -Eq '\*:23762|0\.0\.0\.0:23762'
 echo 'YIMO VPS setup complete and health-checked.'

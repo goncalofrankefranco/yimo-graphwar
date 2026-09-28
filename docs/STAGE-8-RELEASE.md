@@ -1,6 +1,6 @@
 # Stage 8 release and installer
 
-YIMO Graphwar 2.0.0 is released from the Git tag `v2.0.0`. The Java client and
+YIMO Graphwar 2.1.0 is released from the Git tag `v2.1.0`. The Java client and
 Java room/global servers target Java 8. The tournament service remains a
 separate Node.js 24.x service and is not started by the Windows client.
 
@@ -19,7 +19,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\build-stage8
 The builder compiles all Java artifacts through the Stage 7 reproducible
 build, copies the selected Java 8 runtime, writes the YIMO endpoint settings,
 creates a portable ZIP, and creates the single-file
-`YIMO-Graphwar-2.0.0-Setup.exe` with Windows IExpress. The output directory
+`YIMO-Graphwar-2.1.0-Setup.exe` with Windows IExpress. The output directory
 contains SHA-256 checksums for the distributable files.
 
 The installed package includes `YIMO-Graphwar.exe`, a native clickable

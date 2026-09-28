@@ -1,7 +1,7 @@
-# YIMO Graphwar 2.0.0 Windows installer source
+# YIMO Graphwar 2.1.0 Windows installer source
 
 `install.cmd` and `install.ps1` are the complete installation logic used by
-the self-extracting `YIMO-Graphwar-2.0.0-Setup.exe`. The installer expands a
+the self-extracting `YIMO-Graphwar-2.1.0-Setup.exe`. The installer expands a
 bundled Java 8 runtime and the three game/server JARs into
 `%LOCALAPPDATA%\YIMO Graphwar`, then creates a Start menu shortcut for the
 native `YIMO-Graphwar.exe` launcher. The launcher starts the bundled

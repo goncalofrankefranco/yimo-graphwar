@@ -7,7 +7,7 @@ test('self-registers a locally generated player identity without an organizer co
     dbPath: ':memory:',
     adminToken: 'admin-test-token',
     roomSecret: 'room-test-secret',
-    buildId: 'YIMO-Graphwar-2.0.0',
+    buildId: 'YIMO-Graphwar-2.1.0',
     protocolVersion: 2,
     now: () => 1_700_000_000,
     participantScryptCost: 256,
@@ -16,7 +16,7 @@ test('self-registers a locally generated player identity without an organizer co
   app.createTournament('admin-test-token', {
     tournamentId: 'self-register-test',
     name: 'Self Register Test',
-    buildId: 'YIMO-Graphwar-2.0.0',
+    buildId: 'YIMO-Graphwar-2.1.0',
     protocolVersion: 2,
   });
   app.openRegistration('admin-test-token', 'self-register-test');
@@ -24,7 +24,7 @@ test('self-registers a locally generated player identity without an organizer co
   const first: any = app.selfRegisterParticipant('self-register-test', {
     playerId: 'yimo-local-player-1234567890',
     displayName: 'Local Player',
-    buildId: 'YIMO-Graphwar-2.0.0',
+    buildId: 'YIMO-Graphwar-2.1.0',
     protocolVersion: 2,
   });
   assert.equal(first.participantId, 'yimo-local-player-1234567890');
@@ -35,7 +35,7 @@ test('self-registers a locally generated player identity without an organizer co
   const second: any = app.selfRegisterParticipant('self-register-test', {
     playerId: 'yimo-local-player-1234567890',
     displayName: 'Local Player',
-    buildId: 'YIMO-Graphwar-2.0.0',
+    buildId: 'YIMO-Graphwar-2.1.0',
     protocolVersion: 2,
   });
   assert.equal(second.participantId, first.participantId);

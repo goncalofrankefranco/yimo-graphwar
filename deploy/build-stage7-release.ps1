@@ -43,7 +43,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $resourceDir = Join-Path $root 'rsc'
 $jarSpecs = @(
-    @{ Name = 'YIMO-Graphwar-2.0.0.jar'; Main = 'Graphwar.Graphwar' },
+    @{ Name = 'YIMO-Graphwar-2.1.0.jar'; Main = 'Graphwar.Graphwar' },
     @{ Name = 'globalServer.jar'; Main = 'GlobalServer.GlobalServer' },
     @{ Name = 'roomServer.jar'; Main = 'RoomServer.RoomServer' }
 )
@@ -69,7 +69,7 @@ Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination $output
 
 $manifest = @(
     'YIMO Graphwar 2.0 Stage 7 release',
-    'Build ID: YIMO-Graphwar-2.0.0',
+    'Build ID: YIMO-Graphwar-2.1.0',
     'Protocol version: 2',
     'Java target: 8',
     'Tournament runtime: Node.js 24.x',

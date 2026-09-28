@@ -24,10 +24,10 @@ Assert-File (Join-Path $PSScriptRoot 'launch-practice-client.cmd') 'Practice-cli
 $notice = Get-Content -Raw (Join-Path $root 'NOTICE.md')
 $licenses = Get-Content -Raw (Join-Path $root 'THIRD-PARTY-LICENSES.md')
 $readme = Get-Content -Raw (Join-Path $PSScriptRoot 'README.md')
-Assert-True ($notice -match 'YIMO Graphwar 2\.0\.0') 'Notice must identify the v2 release.'
+Assert-True ($notice -match 'YIMO Graphwar 2\.1\.0') 'Notice must identify the v2.1 release.'
 Assert-True ($notice -match 'GPL-3\.0') 'Notice must identify GPL-3.0.'
 Assert-True ($licenses -match 'OpenJDK') 'Third-party license audit must cover the bundled runtime.'
-Assert-True ($readme -match 'YIMO-Graphwar-2\.0\.0-Setup\.exe') 'Installer README must document the v2 installer.'
+Assert-True ($readme -match 'YIMO-Graphwar-2\.1\.0-Setup\.exe') 'Installer README must document the v2.1 installer.'
 
 $sourceFiles = @(
         (Join-Path $PSScriptRoot 'build-stage8-release.ps1'),

@@ -25,7 +25,7 @@ try {
     # only that stale extractor cache so an earlier package cannot contaminate
     # this isolated install check.
     $legacyIexpressTemp = Join-Path $oldTemp 'IXP000.TMP'
-    $activeInstaller = Get-Process -Name 'YIMO-Graphwar-2.0.0-Setup' -ErrorAction SilentlyContinue
+    $activeInstaller = Get-Process -Name 'YIMO-Graphwar-2.1.0-Setup' -ErrorAction SilentlyContinue
     if ($null -ne $activeInstaller) { throw 'another YIMO installer test is already running.' }
     if (Test-Path -LiteralPath $legacyIexpressTemp) {
         Remove-Item -LiteralPath $legacyIexpressTemp -Recurse -Force
@@ -37,14 +37,14 @@ try {
     $env:YIMO_INSTALL_NO_LAUNCH = '1'
     New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
 
-    $setup = Join-Path $release 'YIMO-Graphwar-2.0.0-Setup.exe'
+    $setup = Join-Path $release 'YIMO-Graphwar-2.1.0-Setup.exe'
     Assert-True (Test-Path -LiteralPath $setup -PathType Leaf) 'setup executable is missing.'
     $process = Start-Process -FilePath $setup -Wait -PassThru -WindowStyle Hidden
     Assert-True ($process.ExitCode -eq 0) "setup exited with code $($process.ExitCode)."
 
     $target = Join-Path $env:LOCALAPPDATA 'YIMO Graphwar'
     foreach ($relative in @(
-            'YIMO-Graphwar-2.0.0.jar',
+            'YIMO-Graphwar-2.1.0.jar',
             'YIMO-Graphwar.exe',
             'YIMO.ico',
             'yimo-logo.png',
@@ -71,7 +71,7 @@ try {
     $secondProcess = Start-Process -FilePath $setup -Wait -PassThru -WindowStyle Hidden
     Assert-True ($secondProcess.ExitCode -eq 0) "second setup run exited with code $($secondProcess.ExitCode)."
     $installedVersion = (Get-Content -Raw (Join-Path $target '.yimo-installed-version')).Trim()
-    Assert-True ($installedVersion -match '^YIMO-Graphwar-2\.0\.0\|') 'installed version marker is invalid.'
+    Assert-True ($installedVersion -match '^YIMO-Graphwar-2\.1\.0\|') 'installed version marker is invalid.'
 
     $javaProcess = Start-Process -FilePath (Join-Path $target 'runtime\bin\java.exe') -ArgumentList @('-version') -Wait -PassThru -WindowStyle Hidden
     Assert-True ($javaProcess.ExitCode -eq 0) 'bundled Java did not start.'

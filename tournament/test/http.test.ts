@@ -3,12 +3,31 @@ import assert from 'node:assert/strict';
 import { createTournamentHttpServer } from '../src/server.ts';
 import { TournamentService } from '../src/service.ts';
 
+test('advertises the v2.1.0 build ID when the tournament service uses defaults', async () => {
+  const app = new TournamentService({
+    dbPath: ':memory:',
+    adminToken: 'admin-test-token',
+    roomSecret: 'room-test-secret',
+  });
+  const server = createTournamentHttpServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address: any = server.address();
+    const response = await fetch(`http://127.0.0.1:${address.port}/healthz`);
+    const body = await response.json() as any;
+    assert.equal(body.buildId, 'YIMO-Graphwar-2.1.0');
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    app.close();
+  }
+});
+
 test('serves health, admin, participant, match, room, and result routes', async () => {
   const app = new TournamentService({
     dbPath: ':memory:',
     adminToken: 'admin-test-token',
     roomSecret: 'room-test-secret',
-    buildId: 'YIMO-Graphwar-2.0.0',
+    buildId: 'YIMO-Graphwar-2.1.0',
     protocolVersion: 2,
     now: () => 1_700_000_000,
     participantScryptCost: 256,
@@ -37,7 +56,7 @@ test('serves health, admin, participant, match, room, and result routes', async 
   try {
     const health = await request('/healthz');
     assert.equal(health.response.status, 200);
-    assert.equal((health.body as any).buildId, 'YIMO-Graphwar-2.0.0');
+    assert.equal((health.body as any).buildId, 'YIMO-Graphwar-2.1.0');
     const home = await request('/', { redirect: 'manual' });
     assert.equal(home.response.status, 200);
     assert.match(home.body as string, /YIMO Graphwar/);
@@ -75,7 +94,7 @@ test('serves health, admin, participant, match, room, and result routes', async 
 
     const created = await post('/api/v1/admin/tournaments', {
       tournamentId: 'http-test', name: 'HTTP Test Cup',
-      buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+      buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
     }, adminHeaders);
     assert.equal(created.response.status, 201);
     const seeded = await post('/api/v1/admin/bracket/seed', {
@@ -92,12 +111,12 @@ test('serves health, admin, participant, match, room, and result routes', async 
     assert.ok(!(Object.prototype.hasOwnProperty.call((bracket.body as any).matches[0], 'matchCode')));
 
     const session = await post('/api/v1/participant-sessions', {
-      participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+      participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
     });
     assert.equal(session.response.status, 200);
     const joined = await post('/api/v1/matches/join', {
       sessionToken: (session.body as any).sessionToken, matchCode: openMatch.matchCode,
-      buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+      buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
     });
     assert.equal(joined.response.status, 200);
     assert.equal((joined.body as any).roomSlot, 30000);
@@ -128,7 +147,7 @@ test('serves authenticated admin lifecycle controls and status projections', asy
     dbPath: ':memory:',
     adminToken: 'admin-test-token',
     roomSecret: 'room-test-secret',
-    buildId: 'YIMO-Graphwar-2.0.0',
+    buildId: 'YIMO-Graphwar-2.1.0',
     protocolVersion: 2,
     now: () => 1_700_000_000,
     participantScryptCost: 256,
@@ -163,7 +182,7 @@ test('serves authenticated admin lifecycle controls and status projections', asy
 
     const created = await post('/api/v1/admin/tournaments', {
       tournamentId: 'admin-lifecycle', name: 'Admin Lifecycle',
-      buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+      buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
     }, adminHeaders);
     assert.equal(created.response.status, 201);
     const unauthorized = await request('/api/v1/admin/tournaments/admin-lifecycle', {
@@ -193,7 +212,7 @@ test('supports player-ID self-registration through the portal API', async () => 
     dbPath: ':memory:',
     adminToken: 'admin-test-token',
     roomSecret: 'room-test-secret',
-    buildId: 'YIMO-Graphwar-2.0.0',
+    buildId: 'YIMO-Graphwar-2.1.0',
     protocolVersion: 2,
     now: () => 1_700_000_000,
     participantScryptCost: 256,
@@ -217,12 +236,12 @@ test('supports player-ID self-registration through the portal API', async () => 
   const admin = { Authorization: 'Bearer admin-test-token' };
   try {
     await post('/api/v1/admin/tournaments', {
-      tournamentId: 'self-http', name: 'Self HTTP', buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+      tournamentId: 'self-http', name: 'Self HTTP', buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
     }, admin);
     await post('/api/v1/admin/tournaments/self-http/registration/open', {}, admin);
     const registered = await post('/api/v1/tournaments/self-http/self-register', {
       playerId: 'yimo-local-http-1234567890', displayName: 'HTTP Player',
-      buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+      buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
     });
     assert.equal(registered.response.status, 200);
     assert.equal((registered.body as any).entry.entryStatus, 'REGISTERED');
@@ -242,7 +261,7 @@ test('accepts the organizer bearer token in the app-specific authorization heade
     dbPath: ':memory:',
     adminToken: 'admin-test-token',
     roomSecret: 'room-test-secret',
-    buildId: 'YIMO-Graphwar-2.0.0',
+    buildId: 'YIMO-Graphwar-2.1.0',
     protocolVersion: 2,
     now: () => 1_700_000_000,
     participantScryptCost: 256,
@@ -258,7 +277,7 @@ test('accepts the organizer bearer token in the app-specific authorization heade
       headers: { Authorization: 'Bearer admin-test-token', 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tournamentId: 'separate-auth-header', name: 'Separate Auth Header',
-        buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+        buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
       }),
     });
     assert.equal(created.status, 201);

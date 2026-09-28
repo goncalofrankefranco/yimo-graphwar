@@ -1,4 +1,4 @@
-# YIMO Graphwar 2.0.0 notices
+# YIMO Graphwar 2.1.0 notices
 
 YIMO Graphwar is a modified version of Graphwar, an artillery game based on
 mathematical functions.

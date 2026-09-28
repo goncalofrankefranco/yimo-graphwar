@@ -31,7 +31,7 @@ if [[ -z "$release_dir" || ! -d "$release_dir" ]]; then
   echo 'Pass --release-dir with the uploaded Stage 7 release directory.' >&2
   exit 2
 fi
-for required in YIMO-Graphwar-2.0.0.jar globalServer.jar roomServer.jar rsc tournament/src/main.ts; do
+for required in YIMO-Graphwar-2.1.0.jar globalServer.jar roomServer.jar rsc tournament/src/main.ts; do
   if [[ ! -e "$release_dir/$required" ]]; then
     echo "Release is missing $required." >&2
     exit 1

@@ -348,7 +348,7 @@ export class TournamentService {
     }
     this.adminToken = options.adminToken;
     this.roomSecret = options.roomSecret;
-    this.buildId = options.buildId ?? 'YIMO-Graphwar-2.0.0';
+    this.buildId = options.buildId ?? 'YIMO-Graphwar-2.1.0';
     this.protocolVersion = options.protocolVersion ?? 2;
     this.now = options.now ?? (() => Math.floor(Date.now() / 1000));
     this.participantScryptCost = options.participantScryptCost ?? 16384;

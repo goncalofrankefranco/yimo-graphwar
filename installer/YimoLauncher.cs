@@ -10,7 +10,7 @@ internal static class YimoLauncher
     {
         string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
         string java = Path.Combine(baseDirectory, "runtime", "bin", "javaw.exe");
-        string jar = Path.Combine(baseDirectory, "YIMO-Graphwar-2.0.0.jar");
+        string jar = Path.Combine(baseDirectory, "YIMO-Graphwar-2.1.0.jar");
         string config = Path.Combine(baseDirectory, "yimo.properties");
         try
         {

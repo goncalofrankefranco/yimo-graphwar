@@ -15,7 +15,7 @@ if (!adminToken || !roomSecret) {
     dbPath,
     adminToken,
     roomSecret,
-    buildId: process.env.YIMO_BUILD_ID ?? 'YIMO-Graphwar-2.0.0',
+    buildId: process.env.YIMO_BUILD_ID ?? 'YIMO-Graphwar-2.1.0',
     protocolVersion: Number(process.env.YIMO_PROTOCOL_VERSION ?? 2),
   });
   const port = Number(process.env.PORT ?? 8080);

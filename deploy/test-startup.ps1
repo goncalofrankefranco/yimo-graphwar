@@ -56,6 +56,10 @@ if ($firstBoot -notmatch 'YIMO_PUBLIC_HOST' -or $firstBoot -notmatch 'https://\$
         $firstBoot -notmatch 'global\.host=graphwar-server\.yimo-official\.org') {
     throw 'first-boot must configure the fixed YIMO game and HTTPS tournament domains.'
 }
+if ($firstBoot -notmatch 'YIMO_BUILD_ID=YIMO-Graphwar-2\.1\.0' -or
+        $firstBoot -notmatch 'sed -i.*YIMO_BUILD_ID') {
+    throw 'first-boot must upgrade an existing tournament service to the current build ID.'
+}
 if ($firstBoot -match 'openssl rand -hex 24|htpasswd -Bbc') {
     throw 'first-boot must not generate or install a public website password.'
 }

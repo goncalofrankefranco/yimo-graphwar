@@ -32,7 +32,7 @@ public final class NetworkProtocolTest {
         properties.setProperty("room.port.start", "30000");
         properties.setProperty("room.port.end", "30049");
         properties.setProperty("tournament.api.baseUrl", "https://yimo.example/api");
-        properties.setProperty("build.id", "YIMO-Graphwar-2.0.0");
+        properties.setProperty("build.id", "YIMO-Graphwar-2.1.0");
         properties.setProperty("protocol.version", "2");
         NetworkConfig config = NetworkConfig.fromProperties(properties);
         check("yimo.example".equals(config.getGlobalHost()) && config.getGlobalPort() == 23762,
@@ -43,6 +43,8 @@ public final class NetworkProtocolTest {
                 "the normal game endpoint must use the YIMO game domain");
         check("https://graphwar.yimo-official.org".equals(defaults.getTournamentApiBaseUrl()),
                 "the normal tournament endpoint must use the HTTPS YIMO domain");
+        check("YIMO-Graphwar-2.1.0".equals(defaults.getBuildId()),
+                "the next release must advertise the 2.1.0 build ID by default");
 
         NetworkConfig overridden = NetworkConfig.fromCommandLine(new String[] {
                 "--global-host", "override.example", "--global-port", "23999",

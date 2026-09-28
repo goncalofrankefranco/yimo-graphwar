@@ -3,7 +3,7 @@ import { TournamentService } from './service.ts';
 export const DEMO_ADMIN_TOKEN = 'demo-admin-token';
 export const DEMO_ROOM_SECRET = 'demo-room-secret';
 export const DEMO_TOURNAMENT_ID = 'yimo-demo-2026';
-export const DEMO_BUILD_ID = 'YIMO-Graphwar-2.0.0';
+export const DEMO_BUILD_ID = 'YIMO-Graphwar-2.1.0';
 export const DEMO_PROTOCOL_VERSION = 2;
 
 export interface DemoFixture {

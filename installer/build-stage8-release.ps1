@@ -62,13 +62,13 @@ try {
     if ($null -eq $csc) { Fail 'The Windows .NET Framework C# compiler was not found.' }
 
     $yimoProperties = @"
-# YIMO Graphwar 2.0.0 default endpoint
+# YIMO Graphwar 2.1.0 default endpoint
 global.host=$GlobalHost
 global.port=23762
 room.port.start=30000
 room.port.end=30049
 tournament.api.baseUrl=$TournamentApiBaseUrl
-build.id=YIMO-Graphwar-2.0.0
+build.id=YIMO-Graphwar-2.1.0
 protocol.version=2
 "@
     Set-Content -LiteralPath (Join-Path $payload 'yimo.properties') -Value $yimoProperties -Encoding ASCII
@@ -80,13 +80,13 @@ global.port=23762
 room.port.start=30000
 room.port.end=30049
 tournament.api.baseUrl=http://127.0.0.1:8080
-build.id=YIMO-Graphwar-2.0.0
+build.id=YIMO-Graphwar-2.1.0
 protocol.version=2
 "@
     Set-Content -LiteralPath (Join-Path $payload 'practice.properties') -Value $practiceProperties -Encoding ASCII
 
     $installedReadme = @"
-YIMO Graphwar 2.0.0
+YIMO Graphwar 2.1.0
 Powered by Cloudzy
 
 Double-click YIMO-Graphwar.exe to connect to the configured YIMO endpoint.
@@ -129,17 +129,17 @@ License: GPL-3.0-or-later; see COPYING and NOTICE.md.
     Copy-Item -LiteralPath $icon -Destination (Join-Path $payload 'YIMO.ico') -Force
     Copy-Item -LiteralPath $officialLogo -Destination (Join-Path $payload 'yimo-logo.png') -Force
 
-    $portable = Join-Path $output 'YIMO-Graphwar-2.0.0-Portable.zip'
+    $portable = Join-Path $output 'YIMO-Graphwar-2.1.0-Portable.zip'
     Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $portable -CompressionLevel Optimal
 
     $payloadZip = Join-Path $iexpressSource 'payload.zip'
     Copy-Item -LiteralPath $portable -Destination $payloadZip -Force
-    Set-Content -LiteralPath (Join-Path $iexpressSource 'payload.version') -Value ("YIMO-Graphwar-2.0.0|$revision") -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $iexpressSource 'payload.version') -Value ("YIMO-Graphwar-2.1.0|$revision") -Encoding ASCII
     Copy-Item -LiteralPath (Join-Path $installerRoot 'install.cmd') -Destination $iexpressSource -Force
     Copy-Item -LiteralPath (Join-Path $installerRoot 'install.ps1') -Destination $iexpressSource -Force
 
-    $installer = Join-Path $output 'YIMO-Graphwar-2.0.0-Setup.exe'
-    $sed = Join-Path $work 'YIMO-Graphwar-2.0.0.sed'
+    $installer = Join-Path $output 'YIMO-Graphwar-2.1.0-Setup.exe'
+    $sed = Join-Path $work 'YIMO-Graphwar-2.1.0.sed'
     $sourceFilesRoot = $iexpressSource.TrimEnd('\') + '\'
     $sedContent = @"
 [Version]
@@ -169,7 +169,7 @@ InstallPrompt=
 DisplayLicense=
 FinishMessage=
 TargetName=$installer
-FriendlyName=YIMO Graphwar 2.0.0
+FriendlyName=YIMO Graphwar 2.1.0
 AppLaunched=install.cmd
 PostInstallCmd=<None>
 AdminQuietInstCmd=
@@ -196,12 +196,12 @@ SourceFiles0=$sourceFilesRoot
     }
 
     $manifest = @(
-        'YIMO Graphwar 2.0.0 release',
-        'Build ID: YIMO-Graphwar-2.0.0',
+        'YIMO Graphwar 2.1.0 release',
+        'Build ID: YIMO-Graphwar-2.1.0',
         'Protocol version: 2',
         'Java target: 8',
-        'Installer: YIMO-Graphwar-2.0.0-Setup.exe',
-        'Portable package: YIMO-Graphwar-2.0.0-Portable.zip',
+        'Installer: YIMO-Graphwar-2.1.0-Setup.exe',
+        'Portable package: YIMO-Graphwar-2.1.0-Portable.zip',
         "Default global host: $GlobalHost",
         "Default tournament API: $TournamentApiBaseUrl",
         "Source revision: $revision",

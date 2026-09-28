@@ -1,5 +1,5 @@
 
-# YIMO Graphwar 2.0.0
+# YIMO Graphwar 2.1.0
 
 CREDITS TO: https://github.com/catabriga/graphwar
 
@@ -161,10 +161,10 @@ Compile the game using the make command (or on your favorite IDE).
 
 On Windows, run the installer and launch `YIMO-Graphwar.exe`; the bundled
 Java runtime means no separate Java installation is required. For source
-builds, run `YIMO-Graphwar-2.0.0.jar` with Java 8.
+builds, run `YIMO-Graphwar-2.1.0.jar` with Java 8.
 
 The v2 Windows package is built by `installer/build-stage8-release.ps1`. It
-produces `YIMO-Graphwar-2.0.0-Setup.exe` with a bundled Java 8 runtime,
+produces `YIMO-Graphwar-2.1.0-Setup.exe` with a bundled Java 8 runtime,
 clickable `YIMO-Graphwar.exe`, and a portable ZIP. Install it, search for
 “YIMO Graphwar”, and click the Start menu shortcut. The game uses the YIMO
 game domain automatically. See

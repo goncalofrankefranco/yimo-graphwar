@@ -169,7 +169,7 @@ Run from the repository root in PowerShell:
 ```powershell
 .\deploy\build-stage7-release.ps1 `
   -JavaHome 'C:\Program Files\Eclipse Adoptium\jdk-8.0.492.9-hotspot' `
-  -OutputDir 'C:\path\outside\the\repo\YIMO-Graphwar-2.0.0-stage7'
+  -OutputDir 'C:\path\outside\the\repo\YIMO-Graphwar-2.1.0-stage7'
 ```
 
 The script compiles all production Java sources with Java 8, creates the
@@ -204,7 +204,7 @@ From the organizer computer, upload the built release directory (not
 `.env.local`):
 
 ```powershell
-scp -r C:\path\outside\the\repo\YIMO-Graphwar-2.0.0-stage7 root@SERVER_IP:/root/yimo-release
+scp -r C:\path\outside\the\repo\YIMO-Graphwar-2.1.0-stage7 root@SERVER_IP:/root/yimo-release
 ssh root@SERVER_IP 'bash /opt/yimo-source/deploy/cloudzy/install-release.sh --release-dir /root/yimo-release'
 ```
 

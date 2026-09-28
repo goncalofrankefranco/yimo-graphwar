@@ -3,5 +3,5 @@ setlocal
 set "BASE=%~dp0"
 set "JAVA=%BASE%runtime\bin\javaw.exe"
 if not exist "%JAVA%" set "JAVA=javaw.exe"
-start "YIMO Graphwar Practice" "%JAVA%" -Xms64m -Xmx256m -Dfile.encoding=UTF-8 -jar "%BASE%YIMO-Graphwar-2.0.0.jar" --config "%BASE%practice.properties" %*
+start "YIMO Graphwar Practice" "%JAVA%" -Xms64m -Xmx256m -Dfile.encoding=UTF-8 -jar "%BASE%YIMO-Graphwar-2.1.0.jar" --config "%BASE%practice.properties" %*
 endlocal

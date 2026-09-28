@@ -31,7 +31,7 @@ environment file or a secret manager:
 | `YIMO_ADMIN_PASSWORD` | required | Single bearer password for organizer endpoints |
 | `YIMO_ROOM_HMAC_SECRET` | required | Secret shared with YIMO tournament room processes |
 | `YIMO_TOURNAMENT_DB` | `./data/tournament.sqlite` | SQLite database path |
-| `YIMO_BUILD_ID` | `YIMO-Graphwar-2.0.0` | Accepted client/server build |
+| `YIMO_BUILD_ID` | `YIMO-Graphwar-2.1.0` | Accepted client/server build |
 | `YIMO_PROTOCOL_VERSION` | `2` | Accepted wire-protocol version |
 | `HOST` | `127.0.0.1` | HTTP bind address; use localhost behind Nginx |
 | `PORT` | `8080` | HTTP bind port |
@@ -143,7 +143,7 @@ Authorization: Bearer <admin-token>
 
 POST /api/v1/admin/tournaments
 Authorization: Bearer <admin-token>
-{"tournamentId":"yimo-cup-2026","name":"YIMO Cup 2026","buildId":"YIMO-Graphwar-2.0.0","protocolVersion":2}
+{"tournamentId":"yimo-cup-2026","name":"YIMO Cup 2026","buildId":"YIMO-Graphwar-2.1.0","protocolVersion":2}
 
 POST /api/v1/admin/bracket/seed
 Authorization: Bearer <admin-token>

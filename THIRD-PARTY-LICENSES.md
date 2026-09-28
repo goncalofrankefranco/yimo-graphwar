@@ -1,7 +1,7 @@
 # Third-party licenses
 
 This file records the third-party components intentionally included or
-referenced by YIMO Graphwar 2.0.0. The release installer carries the relevant
+referenced by YIMO Graphwar 2.1.0. The release installer carries the relevant
 runtime license files alongside the runtime where the vendor supplies them.
 
 ## Graphwar upstream

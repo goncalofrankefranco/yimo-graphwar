@@ -9,7 +9,7 @@ test('scheduled demo advances through registration and starts a public bracket',
   assert.equal(demo.advanceTo(110), 1);
   for (const code of demo.participantCodes) {
     const session = demo.service.createParticipantSession({
-      participantCode: code, buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+      participantCode: code, buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
     });
     demo.service.registerParticipant(session.sessionToken, DEMO_TOURNAMENT_ID);
   }
@@ -48,7 +48,7 @@ test('scheduled demo supports HTTP registration, assigned join, and result advan
     const sessions: any[] = [];
     for (const code of demo.participantCodes) {
       const session = await post('/api/v1/participant-sessions', {
-        participantCode: code, buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+        participantCode: code, buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
       });
       assert.equal(session.response.status, 200);
       sessions.push(session.body);
@@ -64,7 +64,7 @@ test('scheduled demo supports HTTP registration, assigned join, and result advan
     assert.equal(schedule.response.status, 200);
     const matchId = (schedule.body as any).nextMatch.matchId;
     const joined = await post(`/api/v1/matches/${matchId}/join-assigned`, {
-      buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+      buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
     }, { Authorization: `Bearer ${sessions[0].sessionToken}` });
     assert.equal(joined.response.status, 200);
     const result = await post(`/api/v1/matches/${matchId}/result`, {

@@ -14,9 +14,11 @@ tournament control service and signed-room implementation are documented in
 
 The Java client and room/global servers remain Java 8 compatible. The
 tournament service requires Node.js 24.x and uses only built-in Node modules.
-The current local defaults are in `rsc/yimo.properties`; deployment values
-belong in an external `yimo.properties` file or command-line overrides. Never
-commit endpoint secrets, organizer tokens, participant codes, or HMAC keys.
+The normal client connects to `graphwar-server.yimo-official.org` for game
+traffic and `https://graphwar.yimo-official.org` for tournaments. There is no
+in-game IP settings screen. Advanced local development can still override
+endpoints with a local config file or command-line flags. Never commit
+organizer tokens, participant codes, or HMAC keys.
 
 The client scales the battlefield to the available resizable window while
 preserving its logical game coordinates. Room hosts select Normal functions,
@@ -164,8 +166,8 @@ builds, run `YIMO-Graphwar-2.0.0.jar` with Java 8.
 The v2 Windows package is built by `installer/build-stage8-release.ps1`. It
 produces `YIMO-Graphwar-2.0.0-Setup.exe` with a bundled Java 8 runtime,
 clickable `YIMO-Graphwar.exe`, and a portable ZIP. Install it, search for
-“YIMO Graphwar”, and click the Start menu shortcut. Connection values can be
-changed in the in-app Settings screen and are saved per Windows user. See
+“YIMO Graphwar”, and click the Start menu shortcut. The game uses the YIMO
+game domain automatically. See
 [`docs/STAGE-8-RELEASE.md`](docs/STAGE-8-RELEASE.md) and
 [`installer/README.md`](installer/README.md) for the reproducible release
 procedure.
@@ -185,16 +187,15 @@ register/check in, view their private next-match schedule, and join an assigned
 room without receiving a public match code. The public bracket never exposes
 participant codes, match codes, room tokens, or organizer secrets.
 
-The deployed HTTP pages and APIs are behind a temporary web password; the
-organizer console then asks for its separate organizer password. This protects
-the website, not the game's separate multiplayer TCP ports. The Java lobby’s
-room list remains a practice-room list; it is not the tournament bracket. The
-local disposable implementation and API contract are
+The public HTTP pages no longer have a site-wide password. Organizer actions
+still require the separate organizer password; game traffic uses its own TCP
+ports. The Java lobby’s room list remains a practice-room list; it is not the
+tournament bracket. The local disposable implementation and API contract are
 documented in [`tournament/README.md`](tournament/README.md) and
 [`docs/STAGES-5-6.md`](docs/STAGES-5-6.md).
 
-Cloudflare DNS, HTTPS, site-password rotation, and safe first-boot behavior are
-documented in [`deploy/README.md`](deploy/README.md#configure-the-private-graphwar-subdomain).
+Cloudflare DNS, HTTPS, organizer authentication, and safe first-boot behavior
+are documented in [`deploy/README.md`](deploy/README.md#configure-the-graphwar-subdomains).
 
 ## Running Local Servers
 

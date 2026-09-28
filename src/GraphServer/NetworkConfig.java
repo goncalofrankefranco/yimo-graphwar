@@ -20,11 +20,11 @@ import java.util.Properties;
 /** Validated YIMO endpoint settings shared by the client and Java servers. */
 public final class NetworkConfig {
     public static final String FILE_NAME = "yimo.properties";
-    public static final String DEFAULT_GLOBAL_HOST = "127.0.0.1";
+    public static final String DEFAULT_GLOBAL_HOST = "graphwar-server.yimo-official.org";
     public static final int DEFAULT_GLOBAL_PORT = 23762;
     public static final int DEFAULT_ROOM_PORT_START = 30000;
     public static final int DEFAULT_ROOM_PORT_END = 30049;
-    public static final String DEFAULT_TOURNAMENT_API = "http://127.0.0.1:8080";
+    public static final String DEFAULT_TOURNAMENT_API = "https://graphwar.yimo-official.org";
     public static final String DEFAULT_BUILD_ID = "YIMO-Graphwar-2.0.0";
     public static final int DEFAULT_PROTOCOL_VERSION = 2;
 

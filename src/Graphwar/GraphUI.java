@@ -49,7 +49,6 @@ public class GraphUI extends JPanel
 		screens[Constants.GLOBAL_ROOM_SCREEN] = new GlobalScreen(graphwar, "/rsc/GlobalRoom.txt");
 		screens[Constants.GAME_SCREEN] = new GameScreen(graphwar, "/rsc/GameScreen.txt");
 		screens[Constants.CAMPAIGN_SCREEN] = new CampaignScreen(graphwar);
-		screens[Constants.SETTINGS_SCREEN] = new SettingsScreen(graphwar);
 		for(int i=0; i<screens.length; i++)
 		{
 			add(screens[i], Integer.toString(i));
@@ -85,11 +84,6 @@ public class GraphUI extends JPanel
 			
 			currentScreen = screens[screenNum];
 			currentScreenIndex = screenNum;
-			if(currentScreen instanceof SettingsScreen)
-			{
-				((SettingsScreen) currentScreen).refresh();
-			}
-			
 			if(currentScreen instanceof StartStopPanel)
 			{
 				((StartStopPanel) currentScreen).startPanel();

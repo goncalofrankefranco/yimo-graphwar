@@ -30,17 +30,13 @@ if [[ ! "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
 fi
 
 install -d /etc/yimo /var/lib/yimo /var/log/yimo
-if [[ ! -s /root/yimo-web-password.txt ]]; then
-  openssl rand -hex 24 > /root/yimo-web-password.txt
-fi
-chmod 600 /root/yimo-web-password.txt
-htpasswd -Bbc /etc/nginx/yimo.htpasswd yimo "$(< /root/yimo-web-password.txt)" >/dev/null
-chown root:www-data /etc/nginx/yimo.htpasswd
-chmod 640 /etc/nginx/yimo.htpasswd
+# Remove temporary site credentials from older preview builds; public pages no
+# longer use a site-wide password. Organizer mutations remain API-protected.
+rm -f /root/yimo-web-password.txt /etc/nginx/yimo.htpasswd
 
 properties_tmp="$(mktemp /etc/yimo/yimo.properties.XXXXXX)"
 cat > "$properties_tmp" <<EOF
-global.host=$public_ip
+global.host=graphwar-server.yimo-official.org
 global.port=23762
 room.port.start=30000
 room.port.end=30049

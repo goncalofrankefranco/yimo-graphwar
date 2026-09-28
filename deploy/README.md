@@ -1,5 +1,7 @@
 # Stage 7: snapshot-ready Cloudzy staging
 
+The YIMO Graphwar VPS hosting is sponsored by Cloudzy.
+
 Stage 7 is deliberately split into two capacities:
 
 1. **Stage 7A — bootstrap and snapshot:** use the selected Cloudzy plan shown
@@ -43,7 +45,8 @@ capacity limits.
   `23762`, and the documented room range `30000:30049`. It also creates a 512 MB
   swapfile and applies bounded Java/Node memory profiles for the 1 GB plan.
 - `first-boot.sh` runs on every restored instance. It detects the current
-  IPv4 address, writes a fresh `yimo.properties`, and creates runtime
+  IPv4 address, writes a fresh `yimo.properties` that points the game client
+  to `graphwar-server.yimo-official.org`, and creates runtime
   tournament secrets only when they are missing. It exposes one organizer
   password at `/root/yimo-admin-password.txt`; the room HMAC key remains
   internal.
@@ -56,11 +59,11 @@ capacity limits.
   `first-boot.sh`; no secrets are stored in the script.
 - `bootstrap-vps.sh` leaves public web traffic fail-closed: Nginx serves only
   ACME challenge files and rejects every other request until HTTPS is ready.
-- `first-boot.sh` creates the temporary site password in
-  `/root/yimo-web-password.txt` and writes its Nginx password hash.
+- `first-boot.sh` removes any leftover site-wide web password from older
+  preview deployments. Public pages no longer use a site password.
 - `enable-domain.sh` obtains a renewing Let’s Encrypt certificate, activates
-  the protected HTTPS virtual host, and verifies anonymous `401` and
-  authenticated `200` health responses.
+  the HTTPS virtual host, and verifies that the public health page returns
+  `200`; organizer API actions remain password-protected.
 - `cloud-init-recovery.yaml` is the paste-ready Cloudzy Startup Scripts &
   Templates version of that flow. It writes the non-secret inputs, checks out
   the approved revision, and invokes `setup-yimo-vps.sh` automatically on the
@@ -92,26 +95,29 @@ The current Stage 7 scripts do not consume `CLOUDZY_API_TOKEN`; there is no
 Cloudzy API connector enabled in this workspace. Keep the token in that file
 on the organizer computer, never in Git, a release archive, cloud-init,
 source code, or chat. The organizer password is kept only in
-`/root/yimo-admin-password.txt`; the temporary web-login password is in
-`/root/yimo-web-password.txt`. Both are removed and regenerated on snapshot
-restore.
+`/root/yimo-admin-password.txt` and is removed and regenerated on snapshot
+restore. The public website has no site-wide password; the admin API still
+checks the organizer password before changing tournament data.
 
-## Configure the private Graphwar subdomain
+## Configure the Graphwar subdomains
 
 The browser pages and all HTTP API routes use
-`https://graphwar.yimo-official.org`. Once the VPS is bootstrapped:
+`https://graphwar.yimo-official.org`. Game clients use
+`graphwar-server.yimo-official.org` for raw TCP traffic. Once the VPS is bootstrapped:
 
-1. In Cloudflare DNS, change only the `graphwar` record to an `A` record for
-   `172.86.118.184` with proxying enabled. Keep the main `yimo-official.org`
-   records unchanged.
+1. In Cloudflare DNS, point both records to the VPS IPv4 address:
+   - `graphwar` → `A`, Cloudflare proxy **enabled** for HTTPS pages.
+   - `graphwar-server` → `A`, proxy **disabled (DNS-only)** because the game
+     protocol uses TCP port `23762`, which is not an HTTP request.
+   Keep the main `yimo-official.org` records unchanged.
 2. From an SSH session to the VPS, run:
 
    ```bash
    sudo /usr/local/sbin/yimo-enable-domain.sh
    ```
 
-   Before the certificate exists, all web requests except ACME challenges are
-   rejected. The app is not exposed briefly without TLS.
+   Before the certificate exists, web requests are rejected except ACME
+   challenges. The app is not exposed briefly without TLS.
 3. In Cloudflare, add host-scoped rules for `graphwar.yimo-official.org`:
    - SSL/TLS encryption mode: **Strict**, matching
      `http.host eq "graphwar.yimo-official.org"`.
@@ -121,15 +127,13 @@ The browser pages and all HTTP API routes use
 
    Do not change the zone-wide SSL mode or Always Use HTTPS setting; the other
    YIMO hostnames remain as they are.
-4. Use username `yimo` and the password in `/root/yimo-web-password.txt` at
-   the browser’s site-login prompt. `/admin` then asks separately for the
+4. The home page, `/admin`, and `/participant` are publicly viewable without a
+   site-login prompt. Organizer actions in `/admin` still require the
    organizer password in `/root/yimo-admin-password.txt`.
 
-The web password protects `/`, `/admin`, `/participant`, health checks, and
-all HTTP APIs. Direct-IP web requests are rejected. It does not password-
-protect the separate game TCP ports (`23762` and `30000–30049`); those remain
-available for multiplayer and must be firewalled separately if gameplay itself
-should be private.
+Direct-IP web requests are rejected. Game TCP ports (`23762` and
+`30000–30049`) remain available for multiplayer and must be firewalled
+separately if gameplay itself should be private.
 
 ## Rebuild a replacement VPS
 
@@ -213,16 +217,16 @@ sudo systemctl status yimo-global.service yimo-tournament.service nginx.service 
 sudo journalctl -u yimo-tournament.service -n 80 --no-pager
 ```
 
-Retrieve the generated organizer password over the protected SSH connection
+Retrieve the generated organizer password over the SSH connection
 only when configuring the local tournament admin:
 
 ```bash
 ssh root@SERVER_IP 'cat /root/yimo-admin-password.txt'
 ```
 
-Do not paste either server password into GitHub or commit it. The web pages
-remain unavailable until DNS is pointed and `yimo-enable-domain.sh` verifies
-the protected HTTPS route.
+Do not paste the organizer password into GitHub or commit it. Public web pages
+become available after DNS is pointed and `yimo-enable-domain.sh` verifies the
+HTTPS route.
 
 ### Scheduled-tournament staging check
 

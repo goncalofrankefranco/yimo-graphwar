@@ -2,8 +2,8 @@
 param(
     [string]$JavaHome = 'C:\Program Files\Eclipse Adoptium\jdk-8.0.492.9-hotspot',
     [string]$RuntimeSource = '',
-    [string]$GlobalHost = '172.86.118.184',
-    [string]$TournamentApiBaseUrl = 'http://172.86.118.184',
+    [string]$GlobalHost = 'graphwar-server.yimo-official.org',
+    [string]$TournamentApiBaseUrl = 'https://graphwar.yimo-official.org',
     [string]$OutputDir = ''
 )
 
@@ -87,6 +87,7 @@ protocol.version=2
 
     $installedReadme = @"
 YIMO Graphwar 2.0.0
+Powered by Cloudzy
 
 Double-click YIMO-Graphwar.exe to connect to the configured YIMO endpoint.
 The Start menu shortcut launches the same executable.

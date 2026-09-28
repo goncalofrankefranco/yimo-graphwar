@@ -38,6 +38,12 @@ public final class NetworkProtocolTest {
         check("yimo.example".equals(config.getGlobalHost()) && config.getGlobalPort() == 23762,
                 "network configuration must load the YIMO endpoint");
 
+        NetworkConfig defaults = NetworkConfig.defaults();
+        check("graphwar-server.yimo-official.org".equals(defaults.getGlobalHost()),
+                "the normal game endpoint must use the YIMO game domain");
+        check("https://graphwar.yimo-official.org".equals(defaults.getTournamentApiBaseUrl()),
+                "the normal tournament endpoint must use the HTTPS YIMO domain");
+
         NetworkConfig overridden = NetworkConfig.fromCommandLine(new String[] {
                 "--global-host", "override.example", "--global-port", "23999",
                 "--tournament-api", "https://override.example/tournament"

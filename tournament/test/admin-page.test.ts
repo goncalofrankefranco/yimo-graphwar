@@ -3,6 +3,36 @@ import assert from 'node:assert/strict';
 import { runInNewContext } from 'node:vm';
 import { ADMIN_PAGE } from '../src/pages.ts';
 
+test('clears a rejected saved organizer password and explains how to recover', async () => {
+  const nodes = new Map<string, any>();
+  const node = (selector: string) => {
+    if (!nodes.has(selector)) nodes.set(selector, {
+      value: selector === '#tournamentId' ? 'offline-test' : '', textContent: '', className: '',
+      appendChild() {}, replaceChildren() {}, addEventListener() {}, focus() { this.focused = true; },
+    });
+    return nodes.get(selector);
+  };
+  const removed: string[] = [];
+  const context: any = {
+    document: { querySelector: node, querySelectorAll: () => [] },
+    sessionStorage: {
+      getItem: () => 'stale-organizer-password', setItem() {},
+      removeItem: (key: string) => removed.push(key),
+    },
+    fetch: async () => new Response(JSON.stringify({ error: 'UNAUTHORIZED' }), {
+      status: 401, headers: { 'Content-Type': 'application/json' },
+    }),
+  };
+  const scripts = [...ADMIN_PAGE.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  runInNewContext(scripts.at(-1)?.[1] ?? '', context);
+  await context.refresh();
+
+  assert.deepEqual(removed, ['yimoAdminToken']);
+  assert.equal(node('#token').value, '');
+  assert.equal(node('#token').focused, true);
+  assert.match(node('#status').textContent, /Organizer password was rejected or expired/);
+});
+
 test('organizer panel explains proxy HTML failures instead of showing a JSON parse error', async () => {
   const nodes = new Map<string, any>();
   const node = (selector: string) => {

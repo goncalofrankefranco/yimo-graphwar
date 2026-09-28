@@ -17,11 +17,6 @@ if [[ "$YIMO_PUBLIC_HOST" != 'graphwar.yimo-official.org' ]]; then
   echo 'YIMO_PUBLIC_HOST must be graphwar.yimo-official.org.' >&2
   exit 1
 fi
-[[ -s /root/yimo-web-password.txt && -s /etc/nginx/yimo.htpasswd ]] || {
-  echo 'The web password has not been initialized. Run VPS bootstrap first.' >&2
-  exit 1
-}
-
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends certbot
@@ -52,23 +47,12 @@ systemctl enable --now certbot.timer
 
 host="$YIMO_PUBLIC_HOST"
 resolve="$host:443:127.0.0.1"
-anonymous_status="$(curl --silent --show-error --max-time 10 --output /dev/null \
+public_status="$(curl --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+  --max-time 10 --output /dev/null \
   --write-out '%{http_code}' --resolve "$resolve" "https://$host/healthz")"
-[[ "$anonymous_status" == '401' ]] || {
-  echo "Expected unauthenticated HTTP 401, got $anonymous_status." >&2
+[[ "$public_status" == '200' ]] || {
+  echo "Expected public HTTPS health HTTP 200, got $public_status." >&2
   exit 1
 }
 
-curl_config="$(mktemp /run/yimo-web-curl.XXXXXX)"
-trap 'rm -f "$curl_config"' EXIT
-printf 'user = "yimo:%s"\nresolve = "%s"\nurl = "https://%s/healthz"\n' \
-  "$(< /root/yimo-web-password.txt)" "$resolve" "$host" > "$curl_config"
-chmod 600 "$curl_config"
-authenticated_status="$(curl --config "$curl_config" --silent --show-error --max-time 10 \
-  --output /dev/null --write-out '%{http_code}')"
-[[ "$authenticated_status" == '200' ]] || {
-  echo "Expected authenticated HTTP 200, got $authenticated_status." >&2
-  exit 1
-}
-
-echo "Protected HTTPS is active for $host. Web password is stored in /root/yimo-web-password.txt."
+echo "Public HTTPS is active for $host. Organizer actions still require the organizer password."

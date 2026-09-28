@@ -26,7 +26,7 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends apache2-utils ca-certificates curl git nginx openssl tar ufw xz-utils
+apt-get install -y --no-install-recommends ca-certificates curl git nginx openssl tar ufw xz-utils
 
 if [[ -z "$YIMO_SSH_CIDR" || "$YIMO_SSH_CIDR" == 'auto' ]]; then
   # A VPS cannot discover the organizer's source IP; auto means safe-to-boot,
@@ -126,7 +126,7 @@ install -m 0644 "$SCRIPT_DIR/yimo-global.service" /etc/systemd/system/yimo-globa
 install -m 0644 "$SCRIPT_DIR/yimo-public-rooms.service" /etc/systemd/system/yimo-public-rooms.service
 install -m 0644 "$SCRIPT_DIR/yimo-tournament.service" /etc/systemd/system/yimo-tournament.service
 /usr/local/sbin/yimo-first-boot.sh
-if [[ -s "/etc/letsencrypt/live/$YIMO_PUBLIC_HOST/fullchain.pem" && -s /etc/nginx/yimo.htpasswd ]]; then
+if [[ -s "/etc/letsencrypt/live/$YIMO_PUBLIC_HOST/fullchain.pem" ]]; then
   install -m 0644 /etc/yimo/nginx-yimo-domain.conf /etc/nginx/sites-available/yimo
 else
   install -m 0644 "$SCRIPT_DIR/nginx-yimo.conf" /etc/nginx/sites-available/yimo

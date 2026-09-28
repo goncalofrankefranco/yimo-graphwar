@@ -18,7 +18,7 @@ $required = @(
     'deploy/cloudzy/install-release.sh',
     'deploy/cloudzy/setup-yimo-vps.sh',
     'deploy/cloudzy/prepare-snapshot.sh',
-    'deploy/cloudzy/cloud-init.yaml'
+    'deploy/cloudzy/cloud-init.yaml',
     'deploy/cloudzy/cloud-init-recovery.yaml'
 )
 
@@ -48,7 +48,8 @@ Assert-True ($setup -match 'YIMO_REPO_REF' -and $setup -match 'YIMO_RELEASE_URL'
 Assert-True ($setup -match 'YIMO_RELEASE_SHA256' -and $setup -match 'sha256sum') 'Recovery setup must support release verification.'
 Assert-True ($setup -notmatch '(?i)(YIMO_ADMIN_TOKEN|YIMO_ROOM_HMAC_SECRET)=.{20,}') 'Recovery setup must not contain runtime secrets.'
 Assert-True ($recoveryCloudInit -match 'YIMO_REPO_REF' -and $recoveryCloudInit -match 'setup-yimo-vps.sh') 'Recovery cloud-init must invoke the setup script.'
-Assert-True ($recoveryCloudInit -match 'REPLACE_WITH_ORGANIZER_CIDR') 'Recovery cloud-init must require a restricted SSH CIDR.'
+Assert-True ($recoveryCloudInit -match 'YIMO_SSH_CIDR=REPLACE_WITH_ORGANIZER_CIDR' -and
+    $cloudInit -match 'YIMO_SSH_CIDR=REPLACE_WITH_ORGANIZER_CIDR') 'Cloud-init templates must require the organizer SSH CIDR.'
 Assert-True ($recoveryCloudInit -notmatch '(?i)(YIMO_ADMIN_TOKEN|YIMO_ROOM_HMAC_SECRET)=.{20,}') 'Recovery cloud-init must not contain runtime secrets.'
 
 Write-Output 'stage7-deployment-config-check: PASS'

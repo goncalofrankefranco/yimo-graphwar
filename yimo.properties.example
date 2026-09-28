@@ -1,5 +1,5 @@
-# Copy this file to yimo.properties beside the released JAR and replace the deployment values.
-global.host=127.0.0.1
+# Optional server/development overrides. Normal YIMO clients use the fixed public domains.
+global.host=graphwar-server.yimo-official.org
 global.port=23762
 room.port.start=30000
 room.port.end=30049

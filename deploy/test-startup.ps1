@@ -10,7 +10,7 @@ $bootstrapTemplate = Get-Content -Raw (Join-Path $root 'deploy\cloudzy\cloud-ini
 $domainSetupPath = Join-Path $root 'deploy\cloudzy\enable-domain.sh'
 $nginxDomainPath = Join-Path $root 'deploy\cloudzy\nginx-yimo-domain.conf'
 if (-not (Test-Path $domainSetupPath) -or -not (Test-Path $nginxDomainPath)) {
-    throw 'The protected domain setup and TLS configuration are missing.'
+    throw 'The domain setup and TLS configuration are missing.'
 }
 $nginxPending = Get-Content -Raw (Join-Path $root 'deploy\cloudzy\nginx-yimo.conf')
 $domainSetup = Get-Content -Raw $domainSetupPath
@@ -37,8 +37,11 @@ if ($recovery -notmatch 'YIMO_REPO_REF=[0-9a-f]{40}' -or $bootstrapTemplate -not
 foreach ($required in @('YIMO_PUBLIC_IP', 'YIMO_SSH_CIDR', 'ufw', 'systemctl', 'nginx')) {
     if ($bootstrap -notmatch [regex]::Escape($required)) { throw "bootstrap script is missing $required" }
 }
-foreach ($required in @('apache2-utils', 'YIMO_PUBLIC_HOST', 'ufw allow 443/tcp', 'fullchain.pem', '/etc/yimo/nginx-yimo-domain.conf')) {
+foreach ($required in @('YIMO_PUBLIC_HOST', 'ufw allow 443/tcp', 'fullchain.pem', '/etc/yimo/nginx-yimo-domain.conf')) {
     if ($bootstrap -notmatch [regex]::Escape($required)) { throw "bootstrap script is missing $required" }
+}
+if ($bootstrap -match 'apache2-utils|yimo\.htpasswd|yimo-web-password') {
+    throw 'Bootstrap must not install or configure a public website password.'
 }
 if ($bootstrap -notmatch "YIMO_SSH_CIDR.*auto" -or $bootstrap -notmatch "SSH is open to the world") {
     throw 'bootstrap must handle auto SSH mode without guessing the organizer IP.'
@@ -49,26 +52,33 @@ if ($bootstrap -match 'detected_ssh_ip|api\.ipify\.org') {
 if ($firstBoot -notmatch 'YIMO_ADMIN_PASSWORD|YIMO_ADMIN_TOKEN') {
     throw 'first-boot must create the single organizer credential.'
 }
-if ($firstBoot -notmatch 'YIMO_PUBLIC_HOST' -or $firstBoot -notmatch 'https://\$public_host') {
-    throw 'first-boot must configure the game client to use the HTTPS tournament domain.'
+if ($firstBoot -notmatch 'YIMO_PUBLIC_HOST' -or $firstBoot -notmatch 'https://\$public_host' -or
+        $firstBoot -notmatch 'global\.host=graphwar-server\.yimo-official\.org') {
+    throw 'first-boot must configure the fixed YIMO game and HTTPS tournament domains.'
 }
-foreach ($required in @('yimo-web-password.txt', 'openssl rand -hex 24', 'htpasswd -Bbc')) {
-    if ($firstBoot -notmatch [regex]::Escape($required)) { throw "first-boot is missing web-password setup: $required" }
+if ($firstBoot -match 'openssl rand -hex 24|htpasswd -Bbc') {
+    throw 'first-boot must not generate or install a public website password.'
 }
 if ($snapshot -notmatch 'yimo-web-password.txt' -or $snapshot -notmatch 'yimo.htpasswd') {
-    throw 'snapshot preparation must remove the one-time web credential and password hash.'
+    throw 'snapshot preparation must remove legacy website password files.'
 }
-if ($firstBootUnit -notmatch 'Before=.*nginx.service') {
-    throw 'first-boot must generate the site password before Nginx starts after a restore.'
+if ($firstBootUnit -notmatch 'Before=.*yimo-global.service') {
+    throw 'first-boot must configure the server before YIMO services start after a restore.'
 }
 foreach ($required in @('return 444', 'well-known/acme-challenge')) {
     if ($nginxPending -notmatch [regex]::Escape($required)) { throw "pending Nginx config is missing $required" }
 }
-foreach ($required in @('listen 443 ssl', 'auth_basic', 'yimo.htpasswd', 'proxy_pass http://127.0.0.1:8080', 'return 301 https://')) {
-    if ($nginxDomain -notmatch [regex]::Escape($required)) { throw "protected Nginx config is missing $required" }
+foreach ($required in @('listen 443 ssl', 'proxy_pass http://127.0.0.1:8080', 'return 301 https://')) {
+    if ($nginxDomain -notmatch [regex]::Escape($required)) { throw "Nginx config is missing $required" }
 }
-foreach ($required in @('certbot certonly', 'nginx -t', 'systemctl reload nginx', 'renewal-hooks/deploy', '401')) {
+if ($nginxDomain -match 'auth_basic|yimo\.htpasswd') {
+    throw 'The public HTTPS site must not require a BasicAuth password.'
+}
+foreach ($required in @('certbot certonly', 'nginx -t', 'systemctl reload nginx', 'renewal-hooks/deploy', '200')) {
     if ($domainSetup -notmatch [regex]::Escape($required)) { throw "domain setup script is missing $required" }
+}
+if ($domainSetup -match '401|yimo-web-password|yimo\.htpasswd|curl_config') {
+    throw 'Domain setup must verify the public site without a website password.'
 }
 if ($recovery -notmatch 'runcmd:' -or $recovery -notmatch 'YIMO_PUBLIC_IP') {
     throw 'Cloudzy recovery template is missing startup configuration.'

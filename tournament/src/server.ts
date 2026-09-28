@@ -12,6 +12,11 @@ function send(response: any, status: number, body: unknown, contentType = 'appli
   response.end(contentType.startsWith('application/json') ? JSON.stringify(body) : String(body));
 }
 
+function sponsoredPage(html: string): string {
+  const footer = '<footer style="width:100%;margin:24px auto 0;padding:16px 24px;color:#687570;font:13px system-ui,sans-serif;text-align:center"><a href="https://cloudzy.com/" rel="noopener noreferrer" target="_blank" style="color:inherit">Powered by Cloudzy</a></footer>';
+  return html.replace('</main>', `${footer}</main>`);
+}
+
 function bearer(request: any): string | undefined {
   const value = [request.headers.authorization, request.headers['x-yimo-api-authorization']]
     .find((header) => typeof header === 'string' && header.startsWith('Bearer '));
@@ -57,11 +62,11 @@ export function createTournamentHttpServer(service: TournamentService): any {
         return;
       }
       if (request.method === 'GET' && url.pathname === '/admin') {
-        send(response, 200, ADMIN_PAGE, 'text/html; charset=utf-8');
+        send(response, 200, sponsoredPage(ADMIN_PAGE), 'text/html; charset=utf-8');
         return;
       }
       if (request.method === 'GET' && url.pathname === '/participant') {
-        send(response, 200, PARTICIPANT_PAGE, 'text/html; charset=utf-8');
+        send(response, 200, sponsoredPage(PARTICIPANT_PAGE), 'text/html; charset=utf-8');
         return;
       }
       const isBracketRoute = request.method === 'GET' && new RegExp(`^/api/v1/tournaments/${idPattern}/bracket$`).test(url.pathname);

@@ -40,7 +40,6 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
     private final JButton createGame;
     private final JButton joinGame;
     private final JButton campaign;
-    private final JButton settings;
 
     private final JTextField nameFieldGlobal;
     private final JButton yesButtonGlobal;
@@ -98,11 +97,17 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         tagline.setFont(new java.awt.Font("Sans", java.awt.Font.BOLD, 13));
         tagline.setForeground(YimoTheme.MENU_LINE);
         tagline.setAlignmentX(JLabel.CENTER_ALIGNMENT);
+        JLabel sponsor = new JLabel("Powered by Cloudzy");
+        sponsor.setFont(YimoTheme.SMALL);
+        sponsor.setForeground(YimoTheme.MENU_LINE);
+        sponsor.setAlignmentX(JLabel.CENTER_ALIGNMENT);
         hero.add(kicker);
         hero.add(Box.createVerticalStrut(18));
         hero.add(title);
         hero.add(Box.createVerticalStrut(18));
         hero.add(tagline);
+        hero.add(Box.createVerticalStrut(12));
+        hero.add(sponsor);
         GridBagConstraints introConstraints = new GridBagConstraints();
         introConstraints.gridx = 0;
         introConstraints.gridy = 0;
@@ -136,14 +141,12 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         createGame = YimoTheme.menuButton("Create Practice Game", false);
         joinGame = YimoTheme.menuButton("Join Room", false);
         campaign = YimoTheme.menuButton("Tutorial", false);
-        settings = YimoTheme.menuButton("Settings", false);
         addMenuFiller(menu, 0);
         addMenuButton(menu, joinGlobal, 1);
         addMenuButton(menu, createGame, 2);
         addMenuButton(menu, joinGame, 3);
         addMenuButton(menu, campaign, 4);
-        addMenuButton(menu, settings, 5);
-        addMenuFiller(menu, 6);
+        addMenuFiller(menu, 5);
         formCards.add(menu, "menu");
 
         nameFieldGlobal = YimoTheme.textField(18);
@@ -189,7 +192,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
     }
 
     static String[] menuLabels() {
-        return new String[] { "Join YIMO Lobby", "Create Practice Game", "Join Room", "Tutorial", "Settings" };
+        return new String[] { "Join YIMO Lobby", "Create Practice Game", "Join Room", "Tutorial" };
     }
 
     @Override
@@ -323,7 +326,6 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         createGame.addActionListener(this);
         joinGame.addActionListener(this);
         campaign.addActionListener(this);
-        settings.addActionListener(this);
         nameFieldGlobal.addActionListener(this);
         yesButtonGlobal.addActionListener(this);
         noButtonGlobal.addActionListener(this);
@@ -474,8 +476,6 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
                 showJoinGame(true);
             } else if (source == campaign) {
                 graphwar.getUI().setScreen(Constants.CAMPAIGN_SCREEN);
-            } else if (source == settings) {
-                graphwar.getUI().setScreen(Constants.SETTINGS_SCREEN);
             }
         } catch (NumberFormatException error) {
             status("Port must be a number between 1 and 65535.", true);

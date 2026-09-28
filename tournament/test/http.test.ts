@@ -44,12 +44,17 @@ test('serves health, admin, participant, match, room, and result routes', async 
     assert.match(home.body as string, /href="\/participant"/);
     assert.match(home.body as string, /href="\/admin"/);
     assert.match(home.body as string, /https:\/\/github\.com\/goncalofrankefranco\/yimo-graphwar/);
+    assert.match(home.body as string, /Powered by Cloudzy/);
     const adminPage = await request('/admin');
+    assert.equal(adminPage.response.status, 200, 'the public admin page must not have a site-password gate');
     assert.match(adminPage.body as string, /YIMO Tournament Admin/);
     assert.match(adminPage.body as string, /X-YIMO-API-Authorization/);
+    assert.match(adminPage.body as string, /Powered by Cloudzy/);
     const participantPage = await request('/participant');
+    assert.equal(participantPage.response.status, 200, 'the competitor page must not have a site-password gate');
     assert.match(participantPage.body as string, /YIMO Tournament/);
     assert.match(participantPage.body as string, /X-YIMO-API-Authorization/);
+    assert.match(participantPage.body as string, /Powered by Cloudzy/);
     assert.match(await (await request('/participant')).body as string, /Participant code/);
     assert.match(await (await request('/participant')).body as string, /Join assigned match/);
     assert.match(await (await request('/participant')).body as string, /Generate player ID/);
@@ -232,7 +237,7 @@ test('supports player-ID self-registration through the portal API', async () => 
   }
 });
 
-test('accepts the app bearer token in a separate header behind web password auth', async () => {
+test('accepts the organizer bearer token in the app-specific authorization header', async () => {
   const app = new TournamentService({
     dbPath: ':memory:',
     adminToken: 'admin-test-token',

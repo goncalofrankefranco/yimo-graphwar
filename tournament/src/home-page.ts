@@ -54,7 +54,7 @@ export const HOME_PAGE = `<!doctype html>
         <circle cx="150" cy="154" r="6" fill="#151a17"/><circle cx="242" cy="112" r="6" fill="#151a17"/>
       </svg>
     </section>
-    <footer><span>YIMO Graphwar · GPL-3.0</span><a class="source" href="https://github.com/goncalofrankefranco/yimo-graphwar" rel="noopener noreferrer" target="_blank">Explore the full source ↗</a></footer>
+    <footer><span>YIMO Graphwar · GPL-3.0</span><a class="source" href="https://github.com/goncalofrankefranco/yimo-graphwar" rel="noopener noreferrer" target="_blank">Explore the full source ↗</a><a class="source" href="https://cloudzy.com/" rel="noopener noreferrer" target="_blank">Powered by Cloudzy</a></footer>
   </main>
 </body>
 </html>`;

@@ -80,7 +80,7 @@ Set-Content -LiteralPath (Join-Path $output 'RELEASE-MANIFEST.txt') -Value $mani
 $files = @(Get-ChildItem -LiteralPath $output -Recurse -File | Sort-Object FullName)
 $hashLines = foreach ($file in $files) {
     $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
-    $relative = $file.FullName.Substring($output.Length).TrimStart('\')
+    $relative = $file.FullName.Substring($output.Length).TrimStart('\').Replace('\', '/')
     "$hash  $relative"
 }
 Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Value $hashLines -Encoding ASCII

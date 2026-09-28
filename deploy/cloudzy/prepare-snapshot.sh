@@ -7,7 +7,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-systemctl stop yimo-global.service yimo-tournament.service yimo-public-rooms.service >/dev/null 2>&1 || true
+systemctl stop yimo-global.service yimo-tournament.service yimo-public-rooms.service nginx.service >/dev/null 2>&1 || true
 # Keep the lobby and tournament units enabled so a restored snapshot starts
 # them after first-boot reconfigures the new IP. Practice rooms stay opt-in.
 systemctl disable yimo-public-rooms.service >/dev/null 2>&1 || true
@@ -15,6 +15,7 @@ systemctl disable yimo-public-rooms.service >/dev/null 2>&1 || true
 # Runtime state and secrets are intentionally excluded from the golden image.
 rm -f /var/lib/yimo/tournament.sqlite /var/lib/yimo/tournament.sqlite-shm /var/lib/yimo/tournament.sqlite-wal
 rm -f /etc/yimo/tournament.env /root/yimo-admin-token.txt /root/yimo-admin-password.txt
+rm -f /root/yimo-web-password.txt /etc/nginx/yimo.htpasswd
 rm -f /etc/yimo/yimo.properties
 
 bootstrap_env=/etc/yimo/bootstrap.env

@@ -39,8 +39,8 @@ capacity limits.
 - `cloud-init.yaml` installs the small base, checks out an explicitly pinned
   Git revision, and runs the bootstrap script.
 - `bootstrap-vps.sh` installs Java 8, Node 24, Nginx, UFW, the system user,
-  and systemd units. It opens only SSH, HTTP, the YIMO lobby port `23762`,
-  and the documented room range `30000:30049`. It also creates a 512 MB
+  and systemd units. It opens only SSH, HTTP/HTTPS, the YIMO lobby port
+  `23762`, and the documented room range `30000:30049`. It also creates a 512 MB
   swapfile and applies bounded Java/Node memory profiles for the 1 GB plan.
 - `first-boot.sh` runs on every restored instance. It detects the current
   IPv4 address, writes a fresh `yimo.properties`, and creates runtime
@@ -54,6 +54,13 @@ capacity limits.
   from source when no verified archive is supplied, and health-checks the
   lobby/API/listeners. It creates fresh runtime secrets through
   `first-boot.sh`; no secrets are stored in the script.
+- `bootstrap-vps.sh` leaves public web traffic fail-closed: Nginx serves only
+  ACME challenge files and rejects every other request until HTTPS is ready.
+- `first-boot.sh` creates the temporary site password in
+  `/root/yimo-web-password.txt` and writes its Nginx password hash.
+- `enable-domain.sh` obtains a renewing Let’s Encrypt certificate, activates
+  the protected HTTPS virtual host, and verifies anonymous `401` and
+  authenticated `200` health responses.
 - `cloud-init-recovery.yaml` is the paste-ready Cloudzy Startup Scripts &
   Templates version of that flow. It writes the non-secret inputs, checks out
   the approved revision, and invokes `setup-yimo-vps.sh` automatically on the
@@ -84,8 +91,45 @@ YIMO_SSH_CIDR=
 The current Stage 7 scripts do not consume `CLOUDZY_API_TOKEN`; there is no
 Cloudzy API connector enabled in this workspace. Keep the token in that file
 on the organizer computer, never in Git, a release archive, cloud-init,
-source code, or chat. The server’s generated organizer password is kept only
-in `/root/yimo-admin-password.txt` and is removed before a snapshot.
+source code, or chat. The organizer password is kept only in
+`/root/yimo-admin-password.txt`; the temporary web-login password is in
+`/root/yimo-web-password.txt`. Both are removed and regenerated on snapshot
+restore.
+
+## Configure the private Graphwar subdomain
+
+The browser pages and all HTTP API routes use
+`https://graphwar.yimo-official.org`. Once the VPS is bootstrapped:
+
+1. In Cloudflare DNS, change only the `graphwar` record to an `A` record for
+   `172.86.118.184` with proxying enabled. Keep the main `yimo-official.org`
+   records unchanged.
+2. From an SSH session to the VPS, run:
+
+   ```bash
+   sudo /usr/local/sbin/yimo-enable-domain.sh
+   ```
+
+   Before the certificate exists, all web requests except ACME challenges are
+   rejected. The app is not exposed briefly without TLS.
+3. In Cloudflare, add host-scoped rules for `graphwar.yimo-official.org`:
+   - SSL/TLS encryption mode: **Strict**, matching
+     `http.host eq "graphwar.yimo-official.org"`.
+   - Redirect HTTP to HTTPS for that host, excluding
+     `/.well-known/acme-challenge/` so certificate issuance and renewal work.
+     Preserve the request path and query string.
+
+   Do not change the zone-wide SSL mode or Always Use HTTPS setting; the other
+   YIMO hostnames remain as they are.
+4. Use username `yimo` and the password in `/root/yimo-web-password.txt` at
+   the browser’s site-login prompt. `/admin` then asks separately for the
+   organizer password in `/root/yimo-admin-password.txt`.
+
+The web password protects `/`, `/admin`, `/participant`, health checks, and
+all HTTP APIs. Direct-IP web requests are rejected. It does not password-
+protect the separate game TCP ports (`23762` and `30000–30049`); those remain
+available for multiplayer and must be firewalled separately if gameplay itself
+should be private.
 
 ## Rebuild a replacement VPS
 
@@ -164,8 +208,8 @@ If `/opt/yimo-source` is not present, upload the `cloudzy` scripts too and
 run the equivalent `install-release.sh` path from that checkout. Then check:
 
 ```bash
-curl http://SERVER_IP/healthz
-sudo systemctl status yimo-global.service yimo-tournament.service --no-pager
+ssh root@SERVER_IP 'curl --fail http://127.0.0.1:8080/healthz'
+sudo systemctl status yimo-global.service yimo-tournament.service nginx.service --no-pager
 sudo journalctl -u yimo-tournament.service -n 80 --no-pager
 ```
 
@@ -176,9 +220,9 @@ only when configuring the local tournament admin:
 ssh root@SERVER_IP 'cat /root/yimo-admin-password.txt'
 ```
 
-Do not paste that password into GitHub or commit it. Because this staging setup
-uses an IP and HTTP, do not use real participant credentials or expose the
-admin page publicly. Add a domain and HTTPS before the event.
+Do not paste either server password into GitHub or commit it. The web pages
+remain unavailable until DNS is pointed and `yimo-enable-domain.sh` verifies
+the protected HTTPS route.
 
 ### Scheduled-tournament staging check
 

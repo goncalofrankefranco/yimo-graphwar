@@ -14,13 +14,19 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 YIMO_SSH_CIDR="${YIMO_SSH_CIDR:-}"
+YIMO_PUBLIC_HOST="${YIMO_PUBLIC_HOST:-graphwar.yimo-official.org}"
 YIMO_JAVA8_URL="${YIMO_JAVA8_URL:-https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jdk/hotspot/normal/eclipse}"
 YIMO_JAVA8_SHA256="${YIMO_JAVA8_SHA256:-}"
 YIMO_SWAP_SIZE="${YIMO_SWAP_SIZE:-512M}"
 
+if [[ "$YIMO_PUBLIC_HOST" != 'graphwar.yimo-official.org' ]]; then
+  echo 'YIMO_PUBLIC_HOST must be graphwar.yimo-official.org.' >&2
+  exit 1
+fi
+
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl git nginx openssl tar ufw xz-utils
+apt-get install -y --no-install-recommends apache2-utils ca-certificates curl git nginx openssl tar ufw xz-utils
 
 if [[ -z "$YIMO_SSH_CIDR" || "$YIMO_SSH_CIDR" == 'auto' ]]; then
   # A VPS cannot discover the organizer's source IP; auto means safe-to-boot,
@@ -67,6 +73,7 @@ if ! getent passwd yimo >/dev/null 2>&1; then
   useradd --system --home-dir "$YIMO_ROOT" --shell /usr/sbin/nologin yimo
 fi
 install -d -o yimo -g yimo "$YIMO_ROOT" "$YIMO_ROOT/releases" /var/lib/yimo /var/log/yimo /etc/yimo
+install -d -m 0755 /var/www/yimo-acme/.well-known/acme-challenge
 
 if [[ "$YIMO_SWAP_SIZE" != '0' ]]; then
   if [[ ! -f /swapfile ]]; then
@@ -90,11 +97,17 @@ if [[ ! -f "$ENV_FILE" ]]; then
   cat > "$ENV_FILE" <<'EOF'
 # Local instance settings. Replace the SSH CIDR before exposing this host.
 YIMO_PUBLIC_IP=
+YIMO_PUBLIC_HOST=graphwar.yimo-official.org
 YIMO_SSH_CIDR=0.0.0.0/0
 YIMO_ENABLE_PRACTICE_ROOMS=0
 YIMO_SWAP_SIZE=512M
 EOF
 else
+  if grep -q '^YIMO_PUBLIC_HOST=' "$ENV_FILE"; then
+    sed -i "s#^YIMO_PUBLIC_HOST=.*#YIMO_PUBLIC_HOST=$YIMO_PUBLIC_HOST#" "$ENV_FILE"
+  else
+    printf 'YIMO_PUBLIC_HOST=%s\n' "$YIMO_PUBLIC_HOST" >> "$ENV_FILE"
+  fi
   if grep -q '^YIMO_SSH_CIDR=' "$ENV_FILE"; then
     sed -i "s#^YIMO_SSH_CIDR=.*#YIMO_SSH_CIDR=$YIMO_SSH_CIDR#" "$ENV_FILE"
   else
@@ -105,12 +118,19 @@ chmod 600 "$ENV_FILE"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 install -m 0750 "$SCRIPT_DIR/first-boot.sh" /usr/local/sbin/yimo-first-boot.sh
+install -m 0750 "$SCRIPT_DIR/enable-domain.sh" /usr/local/sbin/yimo-enable-domain.sh
 install -m 0750 "$SCRIPT_DIR/prepare-snapshot.sh" /usr/local/sbin/yimo-prepare-snapshot.sh
+install -m 0644 "$SCRIPT_DIR/nginx-yimo-domain.conf" /etc/yimo/nginx-yimo-domain.conf
 install -m 0644 "$SCRIPT_DIR/yimo-first-boot.service" /etc/systemd/system/yimo-first-boot.service
 install -m 0644 "$SCRIPT_DIR/yimo-global.service" /etc/systemd/system/yimo-global.service
 install -m 0644 "$SCRIPT_DIR/yimo-public-rooms.service" /etc/systemd/system/yimo-public-rooms.service
 install -m 0644 "$SCRIPT_DIR/yimo-tournament.service" /etc/systemd/system/yimo-tournament.service
-install -m 0644 "$SCRIPT_DIR/nginx-yimo.conf" /etc/nginx/sites-available/yimo
+/usr/local/sbin/yimo-first-boot.sh
+if [[ -s "/etc/letsencrypt/live/$YIMO_PUBLIC_HOST/fullchain.pem" && -s /etc/nginx/yimo.htpasswd ]]; then
+  install -m 0644 /etc/yimo/nginx-yimo-domain.conf /etc/nginx/sites-available/yimo
+else
+  install -m 0644 "$SCRIPT_DIR/nginx-yimo.conf" /etc/nginx/sites-available/yimo
+fi
 rm -f /etc/nginx/sites-enabled/default
 ln -sfn /etc/nginx/sites-available/yimo /etc/nginx/sites-enabled/yimo
 
@@ -119,12 +139,13 @@ systemctl daemon-reload
 systemctl enable nginx.service yimo-first-boot.service
 systemctl restart nginx.service
 
-# Stage 7 is IP-only, so HTTP is intentionally temporary. Add HTTPS before
-# using real participant codes or publishing the tournament endpoint.
+# Open HTTP only for ACME/HTTPS redirect, and keep the site fail-closed without
+# an origin certificate. The separate multiplayer TCP ports remain available.
 ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow 80/tcp
+ufw allow 443/tcp
 ufw allow 23762/tcp
 ufw allow 30000:30049/tcp
 if [[ -n "$YIMO_SSH_CIDR" && "$YIMO_SSH_CIDR" != '0.0.0.0/0' ]]; then
@@ -135,5 +156,4 @@ else
 fi
 ufw --force enable
 
-/usr/local/sbin/yimo-first-boot.sh
 echo 'YIMO bootstrap complete. Install a release with install-release.sh.'

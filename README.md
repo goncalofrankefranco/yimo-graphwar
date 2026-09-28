@@ -175,8 +175,9 @@ The hosting choice, load-test thresholds, and event runbook are in
 
 ## Tournament management
 
-The tournament control service has a real organizer console at `/admin` and
-a competitor portal at `/participant`. New tournaments start as `DRAFT`, can
+The tournament site is at [graphwar.yimo-official.org](https://graphwar.yimo-official.org).
+It has a YIMO Graphwar landing page, a source link, an organizer console at
+`/admin`, and a competitor portal at `/participant`. New tournaments start as `DRAFT`, can
 open scheduled registration and optional check-in, and can be started manually
 or automatically. Starting freezes the eligible roster and creates one seeded
 single-elimination bracket. Competitors log in with organizer-issued codes,
@@ -184,10 +185,16 @@ register/check in, view their private next-match schedule, and join an assigned
 room without receiving a public match code. The public bracket never exposes
 participant codes, match codes, room tokens, or organizer secrets.
 
-The Java lobby’s room list remains a practice-room list; it is not the
-tournament bracket. The local disposable implementation and API contract are
+The deployed HTTP pages and APIs are behind a temporary web password; the
+organizer console then asks for its separate organizer password. This protects
+the website, not the game's separate multiplayer TCP ports. The Java lobby’s
+room list remains a practice-room list; it is not the tournament bracket. The
+local disposable implementation and API contract are
 documented in [`tournament/README.md`](tournament/README.md) and
 [`docs/STAGES-5-6.md`](docs/STAGES-5-6.md).
+
+Cloudflare DNS, HTTPS, site-password rotation, and safe first-boot behavior are
+documented in [`deploy/README.md`](deploy/README.md#configure-the-private-graphwar-subdomain).
 
 ## Running Local Servers
 

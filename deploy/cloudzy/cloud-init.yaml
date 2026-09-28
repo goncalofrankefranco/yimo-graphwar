@@ -13,6 +13,7 @@ write_files:
       YIMO_REPO_URL=https://github.com/goncalofrankefranco/yimo-graphwar.git
       YIMO_REPO_REF=7cce143
       YIMO_PUBLIC_IP=172.86.118.184
+      YIMO_PUBLIC_HOST=graphwar.yimo-official.org
       YIMO_SSH_CIDR=auto
       YIMO_JAVA8_URL=https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jdk/hotspot/normal/eclipse
       YIMO_JAVA8_SHA256=

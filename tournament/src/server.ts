@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
-import { ADMIN_PAGE } from './admin-page.ts';
+import { ADMIN_PAGE } from './pages.ts';
+import { HOME_PAGE } from './home-page.ts';
 import { PARTICIPANT_PAGE } from './participant-page.ts';
 import { ServiceError, TournamentService } from './service.ts';
 
@@ -11,13 +12,9 @@ function send(response: any, status: number, body: unknown, contentType = 'appli
   response.end(contentType.startsWith('application/json') ? JSON.stringify(body) : String(body));
 }
 
-function redirect(response: any, location: string): void {
-  response.writeHead(302, { Location: location, 'Cache-Control': 'no-store' });
-  response.end();
-}
-
 function bearer(request: any): string | undefined {
-  const value = request.headers.authorization;
+  const value = [request.headers.authorization, request.headers['x-yimo-api-authorization']]
+    .find((header) => typeof header === 'string' && header.startsWith('Bearer '));
   return typeof value === 'string' && value.startsWith('Bearer ') ? value.slice(7) : undefined;
 }
 
@@ -45,7 +42,7 @@ const idPattern = '[A-Za-z0-9_-]+';
 export function createTournamentHttpServer(service: TournamentService): any {
   return createServer(async (request: any, response: any) => {
     if (request.method === 'OPTIONS') {
-      response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,Content-Type' });
+      response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,X-YIMO-API-Authorization,Content-Type' });
       response.end();
       return;
     }
@@ -56,7 +53,7 @@ export function createTournamentHttpServer(service: TournamentService): any {
         return;
       }
       if (request.method === 'GET' && url.pathname === '/') {
-        redirect(response, '/participant');
+        send(response, 200, HOME_PAGE, 'text/html; charset=utf-8');
         return;
       }
       if (request.method === 'GET' && url.pathname === '/admin') {

@@ -19,12 +19,24 @@ public_ip="${YIMO_PUBLIC_IP:-}"
 if [[ -z "$public_ip" ]]; then
   public_ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}')"
 fi
+public_host="${YIMO_PUBLIC_HOST:-graphwar.yimo-official.org}"
+if [[ "$public_host" != 'graphwar.yimo-official.org' ]]; then
+  echo 'YIMO_PUBLIC_HOST must be graphwar.yimo-official.org.' >&2
+  exit 1
+fi
 if [[ ! "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
   echo 'Could not determine a public IPv4 address. Set YIMO_PUBLIC_IP in /etc/yimo/bootstrap.env.' >&2
   exit 1
 fi
 
 install -d /etc/yimo /var/lib/yimo /var/log/yimo
+if [[ ! -s /root/yimo-web-password.txt ]]; then
+  openssl rand -hex 24 > /root/yimo-web-password.txt
+fi
+chmod 600 /root/yimo-web-password.txt
+htpasswd -Bbc /etc/nginx/yimo.htpasswd yimo "$(< /root/yimo-web-password.txt)" >/dev/null
+chown root:www-data /etc/nginx/yimo.htpasswd
+chmod 640 /etc/nginx/yimo.htpasswd
 
 properties_tmp="$(mktemp /etc/yimo/yimo.properties.XXXXXX)"
 cat > "$properties_tmp" <<EOF
@@ -32,7 +44,7 @@ global.host=$public_ip
 global.port=23762
 room.port.start=30000
 room.port.end=30049
-tournament.api.baseUrl=http://$public_ip
+tournament.api.baseUrl=https://$public_host
 build.id=YIMO-Graphwar-2.0.0
 protocol.version=2
 EOF

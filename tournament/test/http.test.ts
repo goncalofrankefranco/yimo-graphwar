@@ -39,10 +39,17 @@ test('serves health, admin, participant, match, room, and result routes', async 
     assert.equal(health.response.status, 200);
     assert.equal((health.body as any).buildId, 'YIMO-Graphwar-2.0.0');
     const home = await request('/', { redirect: 'manual' });
-    assert.equal(home.response.status, 302);
-    assert.equal(home.response.headers.get('location'), '/participant');
-    assert.match(await (await request('/admin')).body as string, /YIMO Tournament Admin/);
-    assert.match(await (await request('/participant')).body as string, /YIMO Tournament/);
+    assert.equal(home.response.status, 200);
+    assert.match(home.body as string, /YIMO Graphwar/);
+    assert.match(home.body as string, /href="\/participant"/);
+    assert.match(home.body as string, /href="\/admin"/);
+    assert.match(home.body as string, /https:\/\/github\.com\/goncalofrankefranco\/yimo-graphwar/);
+    const adminPage = await request('/admin');
+    assert.match(adminPage.body as string, /YIMO Tournament Admin/);
+    assert.match(adminPage.body as string, /X-YIMO-API-Authorization/);
+    const participantPage = await request('/participant');
+    assert.match(participantPage.body as string, /YIMO Tournament/);
+    assert.match(participantPage.body as string, /X-YIMO-API-Authorization/);
     assert.match(await (await request('/participant')).body as string, /Participant code/);
     assert.match(await (await request('/participant')).body as string, /Join assigned match/);
     assert.match(await (await request('/participant')).body as string, /Generate player ID/);
@@ -219,6 +226,45 @@ test('supports player-ID self-registration through the portal API', async () => 
     });
     assert.equal(player.response.status, 200);
     assert.equal((player.body as any).participant.participantId, 'yimo-local-http-1234567890');
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    app.close();
+  }
+});
+
+test('accepts the app bearer token in a separate header behind web password auth', async () => {
+  const app = new TournamentService({
+    dbPath: ':memory:',
+    adminToken: 'admin-test-token',
+    roomSecret: 'room-test-secret',
+    buildId: 'YIMO-Graphwar-2.0.0',
+    protocolVersion: 2,
+    now: () => 1_700_000_000,
+    participantScryptCost: 256,
+    rateLimitMax: 1000,
+  });
+  const server = createTournamentHttpServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address: any = server.address();
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    const created = await fetch(`${base}/api/v1/admin/tournaments`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer admin-test-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tournamentId: 'separate-auth-header', name: 'Separate Auth Header',
+        buildId: 'YIMO-Graphwar-2.0.0', protocolVersion: 2,
+      }),
+    });
+    assert.equal(created.status, 201);
+    const details = await fetch(`${base}/api/v1/admin/tournaments/separate-auth-header`, {
+      headers: {
+        Authorization: 'Basic eWltbzpzaXRlLXBhc3M=',
+        'X-YIMO-API-Authorization': 'Bearer admin-test-token',
+      },
+    });
+    assert.equal(details.status, 200);
+    assert.equal((await details.json() as any).tournamentId, 'separate-auth-header');
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     app.close();

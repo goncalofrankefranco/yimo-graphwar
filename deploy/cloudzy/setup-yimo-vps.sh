@@ -9,12 +9,13 @@ fi
 YIMO_REPO_URL="${YIMO_REPO_URL:-https://github.com/goncalofrankefranco/yimo-graphwar.git}"
 YIMO_REPO_REF="${YIMO_REPO_REF:-7cce143}"
 YIMO_PUBLIC_IP="${YIMO_PUBLIC_IP:-}"
+YIMO_PUBLIC_HOST="${YIMO_PUBLIC_HOST:-graphwar.yimo-official.org}"
 YIMO_SSH_CIDR="${YIMO_SSH_CIDR:-auto}"
 YIMO_RELEASE_URL="${YIMO_RELEASE_URL:-}"
 YIMO_RELEASE_SHA256="${YIMO_RELEASE_SHA256:-}"
 YIMO_ENABLE_PRACTICE_ROOMS="${YIMO_ENABLE_PRACTICE_ROOMS:-0}"
 YIMO_SWAP_SIZE="${YIMO_SWAP_SIZE:-512M}"
-export YIMO_PUBLIC_IP YIMO_SSH_CIDR YIMO_ENABLE_PRACTICE_ROOMS YIMO_SWAP_SIZE
+export YIMO_PUBLIC_IP YIMO_PUBLIC_HOST YIMO_SSH_CIDR YIMO_ENABLE_PRACTICE_ROOMS YIMO_SWAP_SIZE
 
 log_file=/var/log/yimo-bootstrap.log
 install -d -m 0750 /var/log
@@ -39,6 +40,7 @@ fi
 install -d -m 0700 /etc/yimo
 cat > /etc/yimo/bootstrap.env <<EOF
 YIMO_PUBLIC_IP=$YIMO_PUBLIC_IP
+YIMO_PUBLIC_HOST=$YIMO_PUBLIC_HOST
 YIMO_SSH_CIDR=$YIMO_SSH_CIDR
 YIMO_ENABLE_PRACTICE_ROOMS=$YIMO_ENABLE_PRACTICE_ROOMS
 YIMO_SWAP_SIZE=$YIMO_SWAP_SIZE
@@ -67,7 +69,7 @@ bash "$source_dir/deploy/cloudzy/install-release.sh" --release-dir "$release_sta
 for unit in yimo-global.service yimo-tournament.service nginx.service; do
   systemctl is-active --quiet "$unit"
 done
-curl --fail --retry 10 --retry-delay 1 --silent http://127.0.0.1/healthz
+curl --fail --retry 10 --retry-delay 1 --silent http://127.0.0.1:8080/healthz
 ss -ltn | grep -Eq '0\.0\.0\.0:80|\*:80'
 ss -ltn | grep -Eq '\*:23762|0\.0\.0\.0:23762'
 echo 'YIMO VPS setup complete and health-checked.'

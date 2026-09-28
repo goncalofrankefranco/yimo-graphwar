@@ -11,7 +11,7 @@ write_files:
     content: |
       # Replace the SSH CIDR before using this template. The permanent YIMO IP is explicit.
       YIMO_REPO_URL=https://github.com/goncalofrankefranco/yimo-graphwar.git
-      YIMO_REPO_REF=aa536d1ae5222d8bc97f662cdf23b15c82b6ce97
+      YIMO_REPO_REF=e317445477214bdbbaec9ca674e7cdaed72c639e
       YIMO_PUBLIC_IP=172.86.118.184
       YIMO_PUBLIC_HOST=graphwar.yimo-official.org
       YIMO_SSH_CIDR=auto

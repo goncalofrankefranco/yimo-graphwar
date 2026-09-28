@@ -7,7 +7,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 YIMO_REPO_URL="${YIMO_REPO_URL:-https://github.com/goncalofrankefranco/yimo-graphwar.git}"
-YIMO_REPO_REF="${YIMO_REPO_REF:-e317445477214bdbbaec9ca674e7cdaed72c639e}"
+YIMO_REPO_REF="${YIMO_REPO_REF:-8a6794afdb0f44e78e8eedbdf68bacf851577293}"
 YIMO_PUBLIC_IP="${YIMO_PUBLIC_IP:-}"
 YIMO_PUBLIC_HOST="${YIMO_PUBLIC_HOST:-graphwar.yimo-official.org}"
 YIMO_SSH_CIDR="${YIMO_SSH_CIDR:-auto}"

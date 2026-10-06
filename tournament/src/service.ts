@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import {
   createHash,
   createHmac,
+  randomInt,
   randomBytes,
   randomUUID,
   scryptSync,
@@ -460,7 +461,7 @@ export class TournamentService {
   activeTournament(): Record<string, unknown> | null {
     const row = this.db.prepare(`
       SELECT tournament_id FROM tournaments
-      WHERE status IN (${ACTIVE_TOURNAMENT_STATUSES})
+      WHERE status IN ('REGISTRATION_OPEN', 'CHECK_IN', 'READY', 'RUNNING')
       ORDER BY CASE status WHEN 'RUNNING' THEN 0 ELSE 1 END, updated_at DESC, created_at DESC LIMIT 1
     `).get() as any;
     return row ? this.publicBracket(String(row.tournament_id)) : null;
@@ -484,11 +485,11 @@ export class TournamentService {
     const tournamentId = validateIdentifier(input?.tournamentId ?? `t-${randomUUID()}`, 'tournamentId');
     const name = requiredText(input?.name, 'name', 120);
     this.requireBuild(input?.buildId, input?.protocolVersion);
-    const timeout = Number(input?.matchTimeoutSeconds ?? 900);
+    const timeout = Number(input?.matchTimeoutSeconds ?? 1200);
     const roomStart = Number(input?.roomPortStart ?? TOURNAMENT_PORT_START);
     // ponytail: one on-demand room per 1 GB staging VPS; widen the configured range after load testing.
     const roomEnd = Number(input?.roomPortEnd ?? TOURNAMENT_PORT_START);
-    if (!Number.isInteger(timeout) || timeout < 60 || timeout > 86400
+    if (!Number.isInteger(timeout) || timeout < 60 || timeout > 1200
       || !Number.isInteger(roomStart) || !Number.isInteger(roomEnd)
       || roomStart < TOURNAMENT_PORT_START || roomEnd > TOURNAMENT_PORT_END
       || roomStart > roomEnd || roomEnd - roomStart + 1 > 50) {
@@ -677,24 +678,15 @@ export class TournamentService {
     const extended = this.transaction(() => {
       const expired = this.db.prepare(`
         SELECT match_id, status, room_slot FROM matches
-        WHERE tournament_id = ? AND status IN ('OPEN', 'ASSIGNED', 'IN_PROGRESS')
+        WHERE tournament_id = ? AND status = 'OPEN'
           AND match_code_expires_at IS NOT NULL AND match_code_expires_at <= ?
       `).all(id, now) as any[];
       for (const match of expired) {
-        if (match.status === 'OPEN') {
-          const code = this.newMatchCode();
-          this.db.prepare(`
-            UPDATE matches SET match_code_hash = ?, match_code_expires_at = ?, updated_at = ?
-            WHERE match_id = ? AND status = 'OPEN' AND match_code_expires_at <= ?
-          `).run(code.hash, expiresAt, now, match.match_id, now);
-        } else {
-          this.db.prepare(`
-            UPDATE matches SET match_code_expires_at = ?, updated_at = ?
-            WHERE match_id = ? AND status IN ('ASSIGNED', 'IN_PROGRESS') AND match_code_expires_at <= ?
-          `).run(expiresAt, now, match.match_id, now);
-          this.db.prepare('UPDATE room_slots SET expires_at = ? WHERE tournament_id = ? AND match_id = ?')
-            .run(expiresAt, id, match.match_id);
-        }
+        const code = this.newMatchCode();
+        this.db.prepare(`
+          UPDATE matches SET match_code_hash = ?, match_code_expires_at = ?, updated_at = ?
+          WHERE match_id = ? AND status = 'OPEN' AND match_code_expires_at <= ?
+        `).run(code.hash, expiresAt, now, match.match_id, now);
         this.audit('MATCH_EXPIRY_EXTENDED', match.match_id, { tournamentId: id, expiresAt });
       }
       return expired.length;
@@ -1206,6 +1198,41 @@ export class TournamentService {
     return changes;
   }
 
+  processExpiredMatches(): string[] {
+    const now = this.timestamp();
+    const expired = this.db.prepare(`
+      SELECT m.match_id, m.player_a_id, m.player_b_id, r.assigned_at
+      FROM matches m
+      JOIN tournaments t ON t.tournament_id = m.tournament_id
+      JOIN room_slots r ON r.tournament_id = m.tournament_id AND r.match_id = m.match_id
+      WHERE t.status = 'RUNNING' AND m.status IN ('ASSIGNED', 'IN_PROGRESS')
+        AND r.state IN ('ASSIGNED', 'IN_PROGRESS') AND r.assigned_at IS NOT NULL
+        AND r.assigned_at + t.match_timeout_seconds <= ?
+      ORDER BY r.assigned_at, m.match_id
+    `).all(now) as any[];
+    const resolved: string[] = [];
+    for (const match of expired) {
+      if (!match.player_a_id || !match.player_b_id) continue;
+      const matchId = String(match.match_id);
+      const winnerId = String(randomInt(2) === 0 ? match.player_a_id : match.player_b_id);
+      const loserId = winnerId === String(match.player_a_id)
+        ? String(match.player_b_id) : String(match.player_a_id);
+      const reason = 'TIMEOUT_RANDOM';
+      const nonce = randomBytes(16).toString('base64url');
+      this.submitResult({
+        matchId,
+        winnerParticipantId: winnerId,
+        loserParticipantId: loserId,
+        reason,
+        serverNonce: nonce,
+        serverSignature: hmac(`${matchId}|${winnerId}|${loserId}|${reason}|${nonce}`, this.roomSecret),
+      });
+      this.audit('MATCH_TIMEOUT_RANDOM_WINNER', matchId, { winnerId, loserId, assignedAt: Number(match.assigned_at) });
+      resolved.push(matchId);
+    }
+    return resolved;
+  }
+
   createParticipantSession(input: SessionInput, clientKey = 'local'): { sessionToken: string; participantId: string; expiresAt: number } {
     this.rateLimiter.check(`session:${clientKey}`, this.timestamp());
     this.requireBuild(input?.buildId, input?.protocolVersion);
@@ -1268,25 +1295,26 @@ export class TournamentService {
       let room = this.db.prepare(
         'SELECT * FROM room_slots WHERE tournament_id = ? AND match_id = ?',
       ).get(match.tournament_id, match.match_id) as any;
+      let matchExpiresAt = match.match_code_expires_at === null
+        ? null : Number(match.match_code_expires_at);
       if (!room) {
         room = this.db.prepare(`
           SELECT * FROM room_slots WHERE tournament_id = ? AND state = 'AVAILABLE'
           ORDER BY room_slot LIMIT 1
         `).get(match.tournament_id) as any;
         if (!room) throw new ServiceError(503, 'ROOM_POOL_EXHAUSTED', 'No tournament room is available.');
-        const roomExpiry = match.match_code_expires_at === null
-          ? now + Number(match.match_timeout_seconds ?? 900)
-          : Number(match.match_code_expires_at);
+        const roomExpiry = now + Number(match.match_timeout_seconds ?? 1200);
         this.db.prepare(`
           UPDATE room_slots SET state = 'ASSIGNED', match_id = ?, assigned_at = ?, heartbeat_at = ?,
             expires_at = ? WHERE tournament_id = ? AND room_slot = ?
         `).run(match.match_id, now, now, roomExpiry, match.tournament_id, room.room_slot);
-        this.db.prepare("UPDATE matches SET room_slot = ?, status = 'ASSIGNED', updated_at = ? WHERE match_id = ?")
-          .run(room.room_slot, now, match.match_id);
+        this.db.prepare(`
+          UPDATE matches SET room_slot = ?, status = 'ASSIGNED', match_code_expires_at = ?, updated_at = ?
+          WHERE match_id = ?
+        `).run(room.room_slot, roomExpiry, now, match.match_id);
+        matchExpiresAt = roomExpiry;
       }
-      const expirySeconds = match.match_code_expires_at === null
-        ? now + 900
-        : Math.min(Number(match.match_code_expires_at), now + 900);
+      const expirySeconds = matchExpiresAt === null ? now + 900 : Math.min(matchExpiresAt, now + 900);
       const expiryMillis = expirySeconds * 1000;
       const token = issueRoomToken({
         protocolVersion: this.protocolVersion,
@@ -1339,7 +1367,8 @@ export class TournamentService {
     if (match.status !== 'OPEN' && match.status !== 'ASSIGNED' && match.status !== 'IN_PROGRESS') {
       throw new ServiceError(409, 'MATCH_CLOSED', 'Match is not accepting players.');
     }
-    if (match.match_code_expires_at !== null && Number(match.match_code_expires_at) <= this.timestamp()) {
+    if (match.status !== 'OPEN' && match.match_code_expires_at !== null
+      && Number(match.match_code_expires_at) <= this.timestamp()) {
       throw new ServiceError(410, 'MATCH_EXPIRED', 'This assigned match has expired.');
     }
     if (match.player_a_id !== participant.participant_id && match.player_b_id !== participant.participant_id) {

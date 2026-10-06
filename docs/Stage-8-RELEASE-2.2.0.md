@@ -29,14 +29,16 @@ the corresponding-source links.
   Java room startup, so the second competitor is not sent to a port before it
   is listening.
 - Bye entries no longer mask the competitor's next playable bracket match.
-- Organizers can extend expired match access without discarding an already
-  assigned room; the action is audited and requires a running tournament.
-- The admin bracket exposes an explicit, confirmed forfeit action only after a
-  match expires; the chosen competitor advances and any assigned room is
-  stopped. The service never awards no-show wins automatically.
-- For an expired match, the organizer can explicitly confirm a no-show, choose
-  which assigned competitor advances, and release that room; the action is
-  audited and never runs automatically.
+- Tournament rooms have a hard 20-minute limit measured from room assignment.
+  An unassigned match can have its access reissued, but an assigned match's
+  deadline cannot be extended.
+- At the deadline, if no signed game result exists, the service uniformly and
+  cryptographically randomly selects one of the two assigned competitors,
+  records a signed `TIMEOUT_RANDOM` result, advances the bracket, and stops the
+  room process.
+- The organizer's confirmed forfeit endpoint remains an explicit manual
+  override for an expired match if the timeout scheduler has not yet resolved
+  it; the normal path is automatic random resolution.
 - The Java room keeps retrying a signed result until the service acknowledges
   it, and stops accepting new players while that result is pending.
 - Canonical competitor names are bound into the signed room-access token; the

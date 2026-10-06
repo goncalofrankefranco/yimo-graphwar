@@ -44,7 +44,7 @@ export function createDemoService(initialNow = Math.floor(Date.now() / 1000)): D
     name: 'YIMO Practice Cup',
     buildId: DEMO_BUILD_ID,
     protocolVersion: DEMO_PROTOCOL_VERSION,
-    matchTimeoutSeconds: 900,
+    matchTimeoutSeconds: 1200,
     roomPortStart: 31000,
     roomPortEnd: 31000,
     registrationOpenAt: schedule.registrationOpenAt,

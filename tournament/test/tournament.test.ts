@@ -275,6 +275,27 @@ test('only one tournament may enter an active lifecycle at a time', () => {
   app.close();
 });
 
+test('new tournaments default to a 20-minute match limit', () => {
+  const app = service();
+  app.createTournament('admin-test-token', {
+    tournamentId: 'twenty-minute-default', name: 'Twenty Minute Default',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+
+  assert.equal(app.db.prepare('SELECT match_timeout_seconds FROM tournaments WHERE tournament_id = ?')
+    .get('twenty-minute-default').match_timeout_seconds, 1200);
+  app.close();
+});
+
+test('tournament match limits cannot exceed 20 minutes', () => {
+  const app = service();
+  assert.throws(() => app.createTournament('admin-test-token', {
+    tournamentId: 'overlong-match', name: 'Overlong Match',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2, matchTimeoutSeconds: 1201,
+  }), (error: any) => error?.code === 'INVALID_INPUT');
+  app.close();
+});
+
 test('public and organizer views prefer a running tournament over a newer legacy start-blocked record', () => {
   const app = service();
   tournament(app, 2, 'running-event');
@@ -287,6 +308,20 @@ test('public and organizer views prefer a running tournament over a newer legacy
 
   assert.equal(app.activeTournament()?.tournamentId, 'running-event');
   assert.equal(app.currentAdminTournament('admin-test-token')?.tournamentId, 'running-event');
+  app.close();
+});
+
+test('start-blocked events stay recoverable for organizers but are not advertised as public active tournaments', () => {
+  const app = service();
+  app.createTournament('admin-test-token', {
+    tournamentId: 'legacy-blocked-only', name: 'Legacy Blocked Only',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.db.prepare("UPDATE tournaments SET status = 'START_BLOCKED' WHERE tournament_id = ?")
+    .run('legacy-blocked-only');
+
+  assert.equal(app.activeTournament(), null);
+  assert.equal(app.currentAdminTournament('admin-test-token')?.tournamentId, 'legacy-blocked-only');
   app.close();
 });
 
@@ -540,7 +575,7 @@ test('recovers a start-blocked tournament by reopening registration and closing 
   app.close();
 });
 
-test('organizers can renew expired match access without discarding an assigned room', () => {
+test('organizers can renew open match codes but cannot extend an assigned room deadline', () => {
   let now = 100;
   const app = service({ now: () => now });
   const seeded = tournament(app, 2, 'renew-expired');
@@ -572,15 +607,94 @@ test('organizers can renew expired match access without discarding an assigned r
   });
   app.db.prepare('UPDATE matches SET match_code_expires_at = ? WHERE match_id = ?').run(now - 1, match.matchId);
   app.db.prepare('UPDATE room_slots SET expires_at = ? WHERE match_id = ?').run(now - 1, match.matchId);
-  assert.equal(app.extendExpiredMatches('admin-test-token', 'renew-expired').extended, 1);
+  assert.equal(app.extendExpiredMatches('admin-test-token', 'renew-expired').extended, 0);
   const active: any = app.db.prepare('SELECT * FROM matches WHERE match_id = ?').get(match.matchId);
   const room: any = app.db.prepare('SELECT * FROM room_slots WHERE match_id = ?').get(match.matchId);
   assert.equal(active.status, 'ASSIGNED');
   assert.equal(active.room_slot, firstJoin.roomSlot);
   assert.equal(room.state, 'ASSIGNED');
-  assert.ok(active.match_code_expires_at > now);
-  assert.ok(room.expires_at > now);
+  assert.equal(active.match_code_expires_at, now - 1);
+  assert.equal(room.expires_at, now - 1);
   app.close();
+});
+
+test('a match timer starts when its room is assigned, not when the bracket is seeded', () => {
+  let now = 1_700_000_000;
+  const app = service({ now: () => now });
+  addParticipants(app, 2);
+  app.createTournament('admin-test-token', {
+    tournamentId: 'assignment-starts-clock', name: 'Assignment Starts Clock',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2, matchTimeoutSeconds: 1200,
+  });
+  const bracket = app.seedBracket('admin-test-token', {
+    tournamentId: 'assignment-starts-clock', participantIds: ['p-1', 'p-2'],
+  });
+  app.db.prepare("UPDATE tournaments SET status = 'RUNNING' WHERE tournament_id = ?")
+    .run('assignment-starts-clock');
+  const match: any = bracket.matches[0];
+  const session = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+
+  now += 1300;
+  app.joinAssignedMatch({
+    sessionToken: session.sessionToken, matchId: match.matchId,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  const row: any = app.db.prepare('SELECT status, match_code_expires_at FROM matches WHERE match_id = ?')
+    .get(match.matchId);
+  const room: any = app.db.prepare('SELECT state, assigned_at, expires_at FROM room_slots WHERE match_id = ?')
+    .get(match.matchId);
+
+  assert.equal(row.status, 'ASSIGNED');
+  assert.equal(room.state, 'ASSIGNED');
+  assert.equal(room.assigned_at, now);
+  assert.equal(row.match_code_expires_at, now + 1200);
+  assert.equal(room.expires_at, now + 1200);
+  app.close();
+});
+
+test('an unfinished assigned match gets a server-random winner after its 20-minute deadline', () => {
+  const previousClock = clock;
+  const app = service();
+  try {
+    addParticipants(app, 2);
+    app.createTournament('admin-test-token', {
+      tournamentId: 'random-timeout', name: 'Random Timeout',
+      buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2, matchTimeoutSeconds: 1200,
+    });
+    const bracket = app.seedBracket('admin-test-token', {
+      tournamentId: 'random-timeout', participantIds: ['p-1', 'p-2'],
+    });
+    app.db.prepare("UPDATE tournaments SET status = 'RUNNING' WHERE tournament_id = ?")
+      .run('random-timeout');
+    const match: any = bracket.matches[0];
+    const session = app.createParticipantSession({
+      participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+    });
+    app.joinAssignedMatch({
+      sessionToken: session.sessionToken, matchId: match.matchId,
+      buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+    });
+    const room: any = app.db.prepare('SELECT assigned_at FROM room_slots WHERE match_id = ?').get(match.matchId);
+
+    clock = Number(room.assigned_at) + 1199;
+    assert.deepEqual(app.processExpiredMatches(), []);
+    clock += 1;
+    assert.deepEqual(app.processExpiredMatches(), [match.matchId]);
+    const result: any = app.db.prepare(`
+      SELECT winner_id, loser_id, result_reason, status FROM matches WHERE match_id = ?
+    `).get(match.matchId);
+    assert.ok(['p-1', 'p-2'].includes(result.winner_id));
+    assert.equal(result.loser_id, result.winner_id === 'p-1' ? 'p-2' : 'p-1');
+    assert.equal(result.result_reason, 'TIMEOUT_RANDOM');
+    assert.equal(result.status, 'COMPLETED');
+    assert.equal(app.activeTournament(), null);
+    assert.deepEqual(app.processExpiredMatches(), []);
+  } finally {
+    app.close();
+    clock = previousClock;
+  }
 });
 
 test('organizers can forfeit an expired match and advance the bracket', () => {

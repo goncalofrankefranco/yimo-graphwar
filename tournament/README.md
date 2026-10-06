@@ -50,7 +50,7 @@ When a match is ready:
 2. In the desktop app, they choose **Join Room**, enter that port, and enter
    their candidate code. The candidate-code box appears only for ports in
    `31000–31049`; the server hostname is fixed to
-   `graphwar-server.yimo-official.org`.
+  `graphwar-server.yimo-official.org`.
 3. The desktop client sends the code over HTTPS to `/api/v1/game/join`. The
    service checks the active tournament, eligibility, assigned match, build,
    and port, then returns a short-lived signed room token and the official
@@ -77,6 +77,14 @@ rejected. Completing the final match sets the tournament to `COMPLETED`, which
 frees the single-active slot. A disconnect during a live match is reported as
 a server-authoritative forfeit.
 
+The hard match timer starts when the tournament room is assigned, not when the
+bracket is seeded or a competitor logs in. It is capped at 20 minutes. If no
+verified result arrives by that deadline, the service uses a cryptographically
+secure random choice between the two assigned competitors, records a signed
+`TIMEOUT_RANDOM` result, advances the bracket, and stops the room process.
+Unassigned matches do not consume play time; expired access can be reissued
+before a room is assigned, but an assigned match's deadline cannot be extended.
+
 ## HTTP routes
 
 | Method and route | Auth | Purpose |
@@ -89,8 +97,8 @@ a server-authoritative forfeit.
 | `POST /api/v1/admin/participants` | organizer bearer | Add an organizer-issued candidate code |
 | `POST /api/v1/admin/tournaments` | organizer bearer | Create the next tournament and its room slots |
 | `POST /api/v1/admin/tournaments/{id}/...` | organizer bearer | Registration, check-in, and start controls |
-| `POST /api/v1/admin/tournaments/{id}/matches/extend-expired` | organizer bearer | Renew expired match access while keeping its assigned room |
-| `POST /api/v1/admin/matches/{id}/forfeit-expired` | organizer bearer | Record an organizer-confirmed no-show and advance the selected winner |
+| `POST /api/v1/admin/tournaments/{id}/matches/extend-expired` | organizer bearer | Reissue expired access for unassigned matches |
+| `POST /api/v1/admin/matches/{id}/forfeit-expired` | organizer bearer | Organizer override for an expired match before automatic timeout resolution |
 | `POST /api/v1/admin/matches/{id}/release-room` | organizer bearer | Stop the Java room after the result is recorded |
 | `POST /api/v1/participant-sessions` | candidate code | Create a short-lived player session and update display name |
 | `POST /api/v1/tournaments/{id}/register` | player session | Register the candidate |

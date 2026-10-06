@@ -39,7 +39,17 @@ if (!adminToken || !roomSecret) {
   const scheduler = setInterval(() => {
     try {
       const changes = service.processScheduledEvents();
-      if (changes > 0) console.log(`Tournament scheduler applied ${changes} change(s).`);
+      const expiredMatches = service.processExpiredMatches();
+      for (const matchId of expiredMatches) {
+        if (roomManager) {
+          void roomManager.release(matchId).catch((error) => {
+            console.error('Timed-out tournament room shutdown failed.', error);
+          });
+        }
+      }
+      if (changes > 0 || expiredMatches.length > 0) {
+        console.log(`Tournament scheduler applied ${changes} lifecycle change(s) and resolved ${expiredMatches.length} timed-out match(es).`);
+      }
     } catch (error) {
       console.error('Tournament scheduler failed.', error);
     }

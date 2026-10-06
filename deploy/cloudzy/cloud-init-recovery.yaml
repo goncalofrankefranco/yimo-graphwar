@@ -11,6 +11,7 @@ write_files:
       YIMO_SSH_CIDR=REPLACE_WITH_ORGANIZER_CIDR
       YIMO_PUBLIC_IP=172.86.118.184
       YIMO_PUBLIC_HOST=graphwar.yimo-official.org
+      YIMO_API_HOST=graphwar-server.yimo-official.org
       YIMO_ENABLE_PRACTICE_ROOMS=1
       YIMO_SWAP_SIZE=512M
 
@@ -28,6 +29,6 @@ runcmd:
       git clone --no-checkout "$YIMO_REPO_URL" /opt/yimo-source
       git -C /opt/yimo-source fetch --depth 1 origin "$YIMO_REPO_REF"
       git -C /opt/yimo-source checkout --detach FETCH_HEAD
-      export YIMO_REPO_URL YIMO_REPO_REF YIMO_SSH_CIDR YIMO_PUBLIC_IP YIMO_PUBLIC_HOST
+      export YIMO_REPO_URL YIMO_REPO_REF YIMO_SSH_CIDR YIMO_PUBLIC_IP YIMO_PUBLIC_HOST YIMO_API_HOST
       export YIMO_ENABLE_PRACTICE_ROOMS YIMO_SWAP_SIZE
       bash /opt/yimo-source/deploy/cloudzy/setup-yimo-vps.sh

@@ -3,7 +3,7 @@ param(
     [string]$JavaHome = 'C:\Program Files\Eclipse Adoptium\jdk-8.0.492.9-hotspot',
     [string]$RuntimeSource = '',
     [string]$GlobalHost = 'graphwar-server.yimo-official.org',
-    [string]$TournamentApiBaseUrl = 'https://graphwar.yimo-official.org',
+    [string]$TournamentApiBaseUrl = 'https://graphwar-server.yimo-official.org',
     [string]$OutputDir = ''
 )
 

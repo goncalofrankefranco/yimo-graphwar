@@ -5,6 +5,6 @@ room.port.start=30000
 room.port.end=30049
 tournament.room.port.start=31000
 tournament.room.port.end=31049
-tournament.api.baseUrl=https://graphwar.yimo-official.org
+tournament.api.baseUrl=https://graphwar-server.yimo-official.org
 build.id=YIMO-Graphwar-2.2.0
 protocol.version=2

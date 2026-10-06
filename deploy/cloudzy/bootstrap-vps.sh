@@ -15,12 +15,17 @@ fi
 
 YIMO_SSH_CIDR="${YIMO_SSH_CIDR:-}"
 YIMO_PUBLIC_HOST="${YIMO_PUBLIC_HOST:-graphwar.yimo-official.org}"
+YIMO_API_HOST="${YIMO_API_HOST:-graphwar-server.yimo-official.org}"
 YIMO_JAVA8_URL="${YIMO_JAVA8_URL:-https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jdk/hotspot/normal/eclipse}"
 YIMO_JAVA8_SHA256="${YIMO_JAVA8_SHA256:-}"
 YIMO_SWAP_SIZE="${YIMO_SWAP_SIZE:-512M}"
 
 if [[ "$YIMO_PUBLIC_HOST" != 'graphwar.yimo-official.org' ]]; then
   echo 'YIMO_PUBLIC_HOST must be graphwar.yimo-official.org.' >&2
+  exit 1
+fi
+if [[ "$YIMO_API_HOST" != 'graphwar-server.yimo-official.org' ]]; then
+  echo 'YIMO_API_HOST must be graphwar-server.yimo-official.org.' >&2
   exit 1
 fi
 
@@ -98,6 +103,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 # Local instance settings. Replace the SSH CIDR before exposing this host.
 YIMO_PUBLIC_IP=
 YIMO_PUBLIC_HOST=graphwar.yimo-official.org
+YIMO_API_HOST=graphwar-server.yimo-official.org
 YIMO_SSH_CIDR=0.0.0.0/0
 YIMO_ENABLE_PRACTICE_ROOMS=0
 YIMO_SWAP_SIZE=512M
@@ -107,6 +113,11 @@ else
     sed -i "s#^YIMO_PUBLIC_HOST=.*#YIMO_PUBLIC_HOST=$YIMO_PUBLIC_HOST#" "$ENV_FILE"
   else
     printf 'YIMO_PUBLIC_HOST=%s\n' "$YIMO_PUBLIC_HOST" >> "$ENV_FILE"
+  fi
+  if grep -q '^YIMO_API_HOST=' "$ENV_FILE"; then
+    sed -i "s#^YIMO_API_HOST=.*#YIMO_API_HOST=$YIMO_API_HOST#" "$ENV_FILE"
+  else
+    printf 'YIMO_API_HOST=%s\n' "$YIMO_API_HOST" >> "$ENV_FILE"
   fi
   if grep -q '^YIMO_SSH_CIDR=' "$ENV_FILE"; then
     sed -i "s#^YIMO_SSH_CIDR=.*#YIMO_SSH_CIDR=$YIMO_SSH_CIDR#" "$ENV_FILE"
@@ -127,7 +138,7 @@ install -m 0644 "$SCRIPT_DIR/yimo-global.service" /etc/systemd/system/yimo-globa
 install -m 0644 "$SCRIPT_DIR/yimo-public-rooms.service" /etc/systemd/system/yimo-public-rooms.service
 install -m 0644 "$SCRIPT_DIR/yimo-tournament.service" /etc/systemd/system/yimo-tournament.service
 /usr/local/sbin/yimo-first-boot.sh
-if [[ -s "/etc/letsencrypt/live/$YIMO_PUBLIC_HOST/fullchain.pem" ]]; then
+if [[ -s "/etc/letsencrypt/live/$YIMO_PUBLIC_HOST/fullchain.pem" && -s "/etc/letsencrypt/live/$YIMO_API_HOST/fullchain.pem" ]]; then
   install -m 0644 /etc/yimo/nginx-yimo-domain.conf /etc/nginx/sites-available/yimo
 else
   install -m 0644 "$SCRIPT_DIR/nginx-yimo.conf" /etc/nginx/sites-available/yimo

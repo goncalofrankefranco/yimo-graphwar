@@ -21,7 +21,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\test-stage8.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\build-stage8-release.ps1 `
   -JavaHome 'C:\Program Files\Eclipse Adoptium\jdk-8.0.492.9-hotspot' `
   -GlobalHost 'graphwar-server.yimo-official.org' `
-  -TournamentApiBaseUrl 'https://graphwar.yimo-official.org'
+  -TournamentApiBaseUrl 'https://graphwar-server.yimo-official.org'
 ```
 
 The build uses the Windows-native IExpress tool and emits a portable ZIP,

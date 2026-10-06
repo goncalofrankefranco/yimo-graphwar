@@ -13,7 +13,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\test-stage8.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\build-stage8-release.ps1 `
   -JavaHome 'C:\Program Files\Eclipse Adoptium\jdk-8.0.492.9-hotspot' `
   -GlobalHost 'graphwar-server.yimo-official.org' `
-  -TournamentApiBaseUrl 'https://graphwar.yimo-official.org'
+  -TournamentApiBaseUrl 'https://graphwar-server.yimo-official.org'
 ```
 
 The builder compiles all Java artifacts through the Stage 7 reproducible
@@ -24,8 +24,9 @@ contains SHA-256 checksums for the distributable files.
 
 The installed package includes `YIMO-Graphwar.exe`, a native clickable
 launcher for the bundled Java runtime. The normal client has no endpoint
-settings screen: it connects to `graphwar-server.yimo-official.org` and uses
-`https://graphwar.yimo-official.org` for tournament pages.
+settings screen: it connects to `graphwar-server.yimo-official.org` for game
+traffic and the tournament API. Browser tournament pages remain at
+`https://graphwar.yimo-official.org`.
 
 The package also includes the responsive battlefield viewport, explicit
 room-mode selection, two-step guided/adaptation campaign lessons, the

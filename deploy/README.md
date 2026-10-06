@@ -104,14 +104,16 @@ checks the organizer password before changing tournament data.
 
 ## Configure the Graphwar subdomains
 
-The browser pages and all HTTP API routes use
-`https://graphwar.yimo-official.org`. Game clients use
-`graphwar-server.yimo-official.org` for raw TCP traffic. Once the VPS is bootstrapped:
+The browser pages use `https://graphwar.yimo-official.org` through Cloudflare.
+Game clients and Java room servers use `https://graphwar-server.yimo-official.org`
+for the tournament API and DNS-only TCP host; the direct API endpoint avoids
+Cloudflare's browser-signature block on Java clients. Once the VPS is bootstrapped:
 
 1. In Cloudflare DNS, point both records to the VPS IPv4 address:
    - `graphwar` → `A`, Cloudflare proxy **enabled** for HTTPS pages.
-   - `graphwar-server` → `A`, proxy **disabled (DNS-only)** because the game
-     protocol uses TCP port `23762`, which is not an HTTP request.
+   - `graphwar-server` → `A`, proxy **disabled (DNS-only)** for the raw game
+     ports and direct HTTPS API. Nginx terminates TLS on this host and proxies
+     `/api/` and `/healthz` to the local tournament service.
    Keep the main `yimo-official.org` records unchanged.
 2. From an SSH session to the VPS, run:
 

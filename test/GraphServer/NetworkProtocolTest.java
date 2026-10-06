@@ -43,8 +43,8 @@ public final class NetworkProtocolTest {
         NetworkConfig defaults = NetworkConfig.defaults();
         check("graphwar-server.yimo-official.org".equals(defaults.getGlobalHost()),
                 "the normal game endpoint must use the YIMO game domain");
-        check("https://graphwar.yimo-official.org".equals(defaults.getTournamentApiBaseUrl()),
-                "the normal tournament endpoint must use the HTTPS YIMO domain");
+        check("https://graphwar-server.yimo-official.org".equals(defaults.getTournamentApiBaseUrl()),
+                "the desktop tournament API must use the DNS-only YIMO game domain");
         check(defaults.getTournamentRoomPortStart() == 31000 && defaults.getTournamentRoomPortEnd() == 31049,
                 "tournament ports must use the range reserved apart from practice rooms");
         check(config.getTournamentRoomPortStart() == 31000 && config.getTournamentRoomPortEnd() == 31049,

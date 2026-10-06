@@ -26,7 +26,7 @@ public final class NetworkConfig {
     public static final int DEFAULT_ROOM_PORT_END = 30049;
     public static final int DEFAULT_TOURNAMENT_ROOM_PORT_START = 31000;
     public static final int DEFAULT_TOURNAMENT_ROOM_PORT_END = 31049;
-    public static final String DEFAULT_TOURNAMENT_API = "https://graphwar.yimo-official.org";
+    public static final String DEFAULT_TOURNAMENT_API = "https://graphwar-server.yimo-official.org";
     public static final String DEFAULT_BUILD_ID = "YIMO-Graphwar-2.2.0";
     public static final int DEFAULT_PROTOCOL_VERSION = 2;
 

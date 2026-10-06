@@ -15,10 +15,12 @@ tournament control service and signed-room implementation are documented in
 The Java client and room/global servers remain Java 8 compatible. The
 tournament service requires Node.js 24.x and uses only built-in Node modules.
 The normal client connects to `graphwar-server.yimo-official.org` for game
-traffic and `https://graphwar.yimo-official.org` for tournaments. There is no
-in-game IP settings screen. Advanced local development can still override
-endpoints with a local config file or command-line flags. Never commit
-organizer tokens, participant codes, or HMAC keys.
+traffic and the tournament API; this DNS-only host avoids Cloudflare's
+browser-signature block on Java clients. Browser pages remain at
+`https://graphwar.yimo-official.org`. There is no in-game IP settings screen.
+Advanced local development can still override endpoints with a local config
+file or command-line flags. Never commit organizer tokens, participant codes,
+or HMAC keys.
 
 The client scales the battlefield to the available resizable window while
 preserving its logical game coordinates. Room hosts select Normal functions,

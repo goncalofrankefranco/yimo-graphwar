@@ -24,6 +24,11 @@ if [[ "$public_host" != 'graphwar.yimo-official.org' ]]; then
   echo 'YIMO_PUBLIC_HOST must be graphwar.yimo-official.org.' >&2
   exit 1
 fi
+api_host="${YIMO_API_HOST:-graphwar-server.yimo-official.org}"
+if [[ "$api_host" != 'graphwar-server.yimo-official.org' ]]; then
+  echo 'YIMO_API_HOST must be graphwar-server.yimo-official.org.' >&2
+  exit 1
+fi
 if [[ ! "$public_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
   echo 'Could not determine a public IPv4 address. Set YIMO_PUBLIC_IP in /etc/yimo/bootstrap.env.' >&2
   exit 1
@@ -42,7 +47,7 @@ room.port.start=30000
 room.port.end=30049
 tournament.room.port.start=31000
 tournament.room.port.end=31049
-tournament.api.baseUrl=https://$public_host
+tournament.api.baseUrl=https://$api_host
 build.id=YIMO-Graphwar-2.2.0
 protocol.version=2
 EOF

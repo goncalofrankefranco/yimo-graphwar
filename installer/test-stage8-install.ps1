@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ReleaseDir,
     [string]$ExpectedGlobalHost = 'graphwar-server.yimo-official.org',
-    [string]$ExpectedTournamentApiBaseUrl = 'https://graphwar.yimo-official.org'
+    [string]$ExpectedTournamentApiBaseUrl = 'https://graphwar-server.yimo-official.org'
 )
 
 $ErrorActionPreference = 'Stop'

@@ -93,6 +93,7 @@ export function createTournamentHttpServer(service: TournamentService,
       }
       const isBracketRoute = request.method === 'GET' && new RegExp(`^/api/v1/tournaments/${idPattern}/bracket$`).test(url.pathname);
       const isAdminTournamentRoute = new RegExp(`^/api/v1/admin/tournaments/${idPattern}$`).test(url.pathname);
+      const isAdminDeleteTournamentRoute = request.method === 'DELETE' && isAdminTournamentRoute;
       const isCurrentAdminTournamentRoute = request.method === 'GET'
         && url.pathname === '/api/v1/admin/tournament/current';
       const isAdminLifecycleRoute = new RegExp(`^/api/v1/admin/tournaments/${idPattern}/(registration/open|registration/close|registration/reopen|check-in/open|check-in/close|matches/extend-expired|start)$`).test(url.pathname);
@@ -110,7 +111,8 @@ export function createTournamentHttpServer(service: TournamentService,
         && new RegExp(`^/api/v1/admin/matches/${idPattern}/forfeit-expired$`).test(url.pathname);
       if (request.method !== 'POST' && !(request.method === 'GET' && url.pathname === '/api/v1/player/matches')
         && !isBracketRoute && !(request.method === 'GET' && isAdminTournamentRoute)
-        && !isPlayerTournamentRoute && !isActiveTournamentRoute && !isCurrentAdminTournamentRoute) {
+        && !isAdminDeleteTournamentRoute && !isPlayerTournamentRoute
+        && !isActiveTournamentRoute && !isCurrentAdminTournamentRoute) {
         throw new ServiceError(404, 'NOT_FOUND', 'Route not found.');
       }
 
@@ -132,6 +134,8 @@ export function createTournamentHttpServer(service: TournamentService,
         send(response, 201, service.addParticipant(bearer(request), body));
       } else if (request.method === 'POST' && url.pathname === '/api/v1/admin/tournaments') {
         send(response, 201, service.createTournament(bearer(request), body));
+      } else if (isAdminDeleteTournamentRoute) {
+        send(response, 200, service.deleteTournament(bearer(request), url.pathname.split('/')[5]));
       } else if (request.method === 'GET' && isAdminTournamentRoute) {
         send(response, 200, service.adminTournament(bearer(request), url.pathname.split('/')[5]));
       } else if (isCurrentAdminTournamentRoute) {

@@ -93,9 +93,10 @@ before a room is assigned, but an assigned match's deadline cannot be extended.
 | `GET /admin` | page public; API protected | Organizer console, automatically loads the current tournament |
 | `GET /participant` | none | Competitor portal and public bracket |
 | `GET /api/v1/tournaments/active` | none | Current public bracket or `null` |
-| `GET /api/v1/admin/tournament/current` | organizer bearer | Resume the current active tournament or latest draft without its ID |
+| `GET /api/v1/admin/tournament/current` | organizer bearer | Resume the current active tournament, latest draft, or latest completed tournament without its ID |
 | `POST /api/v1/admin/participants` | organizer bearer | Add an organizer-issued candidate code |
 | `POST /api/v1/admin/tournaments` | organizer bearer | Create the next tournament and its room slots |
+| `DELETE /api/v1/admin/tournaments/{id}` | organizer bearer | Delete a non-running tournament and its entries/bracket; retain an audit event |
 | `POST /api/v1/admin/tournaments/{id}/...` | organizer bearer | Registration, check-in, and start controls |
 | `POST /api/v1/admin/tournaments/{id}/matches/extend-expired` | organizer bearer | Reissue expired access for unassigned matches |
 | `POST /api/v1/admin/matches/{id}/forfeit-expired` | organizer bearer | Organizer override for an expired match before automatic timeout resolution |
@@ -113,6 +114,13 @@ The old unauthenticated local-player-ID self-registration route is removed.
 Participant codes are stored as a keyed lookup hash plus salted `scrypt`
 verification; session tokens and room tokens are never returned by public
 bracket routes.
+
+The organizer console can delete drafts, registration/check-in/ready events,
+start-blocked events, and completed tournaments. A running tournament or one
+with an assigned/in-progress/draining room is protected. Deletion removes the
+tournament's entries, room slots, and bracket rows while retaining a
+`TOURNAMENT_DELETED` audit event. The latest completed tournament remains
+loadable in the organizer console so it can be removed when desired.
 
 ## Database and tests
 

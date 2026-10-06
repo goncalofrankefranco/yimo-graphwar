@@ -601,3 +601,45 @@ test('accepts the organizer bearer token in the app-specific authorization heade
     app.close();
   }
 });
+
+test('organizer can delete a non-running tournament through the authenticated admin route', async () => {
+  const app = new TournamentService({
+    dbPath: ':memory:',
+    adminToken: 'admin-test-token',
+    roomSecret: 'room-test-secret',
+    buildId: 'YIMO-Graphwar-2.2.0',
+    protocolVersion: 2,
+    now: () => 1_700_000_000,
+    participantScryptCost: 256,
+    rateLimitMax: 1000,
+  });
+  const server = createTournamentHttpServer(app);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address: any = server.address();
+  const base = `http://127.0.0.1:${address.port}`;
+  const admin = { Authorization: 'Bearer admin-test-token' };
+  try {
+    const page = await fetch(`${base}/admin`);
+    assert.match(await page.text(), /id="deleteTournament"/);
+    const created = await fetch(`${base}/api/v1/admin/tournaments`, {
+      method: 'POST', headers: { ...admin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tournamentId: 'delete-via-http', name: 'Delete via HTTP',
+        buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+      }),
+    });
+    assert.equal(created.status, 201);
+
+    const unauthorized = await fetch(`${base}/api/v1/admin/tournaments/delete-via-http`, { method: 'DELETE' });
+    assert.equal(unauthorized.status, 401);
+
+    const deleted = await fetch(`${base}/api/v1/admin/tournaments/delete-via-http`, {
+      method: 'DELETE', headers: admin,
+    });
+    assert.equal(deleted.status, 200);
+    assert.deepEqual(await deleted.json(), { tournamentId: 'delete-via-http', deleted: true });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    app.close();
+  }
+});

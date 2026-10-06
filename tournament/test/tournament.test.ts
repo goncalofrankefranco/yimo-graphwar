@@ -762,3 +762,60 @@ test('a first-round bye does not hide the player’s next playable match', () =>
   assert.equal(schedule.nextMatch.status, 'PENDING');
   app.close();
 });
+
+test('organizers can delete a start-blocked tournament so it no longer blocks a new event', () => {
+  const app = service();
+  addParticipants(app, 1);
+  app.createTournament('admin-test-token', {
+    tournamentId: 'stuck-event', name: 'Stuck Event',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.openRegistration('admin-test-token', 'stuck-event');
+  const session = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.registerParticipant(session.sessionToken, 'stuck-event');
+  app.db.prepare("UPDATE tournaments SET status = 'START_BLOCKED' WHERE tournament_id = ?")
+    .run('stuck-event');
+
+  const result = app.deleteTournament('admin-test-token', 'stuck-event');
+  assert.deepEqual(result, { tournamentId: 'stuck-event', deleted: true });
+  assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM tournaments').get().count, 0);
+  assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM tournament_entries').get().count, 0);
+  assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM room_slots').get().count, 0);
+  assert.equal(app.db.prepare("SELECT COUNT(*) AS count FROM audit_events WHERE event_type = 'TOURNAMENT_DELETED'").get().count, 1);
+
+  app.createTournament('admin-test-token', {
+    tournamentId: 'next-event', name: 'Next Event',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  assert.equal(app.openRegistration('admin-test-token', 'next-event').status, 'REGISTRATION_OPEN');
+  app.close();
+});
+
+test('organizers cannot delete a running tournament', () => {
+  const app = service();
+  tournament(app, 2, 'protected-running-event');
+  throwsCode(() => app.deleteTournament('admin-test-token', 'protected-running-event'), 'TOURNAMENT_NOT_DELETABLE');
+  assert.equal(app.adminTournament('admin-test-token', 'protected-running-event').status, 'RUNNING');
+  app.db.prepare("UPDATE tournaments SET status = 'COMPLETED' WHERE tournament_id = ?")
+    .run('protected-running-event');
+  app.db.prepare("UPDATE room_slots SET state = 'IN_PROGRESS' WHERE tournament_id = ? AND room_slot = 31000")
+    .run('protected-running-event');
+  throwsCode(() => app.deleteTournament('admin-test-token', 'protected-running-event'), 'TOURNAMENT_NOT_DELETABLE');
+  assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM tournaments WHERE tournament_id = ?')
+    .get('protected-running-event').count, 1);
+  app.close();
+});
+
+test('admins can still load the latest completed tournament to remove its old record', () => {
+  const app = service();
+  app.createTournament('admin-test-token', {
+    tournamentId: 'finished-event', name: 'Finished Event',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.db.prepare("UPDATE tournaments SET status = 'COMPLETED' WHERE tournament_id = ?")
+    .run('finished-event');
+  assert.equal(app.currentAdminTournament('admin-test-token')?.tournamentId, 'finished-event');
+  app.close();
+});

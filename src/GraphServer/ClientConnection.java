@@ -22,10 +22,14 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 
 public class ClientConnection implements Runnable
 {
+	private static final Timer HANDSHAKE_TIMER = new Timer("graphserver-handshake-deadlines", true);
+
 	private Connection connection;	
 	private List<Player> players;	
 	private GraphServer server;	
@@ -34,6 +38,8 @@ public class ClientConnection implements Runnable
 	private boolean readyNextTurn;	
 	private boolean gameFinished;
 	private boolean skipLevel;
+	private RoomAccessPolicy roomAccessPolicy;
+	private RoomAccessToken.Payload roomAccessPayload;
 	
 	public ClientConnection(GraphServer server, Socket socket) throws IOException
 	{
@@ -42,30 +48,53 @@ public class ClientConnection implements Runnable
 
 	public ClientConnection(GraphServer server, Socket socket, RoomAccessPolicy roomAccessPolicy) throws IOException
 	{
-		this.server = server;		
-		this.connection = new Connection(socket);
-		String hello = connection.readMessage();
-		String response = NetworkProtocol.handshakeResponse(hello);
-		connection.sendMessage(response);
-		if(NetworkProtocol.isHandshakeAccepted(response) == false)
+		this(server, socket, roomAccessPolicy, Constants.TIMEOUT_CONNECTING);
+	}
+
+	ClientConnection(GraphServer server, Socket socket, RoomAccessPolicy roomAccessPolicy,
+			long handshakeTimeoutMillis) throws IOException
+	{
+		this.server = server;
+		this.roomAccessPolicy = roomAccessPolicy;
+		TimerTask deadline = new TimerTask()
 		{
-			connection.close();
-			throw new IOException("Rejected incompatible YIMO client");
-		}
-		if(roomAccessPolicy != null && roomAccessPolicy.isRequired())
-		{
-			String accessMessage = connection.readMessage();
-			String[] fields = accessMessage == null ? new String[0] : accessMessage.split("&", -1);
-			RoomAccessToken.Payload payload = fields.length == 2 && NetworkProtocol.TOURNAMENT_JOIN.equals(fields[0])
-					? roomAccessPolicy.accept(fields[1], System.currentTimeMillis()) : null;
-			if(payload == null)
+			public void run()
 			{
-				connection.sendMessage(NetworkProtocol.TOURNAMENT_REJECTED);
-				connection.close();
-				throw new IOException("Rejected invalid tournament room token");
+				try { socket.close(); } catch(IOException ignored) { }
 			}
-			connection.sendMessage(NetworkProtocol.TOURNAMENT_ACCEPTED+"&"+payload.getMatchId()+"&"
-					+payload.getParticipantId()+"&"+payload.getRoomSlot());
+		};
+		HANDSHAKE_TIMER.schedule(deadline, Math.max(1L, handshakeTimeoutMillis));
+		try
+		{
+			this.connection = new Connection(socket);
+			String hello = connection.readMessage();
+			String response = NetworkProtocol.handshakeResponse(hello);
+			connection.sendMessage(response);
+			if(NetworkProtocol.isHandshakeAccepted(response) == false)
+			{
+				connection.close();
+				throw new IOException("Rejected incompatible YIMO client");
+			}
+			if(roomAccessPolicy != null && roomAccessPolicy.isRequired())
+			{
+				String accessMessage = connection.readMessage();
+				String[] fields = accessMessage == null ? new String[0] : accessMessage.split("&", -1);
+				RoomAccessToken.Payload payload = fields.length == 2 && NetworkProtocol.TOURNAMENT_JOIN.equals(fields[0])
+						? roomAccessPolicy.accept(fields[1], System.currentTimeMillis()) : null;
+				if(payload == null)
+				{
+					connection.sendMessage(NetworkProtocol.TOURNAMENT_REJECTED);
+					connection.close();
+					throw new IOException("Rejected invalid tournament room token");
+				}
+				this.roomAccessPayload = payload;
+				connection.sendMessage(NetworkProtocol.TOURNAMENT_ACCEPTED+"&"+payload.getMatchId()+"&"
+						+payload.getParticipantId()+"&"+payload.getRoomSlot());
+			}
+		}
+		finally
+		{
+			deadline.cancel();
 		}
 			
 		this.players = new ArrayList<Player>();
@@ -80,6 +109,16 @@ public class ClientConnection implements Runnable
 	public List<Player> getPlayers()
 	{
 		return players;		
+	}
+
+	public String getTournamentParticipantId()
+	{
+		return roomAccessPayload == null ? null : roomAccessPayload.getParticipantId();
+	}
+
+	public String getTournamentDisplayName()
+	{
+		return roomAccessPayload == null ? null : roomAccessPayload.getDisplayName();
 	}
 	
 	public boolean isLeader()
@@ -155,6 +194,11 @@ public class ClientConnection implements Runnable
 	public void disconnect()
 	{
 		running = false;
+		if(roomAccessPayload != null && roomAccessPolicy != null)
+		{
+			roomAccessPolicy.release(roomAccessPayload.getParticipantId());
+			roomAccessPayload = null;
+		}
 						
 		try 
 		{
@@ -217,7 +261,7 @@ public class ClientConnection implements Runnable
 			}
 			catch (IOException e) 
 			{
-				e.printStackTrace();
+				if(running) System.out.println("Client connection closed ("+e.getClass().getSimpleName()+").");
 				
 				server.removeClient(this);
 				disconnect();

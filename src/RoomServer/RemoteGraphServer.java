@@ -24,10 +24,13 @@ import GraphServer.Constants;
 import GraphServer.GraphServer;
 import GraphServer.Player;
 import GraphServer.RoomAccessPolicy;
+import GraphServer.TournamentResultReporter;
 
 public class RemoteGraphServer extends GraphServer
 {
 	private GlobalClient globalClient;
+	private boolean tournamentResultReported;
+	private boolean tournamentResultReporting;
 	
 	public int getNumClients()
 	{
@@ -53,7 +56,8 @@ public class RemoteGraphServer extends GraphServer
 	{
 		super();
 		
-		this.globalClient = globalClient;		
+		this.globalClient = globalClient;
+		tournamentResultReported = false;
 	}
 
 	/** Hidden tournament rooms may use the same status bridge with a required signed token. */
@@ -62,20 +66,28 @@ public class RemoteGraphServer extends GraphServer
 		super(roomAccessPolicy);
 
 		this.globalClient = globalClient;
+		tournamentResultReported = false;
+	}
+
+	public RemoteGraphServer(GlobalClient globalClient, int port, RoomAccessPolicy roomAccessPolicy) throws IOException
+	{
+		super(port, roomAccessPolicy);
+		this.globalClient = globalClient;
+		tournamentResultReported = false;
 	}
 
 	protected void sendAddPlayerMessage(Player player, ClientConnection playerFrom)
 	{
 		super.sendAddPlayerMessage(player, playerFrom);
 		
-		globalClient.sendRoomStatus(this.gameMode, this.players.size());
+		if(globalClient != null) globalClient.sendRoomStatus(this.gameMode, this.players.size());
 	}
 	
 	protected boolean removePlayer(int playerID, ClientConnection client)
 	{
 		boolean v = super.removePlayer(playerID, client);
 		
-		globalClient.sendRoomStatus(this.gameMode, this.players.size());
+		if(globalClient != null) globalClient.sendRoomStatus(this.gameMode, this.players.size());
 		
 		return v;
 	}
@@ -84,39 +96,105 @@ public class RemoteGraphServer extends GraphServer
 	{
 		super.sendModeMessage();
 		
-		globalClient.sendRoomStatus(this.gameMode, this.players.size());
+		if(globalClient != null) globalClient.sendRoomStatus(this.gameMode, this.players.size());
 	}
 	
 	public void removeClient(ClientConnection client)
 	{
+		String[] result = null;
+		String reason = "FORFEIT";
+		if(isTournamentRoom() && this.gameState == Constants.GAME)
+		{
+			result = tournamentResult();
+			if(result != null) reason = "NORMAL";
+			else result = tournamentForfeitResult(client);
+		}
 		super.removeClient(client);
-				
+		if(isTournamentRoom())
+		{
+			if(result != null) reportTournamentResult(result, reason);
+			return;
+		}
 		if(this.clients.size() == 0)
 		{
 			if(this.gameState == Constants.GAME)
 			{
 				this.goPreGame();
-				globalClient.recreateRoom();
+				if(globalClient != null) globalClient.recreateRoom();
 			}
 		}
-		
-		globalClient.sendRoomStatus(this.gameMode, this.players.size());
+		if(globalClient != null) globalClient.sendRoomStatus(this.gameMode, this.players.size());
 	}
 	
 	protected void startGame()
 	{
-		super.startGame();
-		
-		globalClient.hideRoom();
+		 super.startGame();
+		 if(globalClient != null) globalClient.hideRoom();
 	}
 	
 	protected void finishGame(ClientConnection client)
 	{
 		super.finishGame(client);
-		
-		if(this.gameState == Constants.PRE_GAME)
+		if(isTournamentRoom())
+		{
+			if(this.gameState == Constants.PRE_GAME)
+			{
+				String[] result = tournamentResult();
+				if(result != null) reportTournamentResult(result, "NORMAL");
+			}
+			return;
+		}
+		if(this.gameState == Constants.PRE_GAME && globalClient != null)
 		{
 			globalClient.recreateRoom();
 		}
-	}	
+	}
+
+	private synchronized void reportTournamentResult(String[] result, String reason)
+	{
+		if(tournamentResultReported || tournamentResultReporting) return;
+		tournamentResultReporting = true;
+		stopAcceptingConnections();
+		final String[] savedResult = result.clone();
+		final String savedReason = reason;
+		Thread reporter = new Thread(new Runnable()
+		{
+			public void run()
+			{
+				while(true)
+				{
+					try
+					{
+						String secret = System.getenv("YIMO_ROOM_HMAC_SECRET");
+						if(secret == null || secret.length() == 0)
+						{
+							throw new IOException("YIMO_ROOM_HMAC_SECRET is missing");
+						}
+						TournamentResultReporter.reportUntilAccepted(Constants.TOURNAMENT_API_BASE_URL,
+								savedResult[0], savedResult[1], savedResult[2], savedReason, secret);
+						synchronized(RemoteGraphServer.this)
+						{
+							tournamentResultReported = true;
+						}
+						RemoteGraphServer.this.finalize();
+						return;
+					}
+					catch(Exception error)
+					{
+						System.err.println("Tournament result remains pending; retrying: " + error.getMessage());
+						try
+						{
+							Thread.sleep(5000L);
+						}
+						catch(InterruptedException ignored)
+						{
+							// Keep the result pending rather than discarding it during shutdown.
+						}
+					}
+				}
+			}
+		}, "yimo-result-reporter-" + result[0]);
+		reporter.setDaemon(false);
+		reporter.start();
+	}
 }

@@ -18,7 +18,13 @@
 package Graphwar;
 
 import java.awt.CardLayout;
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 
 import javax.swing.JPanel;
 
@@ -94,6 +100,48 @@ public class GraphUI extends JPanel
 	public JPanel getScreen(int screenNum)
 	{
 		return screens[screenNum];
+	}
+
+	static String versionBadgeText()
+	{
+		String buildId = Constants.BUILD_ID;
+		String prefix = "YIMO-Graphwar-";
+		return buildId.startsWith(prefix) ? "YIMO Graphwar " + buildId.substring(prefix.length()) : buildId;
+	}
+
+	static void paintVersionBadge(Graphics graphics, int width, int height)
+	{
+		if(width < 80 || height < 40) return;
+		Graphics2D g = (Graphics2D)graphics.create();
+		try
+		{
+			g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+			Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 11);
+			g.setFont(font);
+			String text = versionBadgeText();
+			FontMetrics metrics = g.getFontMetrics();
+			int paddingX = 7;
+			int paddingY = 4;
+			int badgeWidth = metrics.stringWidth(text) + paddingX * 2;
+			int badgeHeight = metrics.getHeight() + paddingY * 2;
+			int x = 12;
+			int y = height - badgeHeight - 10;
+			g.setColor(new Color(8, 14, 20, 190));
+			g.fillRoundRect(x, y, badgeWidth, badgeHeight, 10, 10);
+			g.setColor(new Color(245, 242, 232, 220));
+			g.drawString(text, x + paddingX, y + paddingY + metrics.getAscent());
+		}
+		finally
+		{
+			g.dispose();
+		}
+	}
+
+	@Override
+	protected void paintChildren(Graphics graphics)
+	{
+		super.paintChildren(graphics);
+		paintVersionBadge(graphics, getWidth(), getHeight());
 	}
 	
 }

@@ -10,6 +10,8 @@ public final class GlobalTournamentLinkTest {
                 "http://172.86.74.172/participant"), "portal URL");
         check(GlobalScreen.tournamentPortalUrl("http://host/").equals(
                 "http://host/participant"), "trailing slash");
+        check(!GlobalScreen.tournamentPortalUrl("https://graphwar.yimo-official.org").contains("playerId"),
+                "the lobby link must not generate or pass an unused local player ID");
         check(GlobalScreen.menuLabels().contains("Tournament"), "lobby label");
         boolean rejected = false;
         try {

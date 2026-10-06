@@ -36,5 +36,22 @@ public final class AuthoritativeGameTest
 
 		game.advanceTurn();
 		check(game.getCurrentPlayerID() == second.getID(), "the server must advance to the next player");
+
+		List<Player> match = new ArrayList<Player>();
+		Player blue = new Player("blue");
+		Player red = new Player("red");
+		blue.setTeam(Constants.TEAM1);
+		red.setTeam(Constants.TEAM2);
+		blue.setNumSoldiers(1);
+		red.setNumSoldiers(1);
+		match.add(blue);
+		match.add(red);
+		AuthoritativeGame duel = new AuthoritativeGame();
+		duel.start(new MapShape[0], new int[] {100, 225, 600, 225}, match, 0,
+				Constants.NORMAL_FUNC, Constants.SHOOTER_RELATIVE_TRAJECTORY);
+		check(duel.getWinningTeam() == -1, "a live match has no winner yet");
+		duel.acceptShot(blue.getID(), "0");
+		check(duel.isGameFinished() && duel.getWinningTeam() == Constants.TEAM1,
+				"authoritative elimination must identify the surviving team as winner");
 	}
 }

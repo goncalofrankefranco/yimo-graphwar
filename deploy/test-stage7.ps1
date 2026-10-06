@@ -15,6 +15,8 @@ $required = @(
     'deploy/cloudzy/yimo-public-rooms.service',
     'deploy/cloudzy/yimo-tournament.service',
     'deploy/cloudzy/nginx-yimo.conf',
+    'deploy/cloudzy/nginx-yimo-domain.conf',
+    'deploy/cloudzy/update-cloudflare-realip.sh',
     'deploy/cloudzy/install-release.sh',
     'deploy/cloudzy/setup-yimo-vps.sh',
     'deploy/cloudzy/prepare-snapshot.sh',
@@ -28,18 +30,25 @@ foreach ($relative in $required) {
 
 $cloudInit = Get-Content (Join-Path $root 'deploy/cloudzy/cloud-init.yaml') -Raw
 $bootstrap = Get-Content (Join-Path $root 'deploy/cloudzy/bootstrap-vps.sh') -Raw
+$realIpUpdate = Get-Content (Join-Path $root 'deploy/cloudzy/update-cloudflare-realip.sh') -Raw
+$domainNginx = Get-Content (Join-Path $root 'deploy/cloudzy/nginx-yimo-domain.conf') -Raw
 $firstBoot = Get-Content (Join-Path $root 'deploy/cloudzy/first-boot.sh') -Raw
 $snapshot = Get-Content (Join-Path $root 'deploy/cloudzy/prepare-snapshot.sh') -Raw
 $globalService = Get-Content (Join-Path $root 'deploy/cloudzy/yimo-global.service') -Raw
 $tournamentService = Get-Content (Join-Path $root 'deploy/cloudzy/yimo-tournament.service') -Raw
 $setup = Get-Content (Join-Path $root 'deploy/cloudzy/setup-yimo-vps.sh') -Raw
 $recoveryCloudInit = Get-Content (Join-Path $root 'deploy/cloudzy/cloud-init-recovery.yaml') -Raw
+$stage7Builder = Get-Content (Join-Path $root 'deploy/build-stage7-release.ps1') -Raw
+$stagingSmoke = Get-Content (Join-Path $root 'deploy/cloudzy/staging-tournament-smoke.mjs') -Raw
 
 Assert-True ($cloudInit -match 'YIMO_REPO_URL') 'Cloud-init must expose the repository URL.'
 Assert-True ($bootstrap -match 'YIMO_JAVA8_URL' -and $bootstrap -match 'setup_24\.x') 'Bootstrap must install Java 8 and Node 24.'
 Assert-True ($firstBoot -match 'YIMO_PUBLIC_IP' -and $firstBoot -match 'YIMO_ROOM_HMAC_SECRET') 'First boot must configure the IP and generate runtime secrets.'
 Assert-True ($snapshot -match 'tournament\.sqlite' -and $snapshot -match 'tournament\.env') 'Snapshot preparation must remove runtime data and secrets.'
-Assert-True ($bootstrap -match '23762' -and $bootstrap -match '30000:30049') 'Firewall must expose only the documented YIMO ports.'
+Assert-True ($bootstrap -match '23762' -and $bootstrap -match '30000:30049' -and $bootstrap -match '31000:31049') 'Firewall must expose separate practice and tournament room ranges.'
+Assert-True ($realIpUpdate -match 'www.cloudflare.com/ips-v4' -and $realIpUpdate -match 'www.cloudflare.com/ips-v6' -and $realIpUpdate -match 'set_real_ip_from' -and $realIpUpdate -match 'real_ip_header CF-Connecting-IP') 'Nginx must trust official Cloudflare proxy IP ranges before restoring visitor IPs.'
+Assert-True ($domainNginx -match 'proxy_set_header X-Forwarded-For \$remote_addr') 'Node rate limiting must receive Nginx’s verified client address.'
+Assert-True ($bootstrap -match 'update-cloudflare-realip.sh' -and $firstBoot -match 'yimo-update-cloudflare-realip.sh') 'The verified Cloudflare client-IP config must install and refresh on boot.'
 Assert-True ($bootstrap -notmatch 'YIMO_ADMIN_TOKEN=.*[A-Za-z0-9]{20,}' -and $bootstrap -notmatch 'YIMO_ROOM_HMAC_SECRET=.*[A-Za-z0-9]{20,}') 'Bootstrap must not contain real secrets.'
 Assert-True ($globalService -match '-Xmx128m' -and $globalService -match 'UseSerialGC') 'Global Java service needs a bounded low-memory profile.'
 Assert-True ($tournamentService -match 'max-old-space-size=160') 'Tournament service needs a bounded Node memory profile.'
@@ -51,5 +60,9 @@ Assert-True ($recoveryCloudInit -match 'YIMO_REPO_REF' -and $recoveryCloudInit -
 Assert-True ($recoveryCloudInit -match 'YIMO_SSH_CIDR=REPLACE_WITH_ORGANIZER_CIDR' -and
     $cloudInit -match 'YIMO_SSH_CIDR=REPLACE_WITH_ORGANIZER_CIDR') 'Cloud-init templates must require the organizer SSH CIDR.'
 Assert-True ($recoveryCloudInit -notmatch '(?i)(YIMO_ADMIN_TOKEN|YIMO_ROOM_HMAC_SECRET)=.{20,}') 'Recovery cloud-init must not contain runtime secrets.'
+Assert-True ($stage7Builder -match 'status --porcelain' -and $stage7Builder -match 'working-tree') 'Stage 7 manifest must distinguish a dirty working tree from a clean commit.'
+Assert-True ($stagingSmoke -match 'createHmac' -and $stagingSmoke -match 'YIMO_ROOM_HMAC_SECRET' -and $stagingSmoke -notmatch 'roomToken: joined\.roomToken') 'Staging smoke must submit a server-signed result, not a participant room token.'
+Assert-True ($stagingSmoke -match 'tournaments/active' -and $stagingSmoke -match 'participants = \[\]' -and $stagingSmoke -match 'index <= 2') 'Staging smoke must refuse an existing active tournament and complete its two-player disposable bracket.'
+Assert-True ($stagingSmoke -match 'release-room' -and $stagingSmoke -match 'roomCleanup\.released') 'Staging smoke must release its completed Java room process.'
 
 Write-Output 'stage7-deployment-config-check: PASS'

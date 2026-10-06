@@ -1,16 +1,18 @@
-# YIMO Graphwar 2.1.0 Windows installer source
+# YIMO Graphwar 2.2.0 Windows installer source
 
 `install.cmd` and `install.ps1` are the complete installation logic used by
-the self-extracting `YIMO-Graphwar-2.1.0-Setup.exe`. The installer expands a
+the self-extracting `YIMO-Graphwar-2.2.0-Setup.exe`. The installer expands a
 bundled Java 8 runtime and the three game/server JARs into
 `%LOCALAPPDATA%\YIMO Graphwar`, then creates a Start menu shortcut for the
 native `YIMO-Graphwar.exe` launcher. The launcher starts the bundled
 Java runtime, so users can search for YIMO Graphwar and click it without
 PowerShell or a separate Java installation.
 
-The setup wrapper records the installed build revision. Re-running the same
-installer reuses the existing installation instead of expanding `payload.zip`
-again; use the Start menu shortcut or `YIMO-Graphwar.exe` to launch the game.
+The setup wrapper records a fingerprint of the actual portable package.
+Re-running the same installer reuses the existing installation instead of
+expanding `payload.zip` again, while any package-content change gets a new
+fingerprint and updates the installation. Use the Start menu shortcut or
+`YIMO-Graphwar.exe` to launch the game.
 
 Build it from the repository root:
 

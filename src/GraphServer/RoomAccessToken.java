@@ -72,16 +72,18 @@ public final class RoomAccessToken {
         private final String buildId;
         private final String matchId;
         private final String participantId;
+        private final String displayName;
         private final int roomSlot;
         private final long expiryMillis;
         private final String nonce;
 
         public Payload(int protocolVersion, String buildId, String matchId, String participantId,
-                int roomSlot, long expiryMillis, String nonce) {
+                String displayName, int roomSlot, long expiryMillis, String nonce) {
             this.protocolVersion = protocolVersion;
             this.buildId = field(buildId, "buildId");
             this.matchId = field(matchId, "matchId");
             this.participantId = field(participantId, "participantId");
+            this.displayName = field(displayName, "displayName");
             this.roomSlot = roomSlot;
             this.expiryMillis = expiryMillis;
             this.nonce = field(nonce, "nonce");
@@ -89,17 +91,17 @@ public final class RoomAccessToken {
 
         private String encode() {
             return protocolVersion + "|" + buildId + "|" + matchId + "|" + participantId + "|"
-                    + roomSlot + "|" + expiryMillis + "|" + nonce;
+                    + displayName + "|" + roomSlot + "|" + expiryMillis + "|" + nonce;
         }
 
         private static Payload parse(String value) {
             String[] fields = value.split("\\|", -1);
-            if (fields.length != 7) {
+            if (fields.length != 8) {
                 return null;
             }
             try {
-                return new Payload(Integer.parseInt(fields[0]), fields[1], fields[2], fields[3],
-                        Integer.parseInt(fields[4]), Long.parseLong(fields[5]), fields[6]);
+                return new Payload(Integer.parseInt(fields[0]), fields[1], fields[2], fields[3], fields[4],
+                        Integer.parseInt(fields[5]), Long.parseLong(fields[6]), fields[7]);
             } catch (RuntimeException error) {
                 return null;
             }
@@ -127,6 +129,10 @@ public final class RoomAccessToken {
 
         public String getParticipantId() {
             return participantId;
+        }
+
+        public String getDisplayName() {
+            return displayName;
         }
 
         public int getRoomSlot() {

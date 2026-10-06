@@ -23,6 +23,7 @@ import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
+import java.util.Arrays;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -30,7 +31,10 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JPasswordField;
 import javax.swing.JTextField;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
 import GraphServer.Constants;
 
@@ -52,7 +56,8 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
 
     private final JTextField nameFieldJoin;
     private final JTextField portFieldJoin;
-    private final JTextField ipFieldJoin;
+    private final JPasswordField candidateCodeField;
+    private JLabel candidateCodeLabel;
     private final JButton yesButtonJoin;
     private final JButton noButtonJoin;
 
@@ -162,7 +167,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
 
         nameFieldJoin = YimoTheme.textField(18);
         portFieldJoin = YimoTheme.textField(8);
-        ipFieldJoin = YimoTheme.textField(18);
+        candidateCodeField = new JPasswordField(18);
         yesButtonJoin = YimoTheme.accentButton("Join");
         noButtonJoin = YimoTheme.quietButton("Back");
         formCards.add(joinForm(), "join");
@@ -266,13 +271,14 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         return grid;
     }
 
-    private void row(JPanel grid, int y, String label, JTextField field) {
+    private JLabel row(JPanel grid, int y, String label, JTextField field) {
         GridBagConstraints labelConstraints = new GridBagConstraints();
         labelConstraints.gridx = 0;
         labelConstraints.gridy = y;
         labelConstraints.anchor = GridBagConstraints.WEST;
         labelConstraints.insets = new Insets(0, 0, 10, 10);
-        grid.add(YimoTheme.label(label), labelConstraints);
+        JLabel rowLabel = YimoTheme.label(label);
+        grid.add(rowLabel, labelConstraints);
 
         GridBagConstraints fieldConstraints = new GridBagConstraints();
         fieldConstraints.gridx = 1;
@@ -281,6 +287,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         fieldConstraints.fill = GridBagConstraints.HORIZONTAL;
         fieldConstraints.insets = new Insets(0, 0, 10, 0);
         grid.add(field, fieldConstraints);
+        return rowLabel;
     }
 
     private JPanel formActions(JButton confirm, JButton cancel) {
@@ -311,11 +318,12 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
     }
 
     private JPanel joinForm() {
-        JPanel panel = formCard("DIRECT CONNECTION", "Join a known room");
+        JPanel panel = formCard("JOIN YIMO ROOM", "Practice rooms need only a port; tournament rooms also need your candidate code.");
         JPanel grid = formGrid();
         row(grid, 0, "Name", nameFieldJoin);
-        row(grid, 1, "Address", ipFieldJoin);
-        row(grid, 2, "Port", portFieldJoin);
+        row(grid, 1, "Port", portFieldJoin);
+        candidateCodeLabel = row(grid, 2, "Candidate code", candidateCodeField);
+        updateCandidateCodeVisibility();
         panel.add(grid, BorderLayout.CENTER);
         panel.add(formActions(yesButtonJoin, noButtonJoin), BorderLayout.SOUTH);
         return panel;
@@ -335,7 +343,12 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         noButtonCreate.addActionListener(this);
         nameFieldJoin.addActionListener(this);
         portFieldJoin.addActionListener(this);
-        ipFieldJoin.addActionListener(this);
+        candidateCodeField.addActionListener(this);
+        portFieldJoin.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent event) { updateCandidateCodeVisibility(); }
+            public void removeUpdate(DocumentEvent event) { updateCandidateCodeVisibility(); }
+            public void changedUpdate(DocumentEvent event) { updateCandidateCodeVisibility(); }
+        });
         yesButtonJoin.addActionListener(this);
         noButtonJoin.addActionListener(this);
     }
@@ -382,10 +395,28 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         if (show) {
             formLayout.show(formCards, "join");
             portFieldJoin.setText(Integer.toString(Constants.DEFAULT_PORT));
-            ipFieldJoin.requestFocusInWindow();
+            candidateCodeField.setText("");
+            updateCandidateCodeVisibility();
+            nameFieldJoin.requestFocusInWindow();
         } else {
             showMenu();
         }
+    }
+
+    static boolean isTournamentPort(int value) {
+        return value >= Constants.TOURNAMENT_ROOM_PORT_START && value <= Constants.TOURNAMENT_ROOM_PORT_END;
+    }
+
+    private void updateCandidateCodeVisibility() {
+        boolean visible = false;
+        try {
+            visible = isTournamentPort(Integer.parseInt(portFieldJoin.getText().trim()));
+        } catch (NumberFormatException ignored) {
+            // Keep the candidate-code field hidden until a complete tournament port is entered.
+        }
+        if (candidateCodeLabel != null) candidateCodeLabel.setVisible(visible);
+        candidateCodeField.setVisible(visible);
+        if (!visible) candidateCodeField.setText("");
     }
 
     private void status(String message, boolean error) {
@@ -452,14 +483,32 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
             if (joinVisible) {
                 if (source == noButtonJoin) {
                     showJoinGame(false);
-                } else if (source == yesButtonJoin || source == nameFieldJoin || source == ipFieldJoin || source == portFieldJoin) {
+                } else if (source == yesButtonJoin || source == nameFieldJoin || source == portFieldJoin || source == candidateCodeField) {
                     String name = playerName(nameFieldJoin);
-                    String address = ipFieldJoin.getText() == null ? "" : ipFieldJoin.getText().trim();
-                    if (name.length() == 0 || address.length() == 0) {
-                        status("Enter a name and room address.", true);
+                    int roomPort = port(portFieldJoin);
+                    if (name.length() == 0) {
+                        status("Enter your display name.", true);
+                    } else if (isTournamentPort(roomPort)) {
+                        char[] candidateCharacters = candidateCodeField.getPassword();
+                        String candidateCode = new String(candidateCharacters).trim();
+                        Arrays.fill(candidateCharacters, '\0');
+                        if (candidateCode.length() == 0) {
+                            status("Enter your candidate code for this tournament port.", true);
+                            return;
+                        }
+                        status("Validating your tournament match…", false);
+                        TournamentClient.JoinDetails assigned = TournamentClient.join(
+                                Constants.TOURNAMENT_API_BASE_URL, candidateCode, name, roomPort,
+                                Constants.BUILD_ID, Constants.PROTOCOL_VERSION);
+                        String officialName = assigned.getDisplayName();
+                        graphwar.joinGame(Constants.GLOBAL_IP, assigned.getPort(), officialName, assigned.getRoomToken());
+                        graphwar.getGameData().addPlayer(officialName);
+                        candidateCodeField.setText("");
+                        showJoinGame(false);
+                        graphwar.getUI().setScreen(Constants.PRE_GAME_SCREEN);
                     } else {
-                        status("Connecting to the room…", false);
-						graphwar.joinGame(address, port(portFieldJoin), name);
+                        status("Connecting to the YIMO room…", false);
+						graphwar.joinGame(Constants.GLOBAL_IP, roomPort, name);
                         graphwar.getGameData().addPlayer(name);
                         showJoinGame(false);
                         graphwar.getUI().setScreen(Constants.PRE_GAME_SCREEN);
@@ -480,7 +529,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         } catch (NumberFormatException error) {
             status("Port must be a number between 1 and 65535.", true);
         } catch (IOException error) {
-            status("Connection failed. Check the address and try again.", true);
+            status("Connection failed. Check the port, candidate code, and internet connection.", true);
             error.printStackTrace();
         }
     }

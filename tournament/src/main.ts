@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createTournamentHttpServer } from './server.ts';
+import { TournamentRoomManager } from './room-manager.ts';
 import { TournamentService } from './service.ts';
 
 const adminToken = process.env.YIMO_ADMIN_PASSWORD ?? process.env.YIMO_ADMIN_TOKEN;
@@ -15,14 +16,23 @@ if (!adminToken || !roomSecret) {
     dbPath,
     adminToken,
     roomSecret,
-    buildId: process.env.YIMO_BUILD_ID ?? 'YIMO-Graphwar-2.1.0',
+    buildId: process.env.YIMO_BUILD_ID ?? 'YIMO-Graphwar-2.2.0',
     protocolVersion: Number(process.env.YIMO_PROTOCOL_VERSION ?? 2),
   });
+  const roomJar = process.env.YIMO_TOURNAMENT_ROOM_SERVER_JAR;
+  const roomManager = roomJar ? new TournamentRoomManager({
+    javaCommand: process.env.YIMO_JAVA_COMMAND ?? '/opt/yimo/java8/bin/java',
+    roomServerJar: roomJar,
+  }) : null;
   const port = Number(process.env.PORT ?? 8080);
   const host = process.env.HOST ?? '127.0.0.1';
-  const server = createTournamentHttpServer(service);
+  const server = createTournamentHttpServer(service, (matchId, roomPort) => {
+    if (!roomManager) throw new Error('Tournament room launcher is not configured.');
+    return roomManager.ensure(matchId, roomPort);
+  }, (matchId) => roomManager ? roomManager.release(matchId) : false);
   const stop = () => {
     clearInterval(scheduler);
+    roomManager?.close();
     server.close();
     service.close();
   };

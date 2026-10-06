@@ -24,10 +24,10 @@ Assert-File (Join-Path $PSScriptRoot 'launch-practice-client.cmd') 'Practice-cli
 $notice = Get-Content -Raw (Join-Path $root 'NOTICE.md')
 $licenses = Get-Content -Raw (Join-Path $root 'THIRD-PARTY-LICENSES.md')
 $readme = Get-Content -Raw (Join-Path $PSScriptRoot 'README.md')
-Assert-True ($notice -match 'YIMO Graphwar 2\.1\.0') 'Notice must identify the v2.1 release.'
+Assert-True ($notice -match 'YIMO Graphwar 2\.2\.0') 'Notice must identify the v2.2 release.'
 Assert-True ($notice -match 'GPL-3\.0') 'Notice must identify GPL-3.0.'
 Assert-True ($licenses -match 'OpenJDK') 'Third-party license audit must cover the bundled runtime.'
-Assert-True ($readme -match 'YIMO-Graphwar-2\.1\.0-Setup\.exe') 'Installer README must document the v2.1 installer.'
+Assert-True ($readme -match 'YIMO-Graphwar-2\.2\.0-Setup\.exe') 'Installer README must document the v2.2 installer.'
 
 $sourceFiles = @(
         (Join-Path $PSScriptRoot 'build-stage8-release.ps1'),
@@ -48,6 +48,9 @@ $buildScript = Get-Content -Raw (Join-Path $PSScriptRoot 'build-stage8-release.p
 $installScript = Get-Content -Raw (Join-Path $PSScriptRoot 'install.ps1')
 Assert-True ($buildScript -match 'YIMO-Graphwar\.exe') 'Build must package the clickable executable.'
 Assert-True ($buildScript -match 'win32icon') 'Build must embed the YIMO icon in the executable.'
+Assert-True ($buildScript -match 'status --porcelain') 'Build manifest must detect an uncommitted source tree.'
+Assert-True ($buildScript -match 'working-tree') 'Dirty builds must not claim a clean commit revision.'
+Assert-True ($buildScript -match 'packageFingerprint' -and $buildScript -match 'Package fingerprint:') 'Installed build identity must be derived from the actual portable package.'
 Assert-True ($installScript -match 'YIMO-Graphwar\.exe') 'Shortcut must target the clickable executable.'
 
 Write-Output 'Stage 8 installer/source smoke checks passed.'

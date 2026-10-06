@@ -43,7 +43,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $resourceDir = Join-Path $root 'rsc'
 $jarSpecs = @(
-    @{ Name = 'YIMO-Graphwar-2.1.0.jar'; Main = 'Graphwar.Graphwar' },
+    @{ Name = 'YIMO-Graphwar-2.2.0.jar'; Main = 'Graphwar.Graphwar' },
     @{ Name = 'globalServer.jar'; Main = 'GlobalServer.GlobalServer' },
     @{ Name = 'roomServer.jar'; Main = 'RoomServer.RoomServer' }
 )
@@ -67,13 +67,20 @@ Copy-Item -LiteralPath (Join-Path $root 'COPYING') -Destination $output
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $output
 Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination $output
 
+$sourceRevision = (& git -C $root rev-parse HEAD 2>$null) -join ''
+if ([string]::IsNullOrWhiteSpace($sourceRevision)) { $sourceRevision = 'unknown' }
+$workingTree = (& git -C $root status --porcelain 2>$null) -join "`n"
+if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($workingTree)) {
+    $sourceRevision += '-working-tree'
+}
+
 $manifest = @(
     'YIMO Graphwar 2.0 Stage 7 release',
-    'Build ID: YIMO-Graphwar-2.1.0',
+    'Build ID: YIMO-Graphwar-2.2.0',
     'Protocol version: 2',
     'Java target: 8',
     'Tournament runtime: Node.js 24.x',
-    "Source revision: $((git -C $root rev-parse HEAD 2>$null) -join '')"
+    "Source revision: $sourceRevision"
 )
 Set-Content -LiteralPath (Join-Path $output 'RELEASE-MANIFEST.txt') -Value $manifest -Encoding UTF8
 

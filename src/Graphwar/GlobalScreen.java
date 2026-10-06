@@ -21,7 +21,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.List;
 
@@ -317,8 +316,7 @@ public class GlobalScreen extends YimoScreen implements ActionListener, StartSto
     }
 
     private void openTournamentPortal() throws IOException {
-        String url = tournamentPortalUrl(Constants.TOURNAMENT_API_BASE_URL)
-                + "?playerId=" + URLEncoder.encode(PlayerIdentity.loadOrCreate(PlayerIdentity.userNode()), "UTF-8");
+        String url = tournamentPortalUrl(Constants.TOURNAMENT_API_BASE_URL);
         if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
             try {
                 Desktop.getDesktop().browse(URI.create(url));

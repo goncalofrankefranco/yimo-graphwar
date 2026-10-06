@@ -25,7 +25,7 @@ trap cleanup EXIT
 
 find "$source_dir/src" -type f -name '*.java' -print > "$sources"
 "$java_home/bin/javac" -encoding UTF-8 -source 8 -target 8 -d "$classes" "@$sources"
-"$java_home/bin/jar" cfe "$output_dir/YIMO-Graphwar-2.1.0.jar" Graphwar.Graphwar -C "$classes" . -C "$source_dir" rsc
+"$java_home/bin/jar" cfe "$output_dir/YIMO-Graphwar-2.2.0.jar" Graphwar.Graphwar -C "$classes" . -C "$source_dir" rsc
 "$java_home/bin/jar" cfe "$output_dir/globalServer.jar" GlobalServer.GlobalServer -C "$classes" . -C "$source_dir" rsc
 "$java_home/bin/jar" cfe "$output_dir/roomServer.jar" RoomServer.RoomServer -C "$classes" . -C "$source_dir" rsc
 cp -a "$source_dir/rsc" "$output_dir/rsc"
@@ -34,5 +34,5 @@ for legal in COPYING LICENSE README.md NOTICE.md THIRD-PARTY-LICENSES.md; do
   [[ -e "$source_dir/$legal" ]] && cp -a "$source_dir/$legal" "$output_dir/$legal"
 done
 revision="$(git -C "$source_dir" rev-parse HEAD 2>/dev/null || printf 'local-build')"
-printf 'YIMO Graphwar Linux server release\nBuild ID: YIMO-Graphwar-2.1.0\nProtocol version: 2\nSource revision: %s\n' "$revision" > "$output_dir/RELEASE-MANIFEST.txt"
+printf 'YIMO Graphwar Linux server release\nBuild ID: YIMO-Graphwar-2.2.0\nProtocol version: 2\nSource revision: %s\n' "$revision" > "$output_dir/RELEASE-MANIFEST.txt"
 printf '%s\n' "$output_dir"

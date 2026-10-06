@@ -39,6 +39,8 @@ public class Constants
 	public static int GLOBAL_PORT = NETWORK_CONFIG.getGlobalPort();
 	public static int ROOM_PORT_START = NETWORK_CONFIG.getRoomPortStart();
 	public static int ROOM_PORT_END = NETWORK_CONFIG.getRoomPortEnd();
+	public static int TOURNAMENT_ROOM_PORT_START = NETWORK_CONFIG.getTournamentRoomPortStart();
+	public static int TOURNAMENT_ROOM_PORT_END = NETWORK_CONFIG.getTournamentRoomPortEnd();
 	public static String TOURNAMENT_API_BASE_URL = NETWORK_CONFIG.getTournamentApiBaseUrl();
 	public static String BUILD_ID = NETWORK_CONFIG.getBuildId();
 	public static int PROTOCOL_VERSION = NETWORK_CONFIG.getProtocolVersion();
@@ -154,6 +156,8 @@ public class Constants
 		GLOBAL_PORT = config.getGlobalPort();
 		ROOM_PORT_START = config.getRoomPortStart();
 		ROOM_PORT_END = config.getRoomPortEnd();
+		TOURNAMENT_ROOM_PORT_START = config.getTournamentRoomPortStart();
+		TOURNAMENT_ROOM_PORT_END = config.getTournamentRoomPortEnd();
 		TOURNAMENT_API_BASE_URL = config.getTournamentApiBaseUrl();
 		BUILD_ID = config.getBuildId();
 		PROTOCOL_VERSION = config.getProtocolVersion();

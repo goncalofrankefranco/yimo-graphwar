@@ -274,4 +274,27 @@ public final class AuthoritativeGame
 		}
 		return !team1Alive || !team2Alive;
 	}
+
+	public int getWinningTeam()
+	{
+		if(!started)
+		{
+			return -1;
+		}
+		boolean team1Alive = false;
+		boolean team2Alive = false;
+		for(Graphwar.Player player : players)
+		{
+			for(int i=0; i<player.getNumSoldiers(); i++)
+			{
+				if(player.getSoldiers()[i].isAlive())
+				{
+					if(player.getTeam() == Constants.TEAM1) team1Alive = true;
+					else team2Alive = true;
+				}
+			}
+		}
+		if(team1Alive == team2Alive) return -1;
+		return team1Alive ? Constants.TEAM1 : Constants.TEAM2;
+	}
 }

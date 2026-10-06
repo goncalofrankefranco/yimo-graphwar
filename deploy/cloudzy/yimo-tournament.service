@@ -9,6 +9,8 @@ User=yimo
 Group=yimo
 WorkingDirectory=/opt/yimo-graphwar/current/tournament
 EnvironmentFile=/etc/yimo/tournament.env
+Environment=YIMO_JAVA_COMMAND=/opt/yimo/java8/bin/java
+Environment=YIMO_TOURNAMENT_ROOM_SERVER_JAR=/opt/yimo-graphwar/current/roomServer.jar
 ExecStart=/usr/bin/node --max-old-space-size=160 --experimental-strip-types /opt/yimo-graphwar/current/tournament/src/main.ts
 Restart=on-failure
 RestartSec=3

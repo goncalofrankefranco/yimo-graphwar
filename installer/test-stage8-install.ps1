@@ -21,15 +21,8 @@ function Assert-True([bool]$condition, [string]$message) {
 
 New-Item -ItemType Directory -Path $test -Force | Out-Null
 try {
-    # IExpress uses a fixed IXP000.TMP name on some Windows builds. Remove
-    # only that stale extractor cache so an earlier package cannot contaminate
-    # this isolated install check.
-    $legacyIexpressTemp = Join-Path $oldTemp 'IXP000.TMP'
-    $activeInstaller = Get-Process -Name 'YIMO-Graphwar-2.1.0-Setup' -ErrorAction SilentlyContinue
+    $activeInstaller = Get-Process -Name 'YIMO-Graphwar-2.2.0-Setup' -ErrorAction SilentlyContinue
     if ($null -ne $activeInstaller) { throw 'another YIMO installer test is already running.' }
-    if (Test-Path -LiteralPath $legacyIexpressTemp) {
-        Remove-Item -LiteralPath $legacyIexpressTemp -Recurse -Force
-    }
     $env:LOCALAPPDATA = Join-Path $test 'local'
     $env:APPDATA = Join-Path $test 'roaming'
     $env:TEMP = Join-Path $test 'temp'
@@ -37,14 +30,16 @@ try {
     $env:YIMO_INSTALL_NO_LAUNCH = '1'
     New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
 
-    $setup = Join-Path $release 'YIMO-Graphwar-2.1.0-Setup.exe'
+    $setup = Join-Path $release 'YIMO-Graphwar-2.2.0-Setup.exe'
+    $portable = Join-Path $release 'YIMO-Graphwar-2.2.0-Portable.zip'
+    $packageFingerprint = (Get-FileHash -LiteralPath $portable -Algorithm SHA256).Hash
     Assert-True (Test-Path -LiteralPath $setup -PathType Leaf) 'setup executable is missing.'
     $process = Start-Process -FilePath $setup -Wait -PassThru -WindowStyle Hidden
     Assert-True ($process.ExitCode -eq 0) "setup exited with code $($process.ExitCode)."
 
     $target = Join-Path $env:LOCALAPPDATA 'YIMO Graphwar'
     foreach ($relative in @(
-            'YIMO-Graphwar-2.1.0.jar',
+            'YIMO-Graphwar-2.2.0.jar',
             'YIMO-Graphwar.exe',
             'YIMO.ico',
             'yimo-logo.png',
@@ -71,7 +66,10 @@ try {
     $secondProcess = Start-Process -FilePath $setup -Wait -PassThru -WindowStyle Hidden
     Assert-True ($secondProcess.ExitCode -eq 0) "second setup run exited with code $($secondProcess.ExitCode)."
     $installedVersion = (Get-Content -Raw (Join-Path $target '.yimo-installed-version')).Trim()
-    Assert-True ($installedVersion -match '^YIMO-Graphwar-2\.1\.0\|') 'installed version marker is invalid.'
+    Assert-True ($installedVersion -match '^YIMO-Graphwar-2\.2\.0\|') 'installed version marker is invalid.'
+    Assert-True ($installedVersion -eq ('YIMO-Graphwar-2.2.0|' + $packageFingerprint.Substring(0, 16))) 'installed marker must change with the actual package contents.'
+    $manifest = Get-Content -Raw (Join-Path $release 'RELEASE-MANIFEST.txt')
+    Assert-True ($manifest.Contains("Package fingerprint: $packageFingerprint")) 'release manifest must record the portable-package fingerprint.'
 
     $javaProcess = Start-Process -FilePath (Join-Path $target 'runtime\bin\java.exe') -ArgumentList @('-version') -Wait -PassThru -WindowStyle Hidden
     Assert-True ($javaProcess.ExitCode -eq 0) 'bundled Java did not start.'

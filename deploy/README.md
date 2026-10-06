@@ -42,14 +42,17 @@ capacity limits.
   Git revision, and runs the bootstrap script.
 - `bootstrap-vps.sh` installs Java 8, Node 24, Nginx, UFW, the system user,
   and systemd units. It opens only SSH, HTTP/HTTPS, the YIMO lobby port
-  `23762`, and the documented room range `30000:30049`. It also creates a 512 MB
+  `23762`, practice rooms `30000:30049`, and tournament-only rooms
+  `31000:31049`. It also creates a 512 MB
   swapfile and applies bounded Java/Node memory profiles for the 1 GB plan.
 - `first-boot.sh` runs on every restored instance. It detects the current
   IPv4 address, writes a fresh `yimo.properties` that points the game client
   to `graphwar-server.yimo-official.org`, and creates runtime
   tournament secrets only when they are missing. It exposes one organizer
   password at `/root/yimo-admin-password.txt`; the room HMAC key remains
-  internal.
+  internal. It refreshes Nginx's trusted proxy ranges from Cloudflare's
+  official IPv4/IPv6 feeds before Nginx starts, so per-player API limits use
+  the verified visitor IP rather than a shared Cloudflare edge IP.
 - `install-release.sh` installs a locally built release atomically while
   keeping the previous release directory as a rollback copy.
 - `setup-yimo-vps.sh` is the replacement-VPS path: it checks out a pinned
@@ -131,9 +134,9 @@ The browser pages and all HTTP API routes use
    site-login prompt. Organizer actions in `/admin` still require the
    organizer password in `/root/yimo-admin-password.txt`.
 
-Direct-IP web requests are rejected. Game TCP ports (`23762` and
-`30000–30049`) remain available for multiplayer and must be firewalled
-separately if gameplay itself should be private.
+Direct-IP web requests are rejected. Game TCP ports (`23762`, practice
+`30000–30049`, and tournament-only `31000–31049`) remain available for
+multiplayer and must be firewalled separately if gameplay itself should be private.
 
 ## Rebuild a replacement VPS
 
@@ -169,7 +172,7 @@ Run from the repository root in PowerShell:
 ```powershell
 .\deploy\build-stage7-release.ps1 `
   -JavaHome 'C:\Program Files\Eclipse Adoptium\jdk-8.0.492.9-hotspot' `
-  -OutputDir 'C:\path\outside\the\repo\YIMO-Graphwar-2.1.0-stage7'
+  -OutputDir 'C:\path\outside\the\repo\YIMO-Graphwar-2.2.0-stage7'
 ```
 
 The script compiles all production Java sources with Java 8, creates the
@@ -204,7 +207,7 @@ From the organizer computer, upload the built release directory (not
 `.env.local`):
 
 ```powershell
-scp -r C:\path\outside\the\repo\YIMO-Graphwar-2.1.0-stage7 root@SERVER_IP:/root/yimo-release
+scp -r C:\path\outside\the\repo\YIMO-Graphwar-2.2.0-stage7 root@SERVER_IP:/root/yimo-release
 ssh root@SERVER_IP 'bash /opt/yimo-source/deploy/cloudzy/install-release.sh --release-dir /root/yimo-release'
 ```
 
@@ -231,12 +234,20 @@ HTTPS route.
 ### Scheduled-tournament staging check
 
 Run `staging-tournament-smoke.mjs` only after saving the existing SQLite
-database. It reads the organizer password from `/root/yimo-admin-password.txt` on
-the VPS and prints pass/fail labels only. The disposable flow creates four
-temporary participants, creates a short `autoStart` tournament, opens
-registration, registers the participants, waits for scheduled close/start,
-joins one assigned match, submits one signed result, and checks public-bracket
-advancement. Remove the helper after the run and restore the pre-test database.
+database and confirming that no tournament is active. It reads the organizer
+password from `/root/yimo-admin-password.txt` and the room HMAC secret from
+`/etc/yimo/tournament.env`; it prints pass/fail labels only. Run without
+printing the environment:
+
+```bash
+sudo bash -c 'set -a; . /etc/yimo/tournament.env; set +a; node --experimental-strip-types /opt/yimo-source/deploy/cloudzy/staging-tournament-smoke.mjs'
+```
+
+The disposable flow creates two temporary participants, schedules one match,
+joins its assigned room, submits a server-HMAC-signed result, confirms the
+bracket completes, then asks the service to stop the finished room. Restore the
+pre-test SQLite backup after success or failure so temporary participants and
+the completed tournament are removed.
 
 This check proves lifecycle and wiring, not final capacity. It must not use
 real participant credentials.
@@ -291,14 +302,14 @@ never the literal `STAMP` placeholder.
 
 ## Smoke-game mode on the 1 GB VM
 
-The small VM can host a lobby, the tournament API, and one lightweight
-practice room after the bounded memory profile is installed. It is still not
-an event server. To enable the practice room for a short manual test:
+The 1 GB VM can host the lobby, tournament API, and one on-demand tournament
+match room at a time under the bounded memory profile. It is still not an
+event server. To enable the optional public practice-room pool for a short test:
 
 ```bash
 sudo sed -i 's/^YIMO_ENABLE_PRACTICE_ROOMS=.*/YIMO_ENABLE_PRACTICE_ROOMS=1/' /etc/yimo/bootstrap.env
 sudo systemctl enable --now yimo-public-rooms.service
-sudo ss -ltn | grep -E ':(30000|30001|30002|30003|30004) '
+sudo ss -ltn | grep -E ':(30000|30001|30002|30003|30004|31000|31001) '
 ```
 
 Room sockets now bind inside `room.port.start`–`room.port.end`, so the

@@ -51,16 +51,9 @@ export interface SeedInput {
 
 export interface SessionInput {
   participantCode: string;
+  displayName?: string;
   buildId: string;
   protocolVersion: number;
-}
-
-export interface SelfRegistrationInput {
-  playerId: string;
-  displayName: string;
-  buildId: string;
-  protocolVersion: number;
-  clientKey?: string;
 }
 
 export interface JoinInput {
@@ -79,6 +72,11 @@ export interface AssignedJoinInput {
   clientKey?: string;
 }
 
+export interface GameJoinInput extends SessionInput {
+  roomPort: number;
+  clientKey?: string;
+}
+
 export interface HeartbeatInput {
   roomToken: string;
   state?: 'ASSIGNED' | 'IN_PROGRESS';
@@ -89,7 +87,8 @@ export interface ResultInput {
   winnerParticipantId: string;
   loserParticipantId: string;
   reason: string;
-  roomToken: string;
+  serverNonce: string;
+  serverSignature: string;
 }
 
 type MatchRow = Record<string, any>;
@@ -179,6 +178,9 @@ CREATE INDEX IF NOT EXISTS idx_match_players_participant ON match_players(partic
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MATCH_CODE_LENGTH = 10;
+const TOURNAMENT_PORT_START = 31000;
+const TOURNAMENT_PORT_END = 31049;
+const ACTIVE_TOURNAMENT_STATUSES = "'REGISTRATION_OPEN', 'CHECK_IN', 'READY', 'START_BLOCKED', 'RUNNING'";
 
 export class ServiceError extends Error {
   readonly status: number;
@@ -246,6 +248,12 @@ function requiredText(value: unknown, field: string, maxLength: number): string 
   return value.trim();
 }
 
+function safeEqualText(left: string, right: string): boolean {
+  const a = Buffer.from(left, 'utf8');
+  const b = Buffer.from(right, 'utf8');
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 function optionalTimestamp(value: unknown, field: string): number | null {
   if (value === undefined || value === null || value === '') return null;
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
@@ -265,6 +273,7 @@ function roomTokenPayload(payload: {
   buildId: string;
   matchId: string;
   participantId: string;
+  displayName: string;
   roomSlot: number;
   expiryMillis: number;
   nonce: string;
@@ -274,6 +283,7 @@ function roomTokenPayload(payload: {
     payload.buildId,
     payload.matchId,
     payload.participantId,
+    payload.displayName,
     payload.roomSlot,
     payload.expiryMillis,
     payload.nonce,
@@ -285,6 +295,7 @@ export function issueRoomToken(payload: {
   buildId: string;
   matchId: string;
   participantId: string;
+  displayName: string;
   roomSlot: number;
   expiryMillis: number;
   nonce: string;
@@ -299,6 +310,7 @@ export function verifyRoomToken(token: string, secret: string, nowMillis: number
   buildId: string;
   matchId: string;
   participantId: string;
+  displayName: string;
   roomSlot: number;
   expiryMillis: number;
   nonce: string;
@@ -312,10 +324,10 @@ export function verifyRoomToken(token: string, secret: string, nowMillis: number
     const actual = Buffer.from(parts[1], 'utf8');
     if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null;
     const fields = raw.split('|');
-    if (fields.length !== 7 || fields.some((field) => field.length === 0)) return null;
+    if (fields.length !== 8 || fields.some((field) => field.length === 0)) return null;
     const protocolVersion = Number(fields[0]);
-    const roomSlot = Number(fields[4]);
-    const expiryMillis = Number(fields[5]);
+    const roomSlot = Number(fields[5]);
+    const expiryMillis = Number(fields[6]);
     if (!Number.isInteger(protocolVersion) || !Number.isInteger(roomSlot)
       || !Number.isInteger(expiryMillis) || expiryMillis < nowMillis) return null;
     return {
@@ -323,9 +335,10 @@ export function verifyRoomToken(token: string, secret: string, nowMillis: number
       buildId: fields[1],
       matchId: fields[2],
       participantId: fields[3],
+      displayName: fields[4],
       roomSlot,
       expiryMillis,
-      nonce: fields[6],
+      nonce: fields[7],
     };
   } catch {
     return null;
@@ -348,7 +361,7 @@ export class TournamentService {
     }
     this.adminToken = options.adminToken;
     this.roomSecret = options.roomSecret;
-    this.buildId = options.buildId ?? 'YIMO-Graphwar-2.1.0';
+    this.buildId = options.buildId ?? 'YIMO-Graphwar-2.2.0';
     this.protocolVersion = options.protocolVersion ?? 2;
     this.now = options.now ?? (() => Math.floor(Date.now() / 1000));
     this.participantScryptCost = options.participantScryptCost ?? 16384;
@@ -429,17 +442,56 @@ export class TournamentService {
     return { participantId, displayName };
   }
 
+  private otherActiveTournament(tournamentId: string): any | undefined {
+    return this.db.prepare(`
+      SELECT tournament_id FROM tournaments
+      WHERE tournament_id <> ? AND status IN (${ACTIVE_TOURNAMENT_STATUSES}) LIMIT 1
+    `).get(tournamentId) as any;
+  }
+
+  private assertNoOtherActiveTournament(tournamentId: string): void {
+    const active = this.otherActiveTournament(tournamentId);
+    if (active) {
+      throw new ServiceError(409, 'ACTIVE_TOURNAMENT_EXISTS',
+        'Another tournament is already active. Complete it before opening another.');
+    }
+  }
+
+  activeTournament(): Record<string, unknown> | null {
+    const row = this.db.prepare(`
+      SELECT tournament_id FROM tournaments
+      WHERE status IN (${ACTIVE_TOURNAMENT_STATUSES})
+      ORDER BY updated_at DESC, created_at DESC LIMIT 1
+    `).get() as any;
+    return row ? this.publicBracket(String(row.tournament_id)) : null;
+  }
+
+  currentAdminTournament(adminToken: string | undefined): Record<string, unknown> | null {
+    this.requireAdmin(adminToken);
+    const active = this.db.prepare(`
+      SELECT tournament_id FROM tournaments WHERE status IN (${ACTIVE_TOURNAMENT_STATUSES})
+      ORDER BY updated_at DESC, created_at DESC LIMIT 1
+    `).get() as any;
+    const row = active ?? this.db.prepare(`
+      SELECT tournament_id FROM tournaments WHERE status = 'DRAFT'
+      ORDER BY updated_at DESC, created_at DESC LIMIT 1
+    `).get() as any;
+    return row ? this.adminTournament(adminToken, String(row.tournament_id)) : null;
+  }
+
   createTournament(adminToken: string | undefined, input: TournamentInput): { tournamentId: string; status: string } {
     this.requireAdmin(adminToken);
     const tournamentId = validateIdentifier(input?.tournamentId ?? `t-${randomUUID()}`, 'tournamentId');
     const name = requiredText(input?.name, 'name', 120);
     this.requireBuild(input?.buildId, input?.protocolVersion);
     const timeout = Number(input?.matchTimeoutSeconds ?? 900);
-    const roomStart = Number(input?.roomPortStart ?? 30000);
-    const roomEnd = Number(input?.roomPortEnd ?? 30049);
+    const roomStart = Number(input?.roomPortStart ?? TOURNAMENT_PORT_START);
+    // ponytail: one on-demand room per 1 GB staging VPS; widen the configured range after load testing.
+    const roomEnd = Number(input?.roomPortEnd ?? TOURNAMENT_PORT_START);
     if (!Number.isInteger(timeout) || timeout < 60 || timeout > 86400
       || !Number.isInteger(roomStart) || !Number.isInteger(roomEnd)
-      || roomStart < 1 || roomEnd > 65535 || roomStart > roomEnd || roomEnd - roomStart + 1 > 50) {
+      || roomStart < TOURNAMENT_PORT_START || roomEnd > TOURNAMENT_PORT_END
+      || roomStart > roomEnd || roomEnd - roomStart + 1 > 50) {
       throw new ServiceError(400, 'INVALID_INPUT', 'Tournament timeout or room-port range is invalid.');
     }
     const requireCheckIn = input?.requireCheckIn === true;
@@ -520,58 +572,6 @@ export class TournamentService {
     return { sessionToken, participantId: participant.participant_id, expiresAt };
   }
 
-  selfRegisterParticipant(tournamentId: string, input: SelfRegistrationInput): Record<string, unknown> {
-    this.rateLimiter.check(`self-register:${input?.clientKey ?? 'local'}`, this.timestamp());
-    this.requireBuild(input?.buildId, input?.protocolVersion);
-    const id = validateIdentifier(input?.playerId, 'playerId');
-    if (!/^yimo-[A-Za-z0-9-]{16,100}$/.test(id)) {
-      throw new ServiceError(400, 'INVALID_INPUT', 'playerId must be a generated YIMO local identity.');
-    }
-    const displayName = requiredText(input?.displayName, 'displayName', 80);
-    const tournament = this.tournamentRow(tournamentId);
-    if (tournament.status !== 'REGISTRATION_OPEN') {
-      throw new ServiceError(409, tournament.status === 'DRAFT' ? 'REGISTRATION_NOT_OPEN' : 'REGISTRATION_CLOSED',
-        'Registration is not open.');
-    }
-    if (tournament.roster_frozen_at !== null) {
-      throw new ServiceError(409, 'ROSTER_FROZEN', 'Tournament registration is frozen.');
-    }
-    const now = this.timestamp();
-    this.transaction(() => {
-      let participant = this.db.prepare('SELECT * FROM participants WHERE participant_id = ?').get(id) as any;
-      if (!participant) {
-        const internalCode = randomBytes(32).toString('base64url');
-        const salt = randomBytes(16).toString('hex');
-        const lookupHash = hmac(internalCode, this.roomSecret);
-        this.db.prepare(`
-          INSERT INTO participants(participant_id, display_name, participant_code_salt, participant_code_hash,
-            participant_code_lookup_hash, session_token_hash, created_at, status)
-          VALUES (?, ?, ?, ?, ?, NULL, ?, 'ACTIVE')
-        `).run(id, displayName, salt, this.participantHash(internalCode, salt), lookupHash, now);
-      } else if (participant.status !== 'ACTIVE') {
-        throw new ServiceError(409, 'PARTICIPANT_INACTIVE', 'This local player identity is inactive.');
-      }
-      this.db.prepare('UPDATE participants SET display_name = ? WHERE participant_id = ?')
-        .run(displayName, id);
-      this.db.prepare(`
-        INSERT OR IGNORE INTO tournament_entries(tournament_id, participant_id, entry_status, registered_at)
-        VALUES (?, ?, 'REGISTERED', ?)
-      `).run(tournament.tournament_id, id, now);
-      this.audit('PARTICIPANT_SELF_REGISTERED', tournament.tournament_id, {
-        participantId: id,
-      });
-    });
-    const session = this.issueParticipantSession(id);
-    const entry = this.db.prepare(
-      'SELECT * FROM tournament_entries WHERE tournament_id = ? AND participant_id = ?',
-    ).get(tournament.tournament_id, id) as any;
-    return {
-      ...session,
-      displayName,
-      entry: this.entryView(entry),
-    };
-  }
-
   private tournamentRow(tournamentId: string): any {
     const id = validateIdentifier(tournamentId, 'tournamentId');
     const tournament = this.db.prepare('SELECT * FROM tournaments WHERE tournament_id = ?').get(id) as any;
@@ -601,6 +601,7 @@ export class TournamentService {
     this.transaction(() => {
       const tournament = this.tournamentRow(id);
       if (tournament.status !== to) {
+        this.assertNoOtherActiveTournament(id);
         assertTransition(tournament.status, to);
         const now = this.timestamp();
         this.db.prepare('UPDATE tournaments SET status = ?, updated_at = ? WHERE tournament_id = ?')
@@ -613,6 +614,28 @@ export class TournamentService {
 
   openRegistration(adminToken: string | undefined, tournamentId: string): Record<string, unknown> {
     return this.changeTournamentStatus(adminToken, tournamentId, 'REGISTRATION_OPEN', 'REGISTRATION_OPENED');
+  }
+
+  reopenRegistration(adminToken: string | undefined, tournamentId: string): Record<string, unknown> {
+    this.requireAdmin(adminToken);
+    const id = validateIdentifier(tournamentId, 'tournamentId');
+    this.transaction(() => {
+      const tournament = this.tournamentRow(id);
+      if (tournament.status !== 'START_BLOCKED' || tournament.roster_frozen_at !== null) {
+        throw new ServiceError(409, 'REGISTRATION_CANNOT_REOPEN',
+          'Registration can only be reopened when a tournament start is blocked.');
+      }
+      this.assertNoOtherActiveTournament(id);
+      assertTransition(tournament.status, 'REGISTRATION_OPEN');
+      const now = this.timestamp();
+      this.db.prepare(`
+        UPDATE tournaments SET status = 'REGISTRATION_OPEN', registration_open_at = ?,
+          registration_close_at = NULL, check_in_open_at = NULL, check_in_close_at = NULL,
+          start_at = NULL, auto_start = 0, updated_at = ? WHERE tournament_id = ?
+      `).run(now, now, id);
+      this.audit('REGISTRATION_REOPENED', id, { from: tournament.status, source: 'admin' });
+    });
+    return this.adminTournament(adminToken, id);
   }
 
   closeRegistration(adminToken: string | undefined, tournamentId: string): Record<string, unknown> {
@@ -631,6 +654,109 @@ export class TournamentService {
       throw new ServiceError(409, 'CHECK_IN_DISABLED', 'Check-in is disabled for this tournament.');
     }
     return this.changeTournamentStatus(adminToken, tournamentId, 'CHECK_IN', 'CHECK_IN_OPENED');
+  }
+
+  closeCheckIn(adminToken: string | undefined, tournamentId: string): Record<string, unknown> {
+    this.requireAdmin(adminToken);
+    const tournament = this.tournamentRow(tournamentId);
+    if (Number(tournament.require_check_in) !== 1) {
+      throw new ServiceError(409, 'CHECK_IN_DISABLED', 'Check-in is disabled for this tournament.');
+    }
+    return this.changeTournamentStatus(adminToken, tournamentId, 'READY', 'CHECK_IN_CLOSED');
+  }
+
+  extendExpiredMatches(adminToken: string | undefined, tournamentId: string): { tournamentId: string; extended: number } {
+    this.requireAdmin(adminToken);
+    const id = validateIdentifier(tournamentId, 'tournamentId');
+    const tournament = this.tournamentRow(id);
+    if (tournament.status !== 'RUNNING') {
+      throw new ServiceError(409, 'TOURNAMENT_NOT_RUNNING', 'Expired matches can only be extended during a running tournament.');
+    }
+    const now = this.timestamp();
+    const expiresAt = now + Number(tournament.match_timeout_seconds);
+    const extended = this.transaction(() => {
+      const expired = this.db.prepare(`
+        SELECT match_id, status, room_slot FROM matches
+        WHERE tournament_id = ? AND status IN ('OPEN', 'ASSIGNED', 'IN_PROGRESS')
+          AND match_code_expires_at IS NOT NULL AND match_code_expires_at <= ?
+      `).all(id, now) as any[];
+      for (const match of expired) {
+        if (match.status === 'OPEN') {
+          const code = this.newMatchCode();
+          this.db.prepare(`
+            UPDATE matches SET match_code_hash = ?, match_code_expires_at = ?, updated_at = ?
+            WHERE match_id = ? AND status = 'OPEN' AND match_code_expires_at <= ?
+          `).run(code.hash, expiresAt, now, match.match_id, now);
+        } else {
+          this.db.prepare(`
+            UPDATE matches SET match_code_expires_at = ?, updated_at = ?
+            WHERE match_id = ? AND status IN ('ASSIGNED', 'IN_PROGRESS') AND match_code_expires_at <= ?
+          `).run(expiresAt, now, match.match_id, now);
+          this.db.prepare('UPDATE room_slots SET expires_at = ? WHERE tournament_id = ? AND match_id = ?')
+            .run(expiresAt, id, match.match_id);
+        }
+        this.audit('MATCH_EXPIRY_EXTENDED', match.match_id, { tournamentId: id, expiresAt });
+      }
+      return expired.length;
+    });
+    return { tournamentId: id, extended };
+  }
+
+  confirmCompletedMatch(adminToken: string | undefined, matchId: string): { matchId: string } {
+    this.requireAdmin(adminToken);
+    const id = validateIdentifier(matchId, 'matchId');
+    const match = this.db.prepare('SELECT status FROM matches WHERE match_id = ?').get(id) as any;
+    if (!match) throw new ServiceError(404, 'MATCH_NOT_FOUND', 'Match not found.');
+    if (match.status !== 'COMPLETED') {
+      throw new ServiceError(409, 'MATCH_NOT_COMPLETED', 'A room can only be released after its result is recorded.');
+    }
+    return { matchId: id };
+  }
+
+  forfeitExpiredMatch(adminToken: string | undefined, matchId: string, winnerSide: string):
+    { matchId: string; winnerParticipantId: string; loserParticipantId: string; roomSlot: number | null; reason: 'FORFEIT'; nextMatch: Record<string, unknown> | null } {
+    this.requireAdmin(adminToken);
+    const id = validateIdentifier(matchId, 'matchId');
+    if (winnerSide !== 'A' && winnerSide !== 'B') {
+      throw new ServiceError(400, 'INVALID_INPUT', 'winnerSide must be A or B.');
+    }
+    const match = this.db.prepare(`
+      SELECT m.*, t.status AS tournament_status FROM matches m
+      JOIN tournaments t ON t.tournament_id = m.tournament_id WHERE m.match_id = ?
+    `).get(id) as MatchRow | undefined;
+    if (!match) throw new ServiceError(404, 'MATCH_NOT_FOUND', 'Match not found.');
+    if (match.tournament_status !== 'RUNNING') {
+      throw new ServiceError(409, 'TOURNAMENT_NOT_RUNNING', 'An expired match can only be forfeited during a running tournament.');
+    }
+    if (!['OPEN', 'ASSIGNED', 'IN_PROGRESS'].includes(match.status)
+      || match.match_code_expires_at === null || Number(match.match_code_expires_at) > this.timestamp()) {
+      throw new ServiceError(409, 'MATCH_NOT_EXPIRED', 'Only an expired, unfinished match can be forfeited.');
+    }
+    const winnerId = winnerSide === 'A' ? match.player_a_id : match.player_b_id;
+    const loserId = winnerSide === 'A' ? match.player_b_id : match.player_a_id;
+    if (!winnerId || !loserId) {
+      throw new ServiceError(409, 'MATCH_NOT_READY', 'A match needs two assigned competitors before a forfeit can be recorded.');
+    }
+    const reason = 'FORFEIT';
+    const serverNonce = randomBytes(16).toString('base64url');
+    const serverSignature = hmac(`${id}|${winnerId}|${loserId}|${reason}|${serverNonce}`, this.roomSecret);
+    const result = this.submitResult({
+      matchId: id,
+      winnerParticipantId: String(winnerId),
+      loserParticipantId: String(loserId),
+      reason,
+      serverNonce,
+      serverSignature,
+    });
+    this.audit('ADMIN_MATCH_FORFEIT', id, { winnerId, loserId, winnerSide });
+    return {
+      matchId: id,
+      winnerParticipantId: String(winnerId),
+      loserParticipantId: String(loserId),
+      roomSlot: match.room_slot === null ? null : Number(match.room_slot),
+      reason,
+      nextMatch: result.nextMatch,
+    };
   }
 
   private entryView(entry: any): Record<string, unknown> {
@@ -766,7 +892,7 @@ export class TournamentService {
       LEFT JOIN participants pb ON pb.participant_id = m.player_b_id
       LEFT JOIN participants pw ON pw.participant_id = m.winner_id
       WHERE m.tournament_id = ? AND (m.player_a_id = ? OR m.player_b_id = ?)
-        AND m.status <> 'COMPLETED' ORDER BY m.round, m.position LIMIT 1
+        AND m.status NOT IN ('COMPLETED', 'BYE') ORDER BY m.round, m.position LIMIT 1
     `).get(tournament.tournament_id, participant.participant_id, participant.participant_id) as any;
     return {
       tournamentId: tournament.tournament_id,
@@ -850,7 +976,7 @@ export class TournamentService {
     ).get(id) as any;
     if (!tournament) throw new ServiceError(404, 'TOURNAMENT_NOT_FOUND', 'Tournament not found.');
     const rows = this.db.prepare(`
-      SELECT m.match_id, m.round, m.position, m.status,
+      SELECT m.match_id, m.round, m.position, m.status, m.match_code_expires_at,
         pa.display_name AS player_a_name, pb.display_name AS player_b_name,
         pw.display_name AS winner_name
       FROM matches m
@@ -871,6 +997,7 @@ export class TournamentService {
         playerB: match.player_b_name ?? null,
         winner: match.winner_name ?? null,
         status: match.status,
+        expiresAt: match.match_code_expires_at === null ? null : Number(match.match_code_expires_at),
       })),
     };
   }
@@ -968,6 +1095,7 @@ export class TournamentService {
       if (!canStart(tournament.status)) {
         throw new ServiceError(409, 'TOURNAMENT_NOT_READY', 'Tournament is not ready to start.');
       }
+      this.assertNoOtherActiveTournament(id);
       const eligibleStatus = Number(tournament.require_check_in) === 1
         ? "entry_status = 'CHECKED_IN'"
         : "entry_status IN ('REGISTERED', 'CHECKED_IN')";
@@ -1040,6 +1168,7 @@ export class TournamentService {
           startAt: row.start_at === null ? null : Number(row.start_at),
         }, now);
         if (!target) continue;
+        if (this.otherActiveTournament(id)) continue;
         if (target === 'RUNNING') {
           const result = this.startTournamentInternal(id, 'scheduler');
           changes += 1;
@@ -1060,6 +1189,7 @@ export class TournamentService {
             startAt: current.start_at === null ? null : Number(current.start_at),
           }, this.timestamp());
           if (currentTarget !== target) return false;
+          this.assertNoOtherActiveTournament(id);
           assertTransition(current.status, target);
           const changedAt = this.timestamp();
           this.db.prepare('UPDATE tournaments SET status = ?, updated_at = ? WHERE tournament_id = ?')
@@ -1089,6 +1219,11 @@ export class TournamentService {
     )) {
       throw new ServiceError(401, 'INVALID_PARTICIPANT_CODE', 'Participant code is invalid.');
     }
+    if (input.displayName !== undefined) {
+      const displayName = requiredText(input.displayName, 'displayName', 80);
+      this.db.prepare('UPDATE participants SET display_name = ? WHERE participant_id = ?')
+        .run(displayName, participant.participant_id);
+    }
     return this.issueParticipantSession(participant.participant_id);
   }
 
@@ -1113,6 +1248,9 @@ export class TournamentService {
       WHERE m.match_code_hash = ?
     `).get(hash) as MatchRow | undefined;
     if (!match) throw new ServiceError(404, 'MATCH_NOT_FOUND', 'Match code is invalid.');
+    if (match.tournament_status !== 'RUNNING') {
+      throw new ServiceError(409, 'TOURNAMENT_NOT_RUNNING', 'Tournament matches are not open yet.');
+    }
     if (!match.match_code_expires_at || Number(match.match_code_expires_at) <= this.timestamp()) {
       throw new ServiceError(410, 'MATCH_CODE_EXPIRED', 'Match code has expired.');
     }
@@ -1155,6 +1293,7 @@ export class TournamentService {
         buildId: this.buildId,
         matchId: match.match_id,
         participantId: participant.participant_id,
+        displayName: participant.display_name,
         roomSlot: Number(room.room_slot),
         expiryMillis,
         nonce: randomBytes(16).toString('base64url'),
@@ -1194,6 +1333,9 @@ export class TournamentService {
       WHERE m.match_id = ?
     `).get(matchId) as MatchRow | undefined;
     if (!match) throw new ServiceError(404, 'MATCH_NOT_FOUND', 'Match not found.');
+    if (match.tournament_status !== 'RUNNING') {
+      throw new ServiceError(409, 'TOURNAMENT_NOT_RUNNING', 'Tournament matches are not open yet.');
+    }
     if (match.status !== 'OPEN' && match.status !== 'ASSIGNED' && match.status !== 'IN_PROGRESS') {
       throw new ServiceError(409, 'MATCH_CLOSED', 'Match is not accepting players.');
     }
@@ -1204,6 +1346,41 @@ export class TournamentService {
       throw new ServiceError(403, 'PARTICIPANT_NOT_IN_MATCH', 'Participant is not assigned to this match.');
     }
     return this.joinMatchForParticipant(match, participant);
+  }
+
+  joinActiveMatch(input: GameJoinInput): {
+    matchId: string; roomSlot: number; port: number; roomToken: string; expiresAt: number; displayName: string;
+  } {
+    this.requireBuild(input?.buildId, input?.protocolVersion);
+    const requestedPort = Number(input?.roomPort);
+    if (!Number.isInteger(requestedPort) || requestedPort < TOURNAMENT_PORT_START || requestedPort > TOURNAMENT_PORT_END) {
+      throw new ServiceError(400, 'INVALID_TOURNAMENT_PORT', 'Enter a port from the tournament room range.');
+    }
+    const active = this.activeTournament();
+    if (!active) throw new ServiceError(404, 'NO_ACTIVE_TOURNAMENT', 'There is no active YIMO tournament.');
+    if (active.status !== 'RUNNING') {
+      throw new ServiceError(409, 'TOURNAMENT_NOT_RUNNING', 'Tournament matches are not open yet.');
+    }
+    const session = this.createParticipantSession(input, input.clientKey ?? 'local');
+    const player = this.playerTournament(session.sessionToken, String(active.tournamentId)) as any;
+    if (!player.entry || player.entry.entryStatus !== 'ELIGIBLE') {
+      throw new ServiceError(403, 'NOT_ELIGIBLE', 'This candidate is not registered and eligible for the active tournament.');
+    }
+    if (!player.nextMatch || !['OPEN', 'ASSIGNED', 'IN_PROGRESS'].includes(player.nextMatch.status)) {
+      throw new ServiceError(409, 'MATCH_NOT_READY', 'Your next match is not ready yet. Refresh the tournament portal after the other match finishes.');
+    }
+    const joined = this.joinAssignedMatch({
+      sessionToken: session.sessionToken,
+      matchId: player.nextMatch.matchId,
+      buildId: input.buildId,
+      protocolVersion: input.protocolVersion,
+      clientKey: input.clientKey,
+    });
+    if (joined.port !== requestedPort) {
+      throw new ServiceError(409, 'WRONG_TOURNAMENT_PORT',
+        `This match is assigned to port ${joined.port}.`, { assignedPort: joined.port, matchId: joined.matchId });
+    }
+    return { ...joined, displayName: player.participant.displayName };
   }
 
   heartbeat(input: HeartbeatInput): { matchId: string; roomSlot: number; state: string } {
@@ -1270,7 +1447,6 @@ export class TournamentService {
       status,
       playerA: nextA,
       playerB: nextB,
-      matchCode: code?.code ?? null,
     };
   }
 
@@ -1279,7 +1455,18 @@ export class TournamentService {
     const winnerId = validateIdentifier(input?.winnerParticipantId, 'winnerParticipantId');
     const loserId = validateIdentifier(input?.loserParticipantId, 'loserParticipantId');
     const reason = requiredText(input?.reason, 'reason', 80);
-    const match = this.db.prepare('SELECT * FROM matches WHERE match_id = ?').get(matchId) as MatchRow | undefined;
+    const nonce = requiredText(input?.serverNonce, 'serverNonce', 100);
+    const signature = requiredText(input?.serverSignature, 'serverSignature', 100);
+    if (!/^[A-Za-z0-9_-]{12,100}$/.test(nonce)) {
+      throw new ServiceError(400, 'INVALID_INPUT', 'serverNonce is invalid.');
+    }
+    if (!safeEqualText(hmac(`${matchId}|${winnerId}|${loserId}|${reason}|${nonce}`, this.roomSecret), signature)) {
+      throw new ServiceError(403, 'INVALID_SERVER_SIGNATURE', 'Match result was not signed by the room server.');
+    }
+    const match = this.db.prepare(`
+      SELECT m.*, t.status AS tournament_status FROM matches m
+      JOIN tournaments t ON t.tournament_id = m.tournament_id WHERE m.match_id = ?
+    `).get(matchId) as MatchRow | undefined;
     if (!match) throw new ServiceError(404, 'MATCH_NOT_FOUND', 'Match not found.');
     if (match.status === 'COMPLETED') {
       if (match.winner_id === winnerId && match.loser_id === loserId && match.result_reason === reason) {
@@ -1287,21 +1474,15 @@ export class TournamentService {
       }
       throw new ServiceError(409, 'RESULT_ALREADY_SUBMITTED', 'A different result is already recorded.');
     }
-    const payload = verifyRoomToken(input?.roomToken, this.roomSecret, this.now() * 1000);
-    if (!payload || payload.protocolVersion !== this.protocolVersion || payload.buildId !== this.buildId
-      || payload.matchId !== matchId || Number(match.room_slot) !== payload.roomSlot) {
-      throw new ServiceError(403, 'INVALID_ROOM_TOKEN', 'Room token is invalid for this match.');
-    }
-    if (match.status !== 'ASSIGNED' && match.status !== 'IN_PROGRESS') {
+    const acceptedMatchState = match.status === 'ASSIGNED' || match.status === 'IN_PROGRESS'
+      || (reason === 'FORFEIT' && match.status === 'OPEN');
+    if (match.tournament_status !== 'RUNNING' || !acceptedMatchState) {
       throw new ServiceError(409, 'MATCH_NOT_ACTIVE', 'Match has not started.');
     }
     const isValidPair = (match.player_a_id === winnerId && match.player_b_id === loserId)
       || (match.player_b_id === winnerId && match.player_a_id === loserId);
     if (!isValidPair) throw new ServiceError(400, 'INVALID_RESULT', 'Winner and loser are not this match pair.');
     return this.transaction(() => {
-      const nonce = randomBytes(16).toString('base64url');
-      const resultBody = `${matchId}|${winnerId}|${loserId}|${reason}|${nonce}`;
-      const signature = hmac(resultBody, this.roomSecret);
       const now = this.timestamp();
       this.db.prepare(`
         UPDATE matches SET status = 'COMPLETED', winner_id = ?, loser_id = ?, result_reason = ?,
@@ -1312,6 +1493,11 @@ export class TournamentService {
           heartbeat_at = NULL, expires_at = NULL WHERE tournament_id = ? AND room_slot = ? AND match_id = ?
       `).run(match.tournament_id, match.room_slot, matchId);
       const nextMatch = this.advanceWinner(match, winnerId);
+      if (!nextMatch) {
+        this.db.prepare("UPDATE tournaments SET status = 'COMPLETED', updated_at = ? WHERE tournament_id = ? AND status = 'RUNNING'")
+          .run(now, match.tournament_id);
+        this.audit('TOURNAMENT_COMPLETED', match.tournament_id, { championId: winnerId });
+      }
       this.audit('MATCH_RESULT_SUBMITTED', matchId, { winnerId, loserId, reason });
       return { duplicate: false, matchId, resultSignature: signature, nextMatch };
     });

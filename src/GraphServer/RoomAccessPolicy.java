@@ -18,6 +18,7 @@ public final class RoomAccessPolicy {
     private final String matchId;
     private final int roomSlot;
     private final Set<String> usedNonces = new HashSet<String>();
+    private final Set<String> activeParticipants = new HashSet<String>();
 
     private RoomAccessPolicy(boolean required, String secret, String matchId, int roomSlot) {
         this.required = required;
@@ -41,6 +42,14 @@ public final class RoomAccessPolicy {
         return required;
     }
 
+    public String getMatchId() {
+        return matchId;
+    }
+
+    public int getRoomSlot() {
+        return roomSlot;
+    }
+
     public synchronized RoomAccessToken.Payload accept(String token, long nowMillis) {
         if (!required) {
             return null;
@@ -48,10 +57,16 @@ public final class RoomAccessPolicy {
         RoomAccessToken.Payload payload = RoomAccessToken.verify(token, secret, nowMillis);
         if (payload == null || payload.getProtocolVersion() != Constants.PROTOCOL_VERSION
                 || !Constants.BUILD_ID.equals(payload.getBuildId()) || !matchId.equals(payload.getMatchId())
-                || payload.getRoomSlot() != roomSlot || usedNonces.contains(payload.getNonce())) {
+                || payload.getRoomSlot() != roomSlot || usedNonces.contains(payload.getNonce())
+                || activeParticipants.contains(payload.getParticipantId())) {
             return null;
         }
         usedNonces.add(payload.getNonce());
+        activeParticipants.add(payload.getParticipantId());
         return payload;
+    }
+
+    public synchronized void release(String participantId) {
+        if (participantId != null) activeParticipants.remove(participantId);
     }
 }

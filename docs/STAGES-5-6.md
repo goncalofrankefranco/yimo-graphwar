@@ -10,7 +10,7 @@ receiving any private deployment material.
 | Stage | Delivered | Gate |
 | --- | --- | --- |
 | 5 — tournament control | Node 24 service, SQLite schema/migration, scheduled lifecycle, registration, optional check-in, admin console, competitor portal, bracket seeding, sessions, joins, room slots, heartbeats, results, disposable demo, tests | Local service test suite passes |
-| 6 — signed room access | Java HMAC token verifier, replay protection, required room policy, bounded 20/50 room pool, protocol messages, tests | Java suite and two-sided token check pass |
+| 6 — signed room access | Separate tournament ports, on-demand hidden Java room processes, candidate-bound HMAC access, fixed 1v1 rules, server-signed results and bracket advancement | Node and Java regression suites pass |
 
 Stage 7 (Cloudzy staging and load testing) remains separate. No public VPS,
 organizer token, participant code, HMAC secret, or private key belongs in this
@@ -20,12 +20,12 @@ repository.
 
 ```text
 organizer -> /admin -> schedule + lifecycle action
-participant -> /participant -> session + register/check-in
+participant -> /participant -> candidate-code login + one active bracket
 scheduler/admin -> frozen roster -> bracket + assigned match
-participant -> assigned-join API -> room slot + signed room token
-Java client -> HELLO -> Java room server
-Java client -> TOURNAMENT_JOIN(token) -> token gate -> room state
-Java room server -> heartbeat/result API -> bracket advancement + room release
+portal Join Room -> assigned-join API -> port + on-demand room process
+desktop Join Room -> HTTPS candidate-code exchange -> signed room token
+Java client -> HELLO -> TOURNAMENT_JOIN(token) -> hidden fixed-policy room
+Java room server -> HMAC result -> bracket advancement + room release
 ```
 
 The tournament service owns identity, match assignment, and bracket state. The
@@ -81,8 +81,11 @@ At start, the service selects registered entries (or checked-in entries when
 required) in deterministic registration order, assigns seeds, freezes the
 roster, writes one bracket in the same SQLite transaction, and records an
 audit event. A roster with fewer than two eligible entries becomes
-`START_BLOCKED` and can be retried after an organizer corrects the roster.
-The five-second scheduler is process-local but restart-safe because status and
+`START_BLOCKED`. The organizer can recover it with **Reopen registration**;
+that clears stale schedule/auto-start deadlines so the scheduler will not
+immediately close it again. After registration closes, required check-in can
+be manually closed from the admin panel before retrying the start. The
+five-second scheduler is process-local but restart-safe because status and
 bracket writes are persisted transactionally. Existing `SEEDED` tournaments
 continue to use the legacy seed/match-code path.
 
@@ -140,7 +143,7 @@ ordinary three-argument join path remains unchanged for practice rooms.
 The Node service and Java room server sign the same UTF-8 payload:
 
 ```text
-protocolVersion|buildId|matchId|participantId|roomSlot|expiryMillis|nonce
+protocolVersion|buildId|matchId|participantId|displayName|roomSlot|expiryMillis|nonce
 ```
 
 The token is:
@@ -155,40 +158,35 @@ base64url(payload-without-padding).base64url(HMAC-SHA256(payload, shared-secret)
 - it is not expired;
 - protocol and build match `Constants`;
 - match ID and room slot match the process configuration;
-- the nonce has not already been accepted by that room process.
+- the nonce has not already been accepted by that room process;
+- the same candidate is not already connected in that room.
 
-The nonce set is process-local and is cleared when a room process is replaced.
-The tournament service issues a fresh nonce for every participant join. A
-future reconnect policy can issue a replacement token through the service; it
-must not disable replay protection.
+The nonce set is process-local and persists for that room's lifetime. A
+disconnect releases the candidate reservation, while replay protection still
+rejects the old token. A newly issued token can reconnect the same candidate.
 
-### Room pool
+### Room process lifecycle
 
-`TournamentRoomPool` models ports `30000–30049` with 20 warm slots by default.
-It is synchronized and exposes these states:
+Practice rooms remain on `30000–30049`. Hidden tournament rooms use
+`31000–31049`; the 1 GB staging configuration defaults to the single port
+`31000`, so only one match process runs at a time. SQLite `room_slots` is the
+allocation source of truth. On assignment, `TournamentRoomManager` starts
+`RoomServer.TournamentRoomMain` with the match ID, exact port, server HMAC
+secret, and YIMO network configuration. The process binds before reporting
+ready and is never registered in the public lobby.
 
-```text
-AVAILABLE -> ASSIGNED -> IN_PROGRESS -> AVAILABLE
-                    \-> DRAINING -> AVAILABLE/OFFLINE (supervisor decision)
+Tournament rooms admit two distinct candidates, one player/team/soldier each,
+and ignore lobby setting changes. On a normal finish, the surviving team is
+reported; a live-match disconnect is a forfeit. The Java server signs
+`matchId|winnerParticipantId|loserParticipantId|reason|serverNonce` with
+HMAC-SHA256. The API verifies the signature, advances the winner in the
+bracket, marks the final tournament complete, and releases the room slot. The
+Java process exits after reporting so the next match can reuse the port.
 
-OFFLINE --expand--> AVAILABLE
-```
-
-The Node `room_slots` table mirrors the same initial 20/50 capacity for match
-allocation. A room supervisor is responsible for starting a Java process on
-the assigned port with a policy equivalent to:
-
-```java
-RoomAccessPolicy policy = RoomAccessPolicy.required(
-    roomHmacSecret, matchId, roomSlot);
-GraphServer server = new GraphServer(roomSlot, policy);
-new Thread(server, "yimo-room-" + matchId).start();
-```
-
-Do not put `roomHmacSecret` in source or a client artifact. The existing
-`RemoteGraphServer` also has a policy-aware constructor for deployments that
-need its status bridge; public practice rooms continue using its open
-constructor.
+The portal polls the bracket and changes its primary action to **Join Room**
+when a competitor's next match is ready. The player then enters the assigned
+port and candidate code in the desktop game; no address or tournament ID is
+needed.
 
 ## Local verification
 
@@ -204,21 +202,23 @@ To exercise the UI and the full local request flow without a database or VPS,
 run `npm run demo` from `tournament/`. It schedules four disposable
 participants through registration, prints the short-lived demo values, and
 serves the bracket at
-`/participant?tournament=yimo-demo-2026`. The public route deliberately omits
+`/participant`. The public route deliberately omits
 match codes and room tokens.
 
 Compile the Java source and tests with the Java 8 toolchain, then run:
 
 ```text
 GraphServer.RoomAccessTokenTest
-GraphServer.TournamentRoomPoolTest
 GraphServer.TournamentRoomAccessTest
+GraphServer.TournamentRoomSettingsTest
+GraphServer.TournamentResultReporterTest
 ```
 
 The full regression suite must be run alongside those three Stage 6 checks.
-The Java test demonstrates token issue/verify, expiry, wrong-secret rejection,
-nonce replay rejection, pool assignment/heartbeat/release, and a client-room
-handshake that accepts a valid token before room state is available.
+The Java tests cover token issue/verify, expiry, wrong-secret and replay
+rejection, duplicate-candidate rejection, immutable tournament room rules,
+HMAC result reporting, and a client-room handshake that accepts a valid token
+before room state is available.
 
 ## Operations and rollback
 

@@ -40,8 +40,10 @@ global.host=graphwar-server.yimo-official.org
 global.port=23762
 room.port.start=30000
 room.port.end=30049
+tournament.room.port.start=31000
+tournament.room.port.end=31049
 tournament.api.baseUrl=https://$public_host
-build.id=YIMO-Graphwar-2.1.0
+build.id=YIMO-Graphwar-2.2.0
 protocol.version=2
 EOF
 chmod 644 "$properties_tmp"
@@ -56,7 +58,7 @@ if [[ ! -f "$tournament_env" ]]; then
 YIMO_ADMIN_PASSWORD=$admin_password
 YIMO_ROOM_HMAC_SECRET=$room_secret
 YIMO_TOURNAMENT_DB=/var/lib/yimo/tournament.sqlite
-YIMO_BUILD_ID=YIMO-Graphwar-2.1.0
+YIMO_BUILD_ID=YIMO-Graphwar-2.2.0
 YIMO_PROTOCOL_VERSION=2
 HOST=127.0.0.1
 PORT=8080
@@ -87,12 +89,16 @@ elif [[ ! -f /root/yimo-admin-password.txt ]]; then
   chmod 600 /root/yimo-admin-password.txt
 fi
 if grep -q '^YIMO_BUILD_ID=' "$tournament_env"; then
-  sed -i 's/^YIMO_BUILD_ID=.*/YIMO_BUILD_ID=YIMO-Graphwar-2.1.0/' "$tournament_env"
+  sed -i 's/^YIMO_BUILD_ID=.*/YIMO_BUILD_ID=YIMO-Graphwar-2.2.0/' "$tournament_env"
 else
-  printf 'YIMO_BUILD_ID=YIMO-Graphwar-2.1.0\n' >> "$tournament_env"
+  printf 'YIMO_BUILD_ID=YIMO-Graphwar-2.2.0\n' >> "$tournament_env"
 fi
 if [[ -f /root/yimo-admin-password.txt ]]; then
   chmod 600 /root/yimo-admin-password.txt
+fi
+
+if [[ -x /usr/local/sbin/yimo-update-cloudflare-realip.sh ]]; then
+  /usr/local/sbin/yimo-update-cloudflare-realip.sh
 fi
 
 chown -R yimo:yimo /var/lib/yimo /var/log/yimo

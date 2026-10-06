@@ -118,6 +118,7 @@ chmod 600 "$ENV_FILE"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 install -m 0750 "$SCRIPT_DIR/first-boot.sh" /usr/local/sbin/yimo-first-boot.sh
+install -m 0755 "$SCRIPT_DIR/update-cloudflare-realip.sh" /usr/local/sbin/yimo-update-cloudflare-realip.sh
 install -m 0750 "$SCRIPT_DIR/enable-domain.sh" /usr/local/sbin/yimo-enable-domain.sh
 install -m 0750 "$SCRIPT_DIR/prepare-snapshot.sh" /usr/local/sbin/yimo-prepare-snapshot.sh
 install -m 0644 "$SCRIPT_DIR/nginx-yimo-domain.conf" /etc/yimo/nginx-yimo-domain.conf
@@ -148,6 +149,7 @@ ufw allow 80/tcp
 ufw allow 443/tcp
 ufw allow 23762/tcp
 ufw allow 30000:30049/tcp
+ufw allow 31000:31049/tcp
 if [[ -n "$YIMO_SSH_CIDR" && "$YIMO_SSH_CIDR" != '0.0.0.0/0' ]]; then
   ufw allow from "$YIMO_SSH_CIDR" to any port 22 proto tcp
 else

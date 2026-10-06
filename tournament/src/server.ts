@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { isIP } from 'node:net';
 import { ADMIN_PAGE } from './pages.ts';
 import { HOME_PAGE } from './home-page.ts';
 import { PARTICIPANT_PAGE } from './participant-page.ts';
@@ -23,6 +24,14 @@ function bearer(request: any): string | undefined {
   return typeof value === 'string' && value.startsWith('Bearer ') ? value.slice(7) : undefined;
 }
 
+function clientAddress(request: any): string {
+  const remote = String(request.socket?.remoteAddress ?? 'unknown');
+  const loopbackProxy = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
+  const forwarded = request.headers['x-forwarded-for'];
+  if (loopbackProxy && typeof forwarded === 'string' && isIP(forwarded.trim())) return forwarded.trim();
+  return remote;
+}
+
 function readJson(request: any): Promise<any> {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -32,6 +41,10 @@ function readJson(request: any): Promise<any> {
     });
     request.on('end', () => {
       if (!data.trim()) return resolve({});
+      if (String(request.headers['content-type'] ?? '').startsWith('application/x-www-form-urlencoded')) {
+        resolve(Object.fromEntries(new URLSearchParams(data)));
+        return;
+      }
       try {
         resolve(JSON.parse(data));
       } catch {
@@ -44,7 +57,16 @@ function readJson(request: any): Promise<any> {
 
 const idPattern = '[A-Za-z0-9_-]+';
 
-export function createTournamentHttpServer(service: TournamentService): any {
+export function createTournamentHttpServer(service: TournamentService,
+  ensureRoom: (matchId: string, port: number) => Promise<void> | void = () => {},
+  releaseRoom: (matchId: string) => Promise<boolean> | boolean = () => false): any {
+  const prepareRoom = async (matchId: string, port: number) => {
+    try {
+      await ensureRoom(matchId, port);
+    } catch {
+      throw new ServiceError(503, 'ROOM_START_FAILED', 'The assigned tournament room is not ready. Try again shortly.');
+    }
+  };
   return createServer(async (request: any, response: any) => {
     if (request.method === 'OPTIONS') {
       response.writeHead(204, { 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,X-YIMO-API-Authorization,Content-Type' });
@@ -71,35 +93,59 @@ export function createTournamentHttpServer(service: TournamentService): any {
       }
       const isBracketRoute = request.method === 'GET' && new RegExp(`^/api/v1/tournaments/${idPattern}/bracket$`).test(url.pathname);
       const isAdminTournamentRoute = new RegExp(`^/api/v1/admin/tournaments/${idPattern}$`).test(url.pathname);
-      const isAdminLifecycleRoute = new RegExp(`^/api/v1/admin/tournaments/${idPattern}/(registration/open|registration/close|check-in/open|start)$`).test(url.pathname);
+      const isCurrentAdminTournamentRoute = request.method === 'GET'
+        && url.pathname === '/api/v1/admin/tournament/current';
+      const isAdminLifecycleRoute = new RegExp(`^/api/v1/admin/tournaments/${idPattern}/(registration/open|registration/close|registration/reopen|check-in/open|check-in/close|matches/extend-expired|start)$`).test(url.pathname);
       const isParticipantActionRoute = request.method === 'POST'
-        && new RegExp(`^/api/v1/tournaments/${idPattern}/(register|check-in|self-register)$`).test(url.pathname);
+        && new RegExp(`^/api/v1/tournaments/${idPattern}/(register|check-in)$`).test(url.pathname);
       const isPlayerTournamentRoute = request.method === 'GET'
         && new RegExp(`^/api/v1/player/tournaments/${idPattern}$`).test(url.pathname);
+      const isActiveTournamentRoute = request.method === 'GET' && url.pathname === '/api/v1/tournaments/active';
       const isAssignedJoinRoute = request.method === 'POST'
         && new RegExp(`^/api/v1/matches/${idPattern}/join-assigned$`).test(url.pathname);
+      const isGameJoinRoute = request.method === 'POST' && url.pathname === '/api/v1/game/join';
+      const isAdminReleaseRoomRoute = request.method === 'POST'
+        && new RegExp(`^/api/v1/admin/matches/${idPattern}/release-room$`).test(url.pathname);
+      const isAdminForfeitRoute = request.method === 'POST'
+        && new RegExp(`^/api/v1/admin/matches/${idPattern}/forfeit-expired$`).test(url.pathname);
       if (request.method !== 'POST' && !(request.method === 'GET' && url.pathname === '/api/v1/player/matches')
-        && !isBracketRoute && !(request.method === 'GET' && isAdminTournamentRoute) && !isPlayerTournamentRoute) {
+        && !isBracketRoute && !(request.method === 'GET' && isAdminTournamentRoute)
+        && !isPlayerTournamentRoute && !isActiveTournamentRoute && !isCurrentAdminTournamentRoute) {
         throw new ServiceError(404, 'NOT_FOUND', 'Route not found.');
       }
 
       const body = request.method === 'POST' ? await readJson(request) : {};
-      const clientKey = request.socket?.remoteAddress ?? 'unknown';
-      if (request.method === 'POST' && url.pathname === '/api/v1/admin/participants') {
+      const clientKey = clientAddress(request);
+      if (isAdminForfeitRoute) {
+        const matchId = url.pathname.split('/')[5];
+        const result = service.forfeitExpiredMatch(bearer(request), matchId, body.winnerSide);
+        let roomReleased = result.roomSlot === null;
+        if (result.roomSlot !== null) {
+          try { roomReleased = await releaseRoom(matchId); } catch { roomReleased = false; }
+        }
+        send(response, 200, { ...result, roomReleased });
+      } else if (isAdminReleaseRoomRoute) {
+        const matchId = url.pathname.split('/')[5];
+        service.confirmCompletedMatch(bearer(request), matchId);
+        send(response, 200, { matchId, released: await releaseRoom(matchId) });
+      } else if (request.method === 'POST' && url.pathname === '/api/v1/admin/participants') {
         send(response, 201, service.addParticipant(bearer(request), body));
       } else if (request.method === 'POST' && url.pathname === '/api/v1/admin/tournaments') {
         send(response, 201, service.createTournament(bearer(request), body));
-      } else if (request.method === 'POST' && url.pathname === '/api/v1/admin/bracket/seed') {
-        send(response, 201, service.seedBracket(bearer(request), body));
       } else if (request.method === 'GET' && isAdminTournamentRoute) {
         send(response, 200, service.adminTournament(bearer(request), url.pathname.split('/')[5]));
+      } else if (isCurrentAdminTournamentRoute) {
+        send(response, 200, service.currentAdminTournament(bearer(request)));
       } else if (request.method === 'POST' && isAdminLifecycleRoute) {
         const parts = url.pathname.split('/');
         const tournamentId = parts[5];
         const action = parts.slice(6).join('/');
         if (action === 'registration/open') send(response, 200, service.openRegistration(bearer(request), tournamentId));
         else if (action === 'registration/close') send(response, 200, service.closeRegistration(bearer(request), tournamentId));
+        else if (action === 'registration/reopen') send(response, 200, service.reopenRegistration(bearer(request), tournamentId));
         else if (action === 'check-in/open') send(response, 200, service.openCheckIn(bearer(request), tournamentId));
+        else if (action === 'check-in/close') send(response, 200, service.closeCheckIn(bearer(request), tournamentId));
+        else if (action === 'matches/extend-expired') send(response, 200, service.extendExpiredMatches(bearer(request), tournamentId));
         else if (action === 'start') send(response, 200, service.startTournament(bearer(request), tournamentId));
         else throw new ServiceError(404, 'NOT_FOUND', 'Route not found.');
       } else if (isParticipantActionRoute) {
@@ -108,21 +154,37 @@ export function createTournamentHttpServer(service: TournamentService): any {
         const sessionToken = bearer(request) ?? body.sessionToken ?? '';
         if (parts[5] === 'register') send(response, 200, service.registerParticipant(sessionToken, tournamentId));
         else if (parts[5] === 'check-in') send(response, 200, service.checkInParticipant(sessionToken, tournamentId));
-        else if (parts[5] === 'self-register') send(response, 200, service.selfRegisterParticipant(tournamentId, { ...body, clientKey }));
         else throw new ServiceError(404, 'NOT_FOUND', 'Route not found.');
       } else if (isPlayerTournamentRoute) {
         send(response, 200, service.playerTournament(bearer(request) ?? url.searchParams.get('sessionToken') ?? '', url.pathname.split('/')[5]));
+      } else if (isActiveTournamentRoute) {
+        send(response, 200, service.activeTournament());
       } else if (isAssignedJoinRoute) {
-        send(response, 200, service.joinAssignedMatch({
+        const joined = service.joinAssignedMatch({
           ...body,
           sessionToken: bearer(request) ?? body.sessionToken ?? '',
           matchId: url.pathname.split('/')[4],
           clientKey,
-        }));
+        });
+        await prepareRoom(joined.matchId, joined.port);
+        send(response, 200, joined);
+      } else if (isGameJoinRoute) {
+        try {
+          const joined = service.joinActiveMatch({ ...body, clientKey });
+          await prepareRoom(joined.matchId, joined.port);
+          const displayName = Buffer.from(joined.displayName, 'utf8').toString('base64url');
+          send(response, 200, `YIMO_ROOM&${joined.port}&${joined.roomToken}&${displayName}`, 'text/plain; charset=utf-8');
+        } catch (error: any) {
+          if (!(error instanceof ServiceError)) throw error;
+          send(response, error.status,
+            `ERROR&${error.code}&${encodeURIComponent(error.message)}`, 'text/plain; charset=utf-8');
+        }
       } else if (request.method === 'POST' && url.pathname === '/api/v1/participant-sessions') {
         send(response, 200, service.createParticipantSession(body, clientKey));
       } else if (request.method === 'POST' && url.pathname === '/api/v1/matches/join') {
-        send(response, 200, service.joinMatch({ ...body, clientKey }));
+        const joined = service.joinMatch({ ...body, clientKey });
+        await prepareRoom(joined.matchId, joined.port);
+        send(response, 200, joined);
       } else if (request.method === 'POST' && url.pathname === '/api/v1/rooms/heartbeat') {
         send(response, 200, service.heartbeat(body));
       } else if (request.method === 'POST' && new RegExp(`^/api/v1/matches/${idPattern}/result$`).test(url.pathname)) {

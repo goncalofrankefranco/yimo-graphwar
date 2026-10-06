@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { createTournamentHttpServer } from '../src/server.ts';
-import { createDemoService, DEMO_TOURNAMENT_ID } from '../src/demo.ts';
+import { createDemoService, DEMO_ROOM_SECRET, DEMO_TOURNAMENT_ID } from '../src/demo.ts';
 
 test('scheduled demo advances through registration and starts a public bracket', () => {
   const demo = createDemoService(100);
@@ -9,7 +10,7 @@ test('scheduled demo advances through registration and starts a public bracket',
   assert.equal(demo.advanceTo(110), 1);
   for (const code of demo.participantCodes) {
     const session = demo.service.createParticipantSession({
-      participantCode: code, buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+      participantCode: code, buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
     });
     demo.service.registerParticipant(session.sessionToken, DEMO_TOURNAMENT_ID);
   }
@@ -48,7 +49,7 @@ test('scheduled demo supports HTTP registration, assigned join, and result advan
     const sessions: any[] = [];
     for (const code of demo.participantCodes) {
       const session = await post('/api/v1/participant-sessions', {
-        participantCode: code, buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+        participantCode: code, buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
       });
       assert.equal(session.response.status, 200);
       sessions.push(session.body);
@@ -64,12 +65,15 @@ test('scheduled demo supports HTTP registration, assigned join, and result advan
     assert.equal(schedule.response.status, 200);
     const matchId = (schedule.body as any).nextMatch.matchId;
     const joined = await post(`/api/v1/matches/${matchId}/join-assigned`, {
-      buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+      buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
     }, { Authorization: `Bearer ${sessions[0].sessionToken}` });
     assert.equal(joined.response.status, 200);
+    const nonce = 'room-result-nonce-demo';
     const result = await post(`/api/v1/matches/${matchId}/result`, {
       winnerParticipantId: 'demo-1', loserParticipantId: 'demo-2', reason: 'DEMO',
-      roomToken: joined.body.roomToken,
+      serverNonce: nonce,
+      serverSignature: createHmac('sha256', DEMO_ROOM_SECRET)
+        .update(`${matchId}|demo-1|demo-2|DEMO|${nonce}`, 'utf8').digest('base64url'),
     });
     assert.equal(result.response.status, 200);
     const after = await request(`/api/v1/player/tournaments/${DEMO_TOURNAMENT_ID}`, {

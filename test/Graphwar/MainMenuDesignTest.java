@@ -35,9 +35,15 @@ public final class MainMenuDesignTest {
         for (String label : labels) {
             check(!"Settings".equals(label), "network settings must not be in the player menu");
         }
+        check(MainMenuScreen.isTournamentPort(31000) && MainMenuScreen.isTournamentPort(31049),
+                "candidate-code entry must activate across the reserved tournament port range");
+        check(!MainMenuScreen.isTournamentPort(30000),
+                "practice room ports must not ask for a candidate code");
         try {
             MainMenuScreen screen = new MainMenuScreen(null, null);
             check(containsText(screen, "Powered by Cloudzy"), "the main menu must credit Cloudzy");
+            check(containsText(screen, "Candidate code"), "the room form must provide candidate-code entry");
+            check(!containsText(screen, "Address"), "the room host must not be user-editable");
         } catch (Exception error) {
             throw new AssertionError("main menu should construct without a running game", error);
         }

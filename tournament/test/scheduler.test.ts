@@ -9,7 +9,7 @@ const options = (now: () => number, dbPath = ':memory:') => ({
   dbPath,
   adminToken: 'admin-test-token',
   roomSecret: 'room-test-secret',
-  buildId: 'YIMO-Graphwar-2.1.0',
+  buildId: 'YIMO-Graphwar-2.2.0',
   protocolVersion: 2,
   now,
   participantScryptCost: 256,
@@ -30,7 +30,7 @@ function registerAll(app: TournamentService, count: number, tournamentId = 'sche
   for (let index = 1; index <= count; index += 1) {
     const session = app.createParticipantSession({
       participantCode: `SCHEDULED-${index}`,
-      buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+      buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
     });
     app.registerParticipant(session.sessionToken, tournamentId);
   }
@@ -42,7 +42,7 @@ test('processes scheduled boundaries idempotently and starts the bracket', () =>
   addParticipants(app, 4);
   app.createTournament('admin-test-token', {
     tournamentId: 'scheduled-test', name: 'Scheduled Test',
-    buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
     registrationOpenAt: 100, registrationCloseAt: 200, startAt: 300, autoStart: true,
   });
   assert.equal(app.processScheduledEvents(), 1);
@@ -69,7 +69,7 @@ test('recovers a started tournament after service restart without duplicating ma
     addParticipants(first, 2);
     first.createTournament('admin-test-token', {
       tournamentId: 'restart-test', name: 'Restart Test',
-      buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+      buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
       registrationOpenAt: 100, registrationCloseAt: 200, startAt: 300, autoStart: true,
     });
     first.processScheduledEvents();

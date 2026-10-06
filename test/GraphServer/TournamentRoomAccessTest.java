@@ -19,7 +19,7 @@ public final class TournamentRoomAccessTest {
         String secret = "test-secret";
         RoomAccessPolicy policy = RoomAccessPolicy.required(secret, "match-1", 30000);
         RoomAccessToken.Payload payload = new RoomAccessToken.Payload(Constants.PROTOCOL_VERSION, Constants.BUILD_ID,
-                "match-1", "participant-1", 30000, expiry, "nonce-access");
+                "match-1", "participant-1", "Official Candidate", 30000, expiry, "nonce-access");
         String token = RoomAccessToken.issue(payload, secret);
         GraphServer server = new GraphServer(0, policy);
         ServerSocket pair = new ServerSocket(0);
@@ -35,6 +35,8 @@ public final class TournamentRoomAccessTest {
         String access = input.readLine();
         check(access != null && access.startsWith(NetworkProtocol.TOURNAMENT_ACCEPTED + "&"),
                 "valid tournament token must be accepted");
+        check("Official Candidate".equals(client.getTournamentDisplayName()),
+                "the signed canonical display name must be available to the room server");
         client.disconnect();
         clientSocket.close();
         server.finalize();

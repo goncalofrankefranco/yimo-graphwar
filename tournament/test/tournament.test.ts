@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TournamentService } from '../src/service.ts';
+import { createHmac } from 'node:crypto';
+import { TournamentService, verifyRoomToken } from '../src/service.ts';
 
 let clock = 1_700_000_000;
 
@@ -30,21 +31,30 @@ function throwsCode(action: () => unknown, code: string) {
   assert.throws(action, (error: any) => error?.code === code);
 }
 
+function signRoomResult(secret: string, matchId: string, winnerId: string, loserId: string,
+  reason: string, nonce: string) {
+  return createHmac('sha256', secret)
+    .update(`${matchId}|${winnerId}|${loserId}|${reason}|${nonce}`, 'utf8')
+    .digest('base64url');
+}
+
 function tournament(app: TournamentService, count: number, tournamentId = 'tournament-1') {
   addParticipants(app, count);
   app.createTournament('admin-test-token', {
     tournamentId,
     name: 'YIMO Test Cup',
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
     matchTimeoutSeconds: 900,
-    roomPortStart: 30000,
-    roomPortEnd: 30049,
+    roomPortStart: 31000,
+    roomPortEnd: 31049,
   });
-  return app.seedBracket('admin-test-token', {
+  const seeded = app.seedBracket('admin-test-token', {
     tournamentId,
     participantIds: Array.from({ length: count }, (_, index) => `p-${index + 1}`),
   });
+  app.db.prepare("UPDATE tournaments SET status = 'RUNNING' WHERE tournament_id = ?").run(tournamentId);
+  return seeded;
 }
 
 test('seeds a non-power-of-two bracket with automatic byes', () => {
@@ -81,17 +91,17 @@ test('rejects wrong-build and wrong-participant joins and assigns a signed room'
   assert.ok(openMatch && openMatch.matchCode);
   const firstSession = app.createParticipantSession({
     participantCode: 'PARTICIPANT-1',
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   });
   const secondSession = app.createParticipantSession({
     participantCode: 'PARTICIPANT-2',
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   });
   const thirdSession = app.createParticipantSession({
     participantCode: 'PARTICIPANT-3',
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   });
   throwsCode(() => app.createParticipantSession({
@@ -101,30 +111,53 @@ test('rejects wrong-build and wrong-participant joins and assigns a signed room'
   }), 'VERSION_MISMATCH');
   throwsCode(() => app.createParticipantSession({
     participantCode: 'NOT-A-REAL-CODE',
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   }), 'INVALID_PARTICIPANT_CODE');
   const firstJoin = app.joinMatch({
     sessionToken: firstSession.sessionToken,
     matchCode: openMatch.matchCode,
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   });
-  assert.equal(firstJoin.roomSlot, 30000);
+  assert.equal(firstJoin.roomSlot, 31000);
   assert.ok(firstJoin.roomToken);
+  assert.equal(verifyRoomToken(firstJoin.roomToken, 'room-test-secret', clock * 1000)?.displayName,
+    'Player 1', 'the signed room token must bind the organizer-canonical name');
   const secondJoin = app.joinMatch({
     sessionToken: secondSession.sessionToken,
     matchCode: openMatch.matchCode,
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   });
   assert.equal(secondJoin.roomSlot, firstJoin.roomSlot);
   throwsCode(() => app.joinMatch({
     sessionToken: thirdSession.sessionToken,
     matchCode: openMatch.matchCode,
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   }), 'PARTICIPANT_NOT_IN_MATCH');
+  app.close();
+});
+
+test('rejects match-code joins before the tournament is running', () => {
+  const app = service();
+  addParticipants(app, 2);
+  app.createTournament('admin-test-token', {
+    tournamentId: 'premature-join', name: 'Premature Join',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  const seeded = app.seedBracket('admin-test-token', {
+    tournamentId: 'premature-join', participantIds: ['p-1', 'p-2'],
+  });
+  const openMatch = seeded.matches.find((match: any) => match.status === 'OPEN') as any;
+  const session = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  throwsCode(() => app.joinMatch({
+    sessionToken: session.sessionToken, matchCode: openMatch.matchCode,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  }), 'TOURNAMENT_NOT_RUNNING');
   app.close();
 });
 
@@ -133,23 +166,27 @@ test('accepts an identical result retry but rejects a conflicting duplicate', ()
   const bracket = tournament(app, 2);
   const match = bracket.matches.find((entry) => entry.status === 'OPEN');
   assert.ok(match && match.matchCode);
+  app.db.prepare("UPDATE tournaments SET status = 'RUNNING' WHERE tournament_id = ?").run('tournament-1');
   const session = app.createParticipantSession({
     participantCode: 'PARTICIPANT-1',
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   });
   const join = app.joinMatch({
     sessionToken: session.sessionToken,
     matchCode: match.matchCode,
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   });
+  app.heartbeat({ roomToken: join.roomToken, state: 'IN_PROGRESS' });
+  const nonce = 'room-result-nonce-idempotent';
   const resultInput = {
     matchId: match.matchId,
     winnerParticipantId: 'p-1',
     loserParticipantId: 'p-2',
     reason: 'NORMAL',
-    roomToken: join.roomToken,
+    serverNonce: nonce,
+    serverSignature: signRoomResult('room-test-secret', match.matchId, 'p-1', 'p-2', 'NORMAL', nonce),
   };
   const first = app.submitResult(resultInput);
   assert.equal(first.duplicate, false);
@@ -159,6 +196,7 @@ test('accepts an identical result retry but rejects a conflicting duplicate', ()
     ...resultInput,
     winnerParticipantId: 'p-2',
     loserParticipantId: 'p-1',
+    serverSignature: signRoomResult('room-test-secret', match.matchId, 'p-2', 'p-1', 'NORMAL', nonce),
   }), 'RESULT_ALREADY_SUBMITTED');
   app.close();
 });
@@ -178,17 +216,140 @@ test('handles 100 concurrent session and join requests under the configured limi
   assert.ok(match && match.matchCode);
   const sessions = await Promise.all(Array.from({ length: 100 }, () => Promise.resolve(app.createParticipantSession({
     participantCode: 'PARTICIPANT-1',
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   }))));
   const joins = await Promise.all(sessions.map((entry) => Promise.resolve(app.joinMatch({
     sessionToken: entry.sessionToken,
     matchCode: match.matchCode,
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   }))));
   assert.equal(joins.length, 100);
-  assert.ok(joins.every((entry) => entry.roomSlot === 30000));
+  assert.ok(joins.every((entry) => entry.roomSlot === 31000));
+  app.close();
+});
+
+test('accepts a result signed by the room server without trusting a player room token', () => {
+  const app = service();
+  const bracket = tournament(app, 2);
+  const match = bracket.matches.find((entry) => entry.status === 'OPEN');
+  assert.ok(match?.matchCode);
+  app.db.prepare("UPDATE tournaments SET status = 'RUNNING' WHERE tournament_id = ?").run('tournament-1');
+  const session = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  const join = app.joinMatch({
+    sessionToken: session.sessionToken, matchCode: match.matchCode,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.heartbeat({ roomToken: join.roomToken, state: 'IN_PROGRESS' });
+  const nonce = 'room-result-nonce-0001';
+  const result = {
+    matchId: match.matchId,
+    winnerParticipantId: 'p-1',
+    loserParticipantId: 'p-2',
+    reason: 'NORMAL',
+    serverNonce: nonce,
+    serverSignature: signRoomResult('room-test-secret', match.matchId, 'p-1', 'p-2', 'NORMAL', nonce),
+  };
+
+  assert.equal(app.submitResult(result).duplicate, false);
+  assert.equal(app.publicBracket('tournament-1').matches[0].status, 'COMPLETED');
+  assert.equal(app.activeTournament(), null, 'the finished tournament should stop being active');
+  app.close();
+});
+
+test('only one tournament may enter an active lifecycle at a time', () => {
+  const app = service();
+  app.createTournament('admin-test-token', {
+    tournamentId: 'active-one', name: 'Active One', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.createTournament('admin-test-token', {
+    tournamentId: 'active-two', name: 'Active Two', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+
+  app.openRegistration('admin-test-token', 'active-one');
+  assert.equal(app.activeTournament().tournamentId, 'active-one');
+  throwsCode(() => app.openRegistration('admin-test-token', 'active-two'), 'ACTIVE_TOURNAMENT_EXISTS');
+  app.close();
+});
+
+test('a verified win advances the player to the next match and completes the tournament final', () => {
+  const app = service();
+  const seeded = tournament(app, 4);
+  app.db.prepare("UPDATE tournaments SET status = 'RUNNING' WHERE tournament_id = ?").run('tournament-1');
+
+  const submit = (matchId: string, winnerId: string, loserId: string, index: number) => {
+    const session = app.createParticipantSession({
+      participantCode: `PARTICIPANT-${winnerId.slice(2)}`,
+      buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+    });
+    const room = app.joinAssignedMatch({
+      sessionToken: session.sessionToken, matchId,
+      buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+    });
+    app.heartbeat({ roomToken: room.roomToken, state: 'IN_PROGRESS' });
+    const nonce = `room-result-nonce-${String(index).padStart(4, '0')}`;
+    return app.submitResult({
+      matchId,
+      winnerParticipantId: winnerId,
+      loserParticipantId: loserId,
+      reason: 'NORMAL',
+      serverNonce: nonce,
+      serverSignature: signRoomResult('room-test-secret', matchId, winnerId, loserId, 'NORMAL', nonce),
+    });
+  };
+
+  const firstRound = seeded.matches.filter((match: any) => match.round === 1);
+  submit(firstRound[0].matchId, 'p-1', 'p-2', 1);
+  const firstWinner = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  assert.equal((app.playerTournament(firstWinner.sessionToken, 'tournament-1') as any).nextMatch.status, 'PENDING');
+
+  submit(firstRound[1].matchId, 'p-4', 'p-3', 2);
+  const waiting = app.playerTournament(firstWinner.sessionToken, 'tournament-1') as any;
+  assert.equal(waiting.nextMatch.status, 'OPEN');
+  assert.equal(waiting.nextMatch.playerA, 'Player 1');
+  assert.equal(waiting.nextMatch.playerB, 'Player 4');
+
+  const finalMatch = app.db.prepare("SELECT match_id AS matchId FROM matches WHERE round = 2").get() as any;
+  const result = submit(finalMatch.matchId, 'p-4', 'p-1', 3);
+  assert.equal(result.duplicate, false);
+  assert.equal(app.publicBracket('tournament-1').status, 'COMPLETED');
+  assert.equal(app.activeTournament(), null);
+  app.close();
+});
+
+test('the game can join an active assigned match using only the candidate code and room port', () => {
+  const app = service();
+  addParticipants(app, 2);
+  app.createTournament('admin-test-token', {
+    tournamentId: 'game-join-test', name: 'Game Join Test',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.openRegistration('admin-test-token', 'game-join-test');
+  for (let index = 1; index <= 2; index += 1) {
+    const session = app.createParticipantSession({
+      participantCode: `PARTICIPANT-${index}`, displayName: `Official Player ${index}`,
+      buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+    });
+    app.registerParticipant(session.sessionToken, 'game-join-test');
+  }
+  app.closeRegistration('admin-test-token', 'game-join-test');
+  app.startTournament('admin-test-token', 'game-join-test');
+
+  const joined = app.joinActiveMatch({
+    participantCode: 'PARTICIPANT-1', displayName: 'Official Player 1', roomPort: 31000,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  assert.equal(joined.port, 31000);
+  assert.ok(joined.roomToken);
+  assert.throws(() => app.joinActiveMatch({
+    participantCode: 'PARTICIPANT-2', displayName: 'Official Player 2', roomPort: 31001,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  }), (error: any) => error?.code === 'WRONG_TOURNAMENT_PORT');
   app.close();
 });
 
@@ -198,11 +359,11 @@ test('registers participants idempotently and closes registration without check-
   app.createTournament('admin-test-token', {
     tournamentId: 'registration-test',
     name: 'Registration Test',
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
   });
   const session = app.createParticipantSession({
-    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   });
   throwsCode(() => app.registerParticipant(session.sessionToken, 'registration-test'), 'REGISTRATION_NOT_OPEN');
   app.openRegistration('admin-test-token', 'registration-test');
@@ -221,7 +382,7 @@ test('supports an enabled check-in window and returns safe admin/player projecti
   app.createTournament('admin-test-token', {
     tournamentId: 'check-in-test',
     name: 'Check-in Test',
-    buildId: 'YIMO-Graphwar-2.1.0',
+    buildId: 'YIMO-Graphwar-2.2.0',
     protocolVersion: 2,
     requireCheckIn: true,
     registrationOpenAt: clock,
@@ -231,7 +392,7 @@ test('supports an enabled check-in window and returns safe admin/player projecti
     startAt: clock + 300,
   });
   const session = app.createParticipantSession({
-    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   });
   app.openRegistration('admin-test-token', 'check-in-test');
   const registered = app.registerParticipant(session.sessionToken, 'check-in-test');
@@ -256,17 +417,17 @@ test('rejects malformed tournament schedule values', () => {
   const app = service();
   assert.throws(() => app.createTournament('admin-test-token', {
     tournamentId: 'bad-schedule-1', name: 'Bad Schedule',
-    buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
     registrationOpenAt: 100.5,
   }), (error: any) => error?.code === 'INVALID_INPUT');
   assert.throws(() => app.createTournament('admin-test-token', {
     tournamentId: 'bad-schedule-2', name: 'Bad Schedule',
-    buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
     registrationOpenAt: 200, registrationCloseAt: 100,
   }), (error: any) => error?.code === 'INVALID_INPUT');
   assert.throws(() => app.createTournament('admin-test-token', {
     tournamentId: 'bad-schedule-3', name: 'Bad Schedule',
-    buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
     autoStart: true,
   }), (error: any) => error?.code === 'INVALID_INPUT');
   app.close();
@@ -277,12 +438,12 @@ test('starts a ready tournament once, freezes its roster, and blocks late entrie
   addParticipants(app, 4);
   app.createTournament('admin-test-token', {
     tournamentId: 'manual-start-test', name: 'Manual Start Test',
-    buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   });
   app.openRegistration('admin-test-token', 'manual-start-test');
   for (let index = 1; index <= 4; index += 1) {
     const session = app.createParticipantSession({
-      participantCode: `PARTICIPANT-${index}`, buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+      participantCode: `PARTICIPANT-${index}`, buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
     });
     app.registerParticipant(session.sessionToken, 'manual-start-test');
   }
@@ -295,7 +456,7 @@ test('starts a ready tournament once, freezes its roster, and blocks late entrie
   assert.equal(repeated.status, 'RUNNING');
   assert.equal(repeated.bracket.matches.length, 3);
   const lateSession = app.createParticipantSession({
-    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   });
   throwsCode(() => app.registerParticipant(lateSession.sessionToken, 'manual-start-test'), 'ROSTER_FROZEN');
   app.close();
@@ -306,11 +467,11 @@ test('blocks a manual start with fewer than two eligible entries', () => {
   addParticipants(app, 1);
   app.createTournament('admin-test-token', {
     tournamentId: 'blocked-start-test', name: 'Blocked Start Test',
-    buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   });
   app.openRegistration('admin-test-token', 'blocked-start-test');
   const session = app.createParticipantSession({
-    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   });
   app.registerParticipant(session.sessionToken, 'blocked-start-test');
   app.closeRegistration('admin-test-token', 'blocked-start-test');
@@ -323,16 +484,118 @@ test('blocks a manual start with fewer than two eligible entries', () => {
   app.close();
 });
 
+test('recovers a start-blocked tournament by reopening registration and closing check-in', () => {
+  let now = 100;
+  const app = service({ now: () => now });
+  addParticipants(app, 2);
+  app.createTournament('admin-test-token', {
+    tournamentId: 'recover-blocked', name: 'Recover Blocked',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+    requireCheckIn: true, autoStart: true,
+    registrationOpenAt: 100, registrationCloseAt: 200, checkInOpenAt: 200,
+    checkInCloseAt: 300, startAt: 400,
+  });
+  app.openRegistration('admin-test-token', 'recover-blocked');
+  const firstSession = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.registerParticipant(firstSession.sessionToken, 'recover-blocked');
+  app.closeRegistration('admin-test-token', 'recover-blocked');
+  app.checkInParticipant(firstSession.sessionToken, 'recover-blocked');
+  app.closeCheckIn('admin-test-token', 'recover-blocked');
+  assert.equal(app.startTournament('admin-test-token', 'recover-blocked').status, 'START_BLOCKED');
+
+  const reopened: any = app.reopenRegistration('admin-test-token', 'recover-blocked');
+  assert.equal(reopened.status, 'REGISTRATION_OPEN');
+  assert.equal(reopened.schedule.autoStart, false);
+  assert.equal(reopened.schedule.registrationCloseAt, null);
+  assert.equal(reopened.schedule.checkInCloseAt, null);
+  assert.equal(reopened.schedule.startAt, null);
+  const secondSession = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-2', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.registerParticipant(secondSession.sessionToken, 'recover-blocked');
+  app.closeRegistration('admin-test-token', 'recover-blocked');
+  app.checkInParticipant(firstSession.sessionToken, 'recover-blocked');
+  app.checkInParticipant(secondSession.sessionToken, 'recover-blocked');
+  app.closeCheckIn('admin-test-token', 'recover-blocked');
+  const started: any = app.startTournament('admin-test-token', 'recover-blocked');
+  assert.equal(started.status, 'RUNNING');
+  assert.equal(started.bracket.matches.length, 1);
+  app.close();
+});
+
+test('organizers can renew expired match access without discarding an assigned room', () => {
+  let now = 100;
+  const app = service({ now: () => now });
+  const seeded = tournament(app, 2, 'renew-expired');
+  const match = seeded.matches.find((entry: any) => entry.status === 'OPEN') as any;
+  assert.ok(match);
+  const oldCodeHash = app.db.prepare('SELECT match_code_hash FROM matches WHERE match_id = ?')
+    .get(match.matchId).match_code_hash;
+  app.db.prepare('UPDATE matches SET match_code_expires_at = ? WHERE match_id = ?').run(now, match.matchId);
+
+  assert.equal(app.extendExpiredMatches('admin-test-token', 'renew-expired').extended, 1);
+  const reopened: any = app.db.prepare('SELECT * FROM matches WHERE match_id = ?').get(match.matchId);
+  assert.equal(reopened.status, 'OPEN');
+  assert.notEqual(reopened.match_code_hash, oldCodeHash);
+  assert.ok(reopened.match_code_expires_at > now);
+
+  const firstSession = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  const secondSession = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-2', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  const firstJoin = app.joinAssignedMatch({
+    sessionToken: firstSession.sessionToken, matchId: match.matchId,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.joinAssignedMatch({
+    sessionToken: secondSession.sessionToken, matchId: match.matchId,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.db.prepare('UPDATE matches SET match_code_expires_at = ? WHERE match_id = ?').run(now - 1, match.matchId);
+  app.db.prepare('UPDATE room_slots SET expires_at = ? WHERE match_id = ?').run(now - 1, match.matchId);
+  assert.equal(app.extendExpiredMatches('admin-test-token', 'renew-expired').extended, 1);
+  const active: any = app.db.prepare('SELECT * FROM matches WHERE match_id = ?').get(match.matchId);
+  const room: any = app.db.prepare('SELECT * FROM room_slots WHERE match_id = ?').get(match.matchId);
+  assert.equal(active.status, 'ASSIGNED');
+  assert.equal(active.room_slot, firstJoin.roomSlot);
+  assert.equal(room.state, 'ASSIGNED');
+  assert.ok(active.match_code_expires_at > now);
+  assert.ok(room.expires_at > now);
+  app.close();
+});
+
+test('organizers can forfeit an expired match and advance the bracket', () => {
+  let now = 100;
+  const app = service({ now: () => now });
+  const seeded = tournament(app, 2, 'forfeit-expired');
+  const match = seeded.matches.find((entry: any) => entry.status === 'OPEN') as any;
+  assert.ok(match);
+  assert.throws(() => app.forfeitExpiredMatch('admin-test-token', match.matchId, 'B'),
+    (error: any) => error?.code === 'MATCH_NOT_EXPIRED');
+  app.db.prepare('UPDATE matches SET match_code_expires_at = ? WHERE match_id = ?').run(now, match.matchId);
+  const result: any = app.forfeitExpiredMatch('admin-test-token', match.matchId, 'B');
+  assert.equal(result.winnerParticipantId, 'p-2');
+  assert.equal(result.loserParticipantId, 'p-1');
+  assert.equal(result.reason, 'FORFEIT');
+  assert.equal(app.publicBracket('forfeit-expired').matches[0].status, 'COMPLETED');
+  assert.equal(app.activeTournament(), null);
+  app.close();
+});
+
 test('shows the next assigned match and joins it without exposing a match code', () => {
   const app = service();
   addParticipants(app, 3);
   app.createTournament('admin-test-token', {
     tournamentId: 'assigned-join-test', name: 'Assigned Join Test',
-    buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   });
   app.openRegistration('admin-test-token', 'assigned-join-test');
   const sessions = [1, 2, 3].map((index) => app.createParticipantSession({
-    participantCode: `PARTICIPANT-${index}`, buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    participantCode: `PARTICIPANT-${index}`, buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   }));
   app.registerParticipant(sessions[0].sessionToken, 'assigned-join-test');
   app.registerParticipant(sessions[1].sessionToken, 'assigned-join-test');
@@ -343,7 +606,7 @@ test('shows the next assigned match and joins it without exposing a match code',
   assert.ok(!JSON.stringify(player).includes('matchCode'));
   const input = {
     matchId: player.nextMatch.matchId,
-    buildId: 'YIMO-Graphwar-2.1.0', protocolVersion: 2,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   };
   const first = app.joinAssignedMatch({ ...input, sessionToken: sessions[0].sessionToken });
   const second = app.joinAssignedMatch({ ...input, sessionToken: sessions[1].sessionToken });
@@ -356,5 +619,17 @@ test('shows the next assigned match and joins it without exposing a match code',
   assert.throws(() => app.joinAssignedMatch({
     ...input, sessionToken: sessions[0].sessionToken, buildId: 'Graphwar-1.1', protocolVersion: 1,
   }), (error: any) => error?.code === 'VERSION_MISMATCH');
+  app.close();
+});
+
+test('a first-round bye does not hide the player’s next playable match', () => {
+  const app = service();
+  tournament(app, 3);
+  const player = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-3', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  const schedule: any = app.playerTournament(player.sessionToken, 'tournament-1');
+  assert.equal(schedule.nextMatch.round, 2);
+  assert.equal(schedule.nextMatch.status, 'PENDING');
   app.close();
 });

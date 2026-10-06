@@ -244,6 +244,11 @@ public class GameData implements Runnable
 	{
 		return currentTurn;
 	}
+
+	public synchronized int getCurrentTurnPlayerID()
+	{
+		return currentTurn >= 0 && currentTurn < players.size() ? players.get(currentTurn).getID() : -1;
+	}
 	
 	public synchronized long getRemainingTime()
 	{
@@ -1141,7 +1146,11 @@ public class GameData implements Runnable
 
 	public synchronized Function buildPreviewFunction(String functionString)
 	{
-		previewFunction = null;
+		return buildPreviewFunction(functionString, -1);
+	}
+
+	public synchronized Function buildPreviewFunction(String functionString, int expectedPlayerID)
+	{
 
 		if(previewEnabled == false || gameState != Constants.GAME || drawingFunction || currentTurn < 0 || currentTurn >= players.size())
 		{
@@ -1149,6 +1158,11 @@ public class GameData implements Runnable
 		}
 
 		Player player = players.get(currentTurn);
+		if(expectedPlayerID >= 0 && player.getID() != expectedPlayerID)
+		{
+			return null;
+		}
+		previewFunction = null;
 		if(player.isLocalPlayer() == false || player instanceof ComputerPlayer || functionString == null || functionString.trim().length() == 0)
 		{
 			return null;

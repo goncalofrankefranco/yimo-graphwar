@@ -57,6 +57,7 @@ public class GameScreen extends YimoScreen implements ActionListener, StartStopP
     private final java.awt.CardLayout contentLayout;
     private boolean quitVisible;
     private boolean showMessageVisible;
+    private volatile long previewRequestGeneration;
 
     public GameScreen(Graphwar graphwar, String confFile) throws Exception {
         super(graphwar);
@@ -319,6 +320,7 @@ public class GameScreen extends YimoScreen implements ActionListener, StartStopP
     }
 
     public void refreshFunction() {
+        invalidatePreviewRequests();
         final Player player = graphwar.getGameData().getCurrentTurnPlayer();
         if (player != null && player.isLocalPlayer() && !(player instanceof ComputerPlayer)) {
             final String function = player.getCurrentTurnSoldier().getFunction();
@@ -401,6 +403,7 @@ public class GameScreen extends YimoScreen implements ActionListener, StartStopP
             if (current != null && !(current instanceof ComputerPlayer)) {
                 String function = funcField.getText();
                 if (function != null && function.trim().length() > 0) {
+                    invalidatePreviewRequests();
                     plane.setPreviewFunction(null);
                     graphwar.getGameData().sendFunction(function);
                 }
@@ -411,21 +414,41 @@ public class GameScreen extends YimoScreen implements ActionListener, StartStopP
     }
 
     public void startDrawingFunction() {
+        invalidatePreviewRequests();
         plane.setPreviewFunction(null);
         plane.startDrawingFunction();
+    }
+
+    private void invalidatePreviewRequests() {
+        previewRequestGeneration++;
+    }
+
+    static boolean isCurrentPreviewRequest(long request, long latestRequest,
+            int expectedPlayerId, int currentPlayerId) {
+        return request == latestRequest && expectedPlayerId >= 0 && expectedPlayerId == currentPlayerId;
     }
 
     private void requestPreview() {
         if (funcField == null || graphwar.getGameData() == null) {
             return;
         }
+        final long request = ++previewRequestGeneration;
+        final GameData data = graphwar.getGameData();
+        final int expectedPlayerId = data.getCurrentTurnPlayerID();
         final String text = funcField.getText();
+        if (expectedPlayerId < 0) {
+            plane.setPreviewFunction(null);
+            return;
+        }
         Thread previewThread = new Thread(new Runnable() {
             public void run() {
-                final Function preview = graphwar.getGameData().buildPreviewFunction(text);
+                final Function preview = data.buildPreviewFunction(text, expectedPlayerId);
                 SwingUtilities.invokeLater(new Runnable() {
                     public void run() {
-                        plane.setPreviewFunction(preview);
+                        if (isCurrentPreviewRequest(request, previewRequestGeneration,
+                                expectedPlayerId, data.getCurrentTurnPlayerID())) {
+                            plane.setPreviewFunction(preview);
+                        }
                     }
                 });
             }

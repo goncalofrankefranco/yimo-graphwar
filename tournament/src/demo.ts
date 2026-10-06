@@ -3,7 +3,7 @@ import { TournamentService } from './service.ts';
 export const DEMO_ADMIN_TOKEN = 'demo-admin-token';
 export const DEMO_ROOM_SECRET = 'demo-room-secret';
 export const DEMO_TOURNAMENT_ID = 'yimo-demo-2026';
-export const DEMO_BUILD_ID = 'YIMO-Graphwar-2.1.0';
+export const DEMO_BUILD_ID = 'YIMO-Graphwar-2.2.0';
 export const DEMO_PROTOCOL_VERSION = 2;
 
 export interface DemoFixture {
@@ -45,8 +45,8 @@ export function createDemoService(initialNow = Math.floor(Date.now() / 1000)): D
     buildId: DEMO_BUILD_ID,
     protocolVersion: DEMO_PROTOCOL_VERSION,
     matchTimeoutSeconds: 900,
-    roomPortStart: 30000,
-    roomPortEnd: 30049,
+    roomPortStart: 31000,
+    roomPortEnd: 31000,
     registrationOpenAt: schedule.registrationOpenAt,
     registrationCloseAt: schedule.registrationCloseAt,
     startAt: schedule.startAt,

@@ -24,24 +24,31 @@ public final class NetworkConfig {
     public static final int DEFAULT_GLOBAL_PORT = 23762;
     public static final int DEFAULT_ROOM_PORT_START = 30000;
     public static final int DEFAULT_ROOM_PORT_END = 30049;
+    public static final int DEFAULT_TOURNAMENT_ROOM_PORT_START = 31000;
+    public static final int DEFAULT_TOURNAMENT_ROOM_PORT_END = 31049;
     public static final String DEFAULT_TOURNAMENT_API = "https://graphwar.yimo-official.org";
-    public static final String DEFAULT_BUILD_ID = "YIMO-Graphwar-2.1.0";
+    public static final String DEFAULT_BUILD_ID = "YIMO-Graphwar-2.2.0";
     public static final int DEFAULT_PROTOCOL_VERSION = 2;
 
     private final String globalHost;
     private final int globalPort;
     private final int roomPortStart;
     private final int roomPortEnd;
+    private final int tournamentRoomPortStart;
+    private final int tournamentRoomPortEnd;
     private final String tournamentApiBaseUrl;
     private final String buildId;
     private final int protocolVersion;
 
     private NetworkConfig(String globalHost, int globalPort, int roomPortStart, int roomPortEnd,
+            int tournamentRoomPortStart, int tournamentRoomPortEnd,
             String tournamentApiBaseUrl, String buildId, int protocolVersion) {
         this.globalHost = globalHost;
         this.globalPort = globalPort;
         this.roomPortStart = roomPortStart;
         this.roomPortEnd = roomPortEnd;
+        this.tournamentRoomPortStart = tournamentRoomPortStart;
+        this.tournamentRoomPortEnd = tournamentRoomPortEnd;
         this.tournamentApiBaseUrl = tournamentApiBaseUrl;
         this.buildId = buildId;
         this.protocolVersion = protocolVersion;
@@ -49,7 +56,8 @@ public final class NetworkConfig {
 
     public static NetworkConfig defaults() {
         return new NetworkConfig(DEFAULT_GLOBAL_HOST, DEFAULT_GLOBAL_PORT, DEFAULT_ROOM_PORT_START,
-                DEFAULT_ROOM_PORT_END, DEFAULT_TOURNAMENT_API, DEFAULT_BUILD_ID, DEFAULT_PROTOCOL_VERSION);
+                DEFAULT_ROOM_PORT_END, DEFAULT_TOURNAMENT_ROOM_PORT_START, DEFAULT_TOURNAMENT_ROOM_PORT_END,
+                DEFAULT_TOURNAMENT_API, DEFAULT_BUILD_ID, DEFAULT_PROTOCOL_VERSION);
     }
 
     /** Loads the external file, then the packaged local-development file, then safe defaults. */
@@ -99,8 +107,14 @@ public final class NetworkConfig {
         int globalPort = port(properties, "global.port", DEFAULT_GLOBAL_PORT);
         int roomStart = port(properties, "room.port.start", DEFAULT_ROOM_PORT_START);
         int roomEnd = port(properties, "room.port.end", DEFAULT_ROOM_PORT_END);
+        int tournamentRoomStart = port(properties, "tournament.room.port.start", DEFAULT_TOURNAMENT_ROOM_PORT_START);
+        int tournamentRoomEnd = port(properties, "tournament.room.port.end", DEFAULT_TOURNAMENT_ROOM_PORT_END);
         if (roomStart > roomEnd) {
             throw new IOException("room.port.start must not exceed room.port.end");
+        }
+        if (tournamentRoomStart > tournamentRoomEnd || tournamentRoomEnd - tournamentRoomStart + 1 > 50
+                || (tournamentRoomStart <= roomEnd && tournamentRoomEnd >= roomStart)) {
+            throw new IOException("tournament room ports must be a separate range of at most 50 ports");
         }
 
         String tournamentApi = value(properties, "tournament.api.baseUrl", DEFAULT_TOURNAMENT_API);
@@ -110,7 +124,8 @@ public final class NetworkConfig {
             throw new IOException("build.id contains unsupported characters");
         }
         int protocolVersion = positive(properties, "protocol.version", DEFAULT_PROTOCOL_VERSION);
-        return new NetworkConfig(host, globalPort, roomStart, roomEnd, tournamentApi, buildId, protocolVersion);
+        return new NetworkConfig(host, globalPort, roomStart, roomEnd, tournamentRoomStart, tournamentRoomEnd,
+                tournamentApi, buildId, protocolVersion);
     }
 
     /** Applies only the supported deployment overrides; positional host arguments are not accepted. */
@@ -231,6 +246,8 @@ public final class NetworkConfig {
         properties.setProperty("global.port", Integer.toString(globalPort));
         properties.setProperty("room.port.start", Integer.toString(roomPortStart));
         properties.setProperty("room.port.end", Integer.toString(roomPortEnd));
+        properties.setProperty("tournament.room.port.start", Integer.toString(tournamentRoomPortStart));
+        properties.setProperty("tournament.room.port.end", Integer.toString(tournamentRoomPortEnd));
         properties.setProperty("tournament.api.baseUrl", tournamentApiBaseUrl);
         properties.setProperty("build.id", buildId);
         properties.setProperty("protocol.version", Integer.toString(protocolVersion));
@@ -251,6 +268,14 @@ public final class NetworkConfig {
 
     public int getRoomPortEnd() {
         return roomPortEnd;
+    }
+
+    public int getTournamentRoomPortStart() {
+        return tournamentRoomPortStart;
+    }
+
+    public int getTournamentRoomPortEnd() {
+        return tournamentRoomPortEnd;
     }
 
     public String getTournamentApiBaseUrl() {

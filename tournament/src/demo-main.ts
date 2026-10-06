@@ -9,7 +9,7 @@ const port = Number(process.env.PORT ?? 8080);
 const server = createTournamentHttpServer(service);
 server.listen(port, host, () => {
   console.log(`YIMO tournament demo listening on http://${host}:${port}`);
-  console.log(`Bracket: http://${host}:${port}/participant?tournament=${demo.tournamentId}`);
+  console.log(`Bracket: http://${host}:${port}/participant`);
   console.log(`Admin token: ${DEMO_ADMIN_TOKEN}`);
   console.log(`Participant codes: ${demo.participantCodes.join(', ')}`);
 });

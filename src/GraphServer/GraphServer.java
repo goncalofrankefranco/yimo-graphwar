@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Random;
+import java.util.concurrent.Semaphore;
 
 
 public class GraphServer implements Runnable
@@ -50,6 +51,7 @@ public class GraphServer implements Runnable
 	protected List<MapShape> customMap;
 	private AuthoritativeGame authoritativeGame;
 	private RoomAccessPolicy roomAccessPolicy;
+	private final Semaphore pendingHandshakes = new Semaphore(16);
 	private boolean countingDown;
 	StartDelayer startDelayer;
 		
@@ -153,72 +155,61 @@ public class GraphServer implements Runnable
 		
 	public void finalize()
 	{
+		stopAcceptingConnections();
+		List<ClientConnection> currentClients;
+		synchronized(this)
+		{
+			currentClients = new ArrayList<ClientConnection>(clients);
+		}
 		String message = NetworkProtocol.DISCONNECT+"";
-		sendMessageAll(message);
-		
-		ListIterator<ClientConnection> itr = clients.listIterator();
-    	
-    	while(itr.hasNext())
-    	{
-    		ClientConnection client = itr.next();
-    		
-    		client.disconnect();
-    	}
-    	    	
-    	acceptingConnections = false;
-    	try
-    	{
+		for(ClientConnection client : currentClients) client.sendMessage(message);
+		for(ClientConnection client : currentClients) client.disconnect();
+	}
+
+	protected void stopAcceptingConnections()
+	{
+		acceptingConnections = false;
+		try
+		{
 			serverSocket.close();
-		} 
-    	catch (IOException e)
-    	{			
-    		e.printStackTrace();
+		}
+		catch(IOException e)
+		{
+			// The socket may already be closed during shutdown.
 		}
 	}
 	
-	public synchronized void addClient(Socket socket)
+	public void addClient(Socket socket)
 	{
-		if(clients.size() < Constants.MAX_CLIENTS)
+		ClientConnection client;
+		try
 		{
-			try
-			{
-				ClientConnection client = new ClientConnection(this, socket, roomAccessPolicy);
-				
-				if(clients.size() == 0)
-				{
-					client.setLeader(true);
-				}
-				
-				clients.add(client);
-				new Thread(client).start();
-				
-				sendAllInfoMessage(client);
-				
-				if(client.isLeader())
-				{
-					sendLeaderMessage(client);
-				}
-			} 
-			catch (IOException e) 
-			{
-				System.out.println("Adding new client failed.");
-				e.printStackTrace();
-			}
+			client = new ClientConnection(this, socket, roomAccessPolicy);
 		}
-		else
+		catch(IOException e)
 		{
-			try 
+			System.out.println("Client handshake rejected ("+e.getClass().getSimpleName()+").");
+			return;
+		}
+		synchronized(this)
+		{
+			int maxClients = roomAccessPolicy.isRequired() ? 2 : Constants.MAX_CLIENTS;
+			if(!acceptingConnections || clients.size() >= maxClients)
 			{
-				ClientConnection client = new ClientConnection(this, socket, roomAccessPolicy);
-				
-				String message = NetworkProtocol.GAME_FULL+"";
-				client.sendMessage(message);
-				
+				client.sendMessage(NetworkProtocol.GAME_FULL+"");
 				client.disconnect();
-			} 
-			catch (IOException e) 
+				return;
+			}
+			if(clients.size() == 0)
 			{
-				e.printStackTrace();
+				client.setLeader(true);
+			}
+			clients.add(client);
+			new Thread(client).start();
+			sendAllInfoMessage(client);
+			if(client.isLeader())
+			{
+				sendLeaderMessage(client);
 			}
 		}
 	}
@@ -226,6 +217,43 @@ public class GraphServer implements Runnable
 	public int getPort()
 	{
 		return this.port;
+	}
+
+	public boolean isTournamentRoom()
+	{
+		return roomAccessPolicy != null && roomAccessPolicy.isRequired();
+	}
+
+	protected String[] tournamentResult()
+	{
+		if(!isTournamentRoom() || authoritativeGame == null || !authoritativeGame.isGameFinished()) return null;
+		int winningTeam = authoritativeGame.getWinningTeam();
+		if(winningTeam != Constants.TEAM1 && winningTeam != Constants.TEAM2) return null;
+		String winner = null;
+		String loser = null;
+		for(ClientConnection client : clients)
+		{
+			String participant = client.getTournamentParticipantId();
+			if(participant == null || client.getPlayers().size() != 1) return null;
+			Player player = client.getPlayers().get(0);
+			if(player.getTeam() == winningTeam) winner = participant;
+			else loser = participant;
+		}
+		if(winner == null || loser == null) return null;
+		return new String[] { roomAccessPolicy.getMatchId(), winner, loser };
+	}
+
+	protected String[] tournamentForfeitResult(ClientConnection departed)
+	{
+		if(!isTournamentRoom() || gameState != Constants.GAME || clients.size() != 2) return null;
+		String loser = departed == null ? null : departed.getTournamentParticipantId();
+		String winner = null;
+		for(ClientConnection client : clients)
+		{
+			if(client != departed) winner = client.getTournamentParticipantId();
+		}
+		if(winner == null || loser == null) return null;
+		return new String[] { roomAccessPolicy.getMatchId(), winner, loser };
 	}
 
 	public void run() 
@@ -240,7 +268,23 @@ public class GraphServer implements Runnable
 				
 				if(acceptingConnections)
 				{
-					addClient(socket);
+					if(!pendingHandshakes.tryAcquire())
+					{
+						socket.close();
+						continue;
+					}
+					Thread handshake = new Thread(() -> {
+						try
+						{
+							addClient(socket);
+						}
+						finally
+						{
+							pendingHandshakes.release();
+						}
+					}, "graphserver-client-handshake");
+					handshake.setDaemon(true);
+					handshake.start();
 				}
 				else
 				{
@@ -260,7 +304,7 @@ public class GraphServer implements Runnable
 		}
 	}
 	
-	private void sendMessageAll(String message)
+	private synchronized void sendMessageAll(String message)
 	{
 		ListIterator<ClientConnection> itr = clients.listIterator();
     	
@@ -354,6 +398,7 @@ public class GraphServer implements Runnable
 	// Returns true if the player belongs to that client
 	private boolean setTeam(int team, int playerID, ClientConnection client)
 	{
+		if(roomAccessPolicy.isRequired()) return false;
 		List<Player> players = client.getPlayers();
 		
 		ListIterator<Player> itr = players.listIterator();
@@ -734,6 +779,18 @@ public class GraphServer implements Runnable
 	
 	private boolean checkAllReady()
 	{
+		if(roomAccessPolicy.isRequired())
+		{
+			if(clients.size() != 2 || players.size() != 2) return false;
+			int team1 = 0;
+			int team2 = 0;
+			for(Player player : players)
+			{
+				if(player.getTeam() == Constants.TEAM1) team1++;
+				else if(player.getTeam() == Constants.TEAM2) team2++;
+			}
+			if(team1 != 1 || team2 != 1) return false;
+		}
 		ListIterator<ClientConnection> itr = clients.listIterator();
     	
 		
@@ -759,7 +816,7 @@ public class GraphServer implements Runnable
     	return true;
 	}
 	
-	public void removeClient(ClientConnection client)
+	public synchronized void removeClient(ClientConnection client)
 	{
 		this.clients.remove(client);
 		
@@ -1388,10 +1445,18 @@ public class GraphServer implements Runnable
 				}break;
 			
 				case NetworkProtocol.ADD_PLAYER:
-				{	
-					if(players.size() < Constants.MAX_PLAYERS)
+				{
+					if(players.size() < Constants.MAX_PLAYERS
+							&& (!roomAccessPolicy.isRequired() || (players.size() < 2 && client.getPlayers().isEmpty())))
 					{
-						Player player = new Player(info[1]);
+						String playerName = roomAccessPolicy.isRequired()
+								? client.getTournamentDisplayName() : info[1];
+						Player player = new Player(playerName);
+						if(roomAccessPolicy.isRequired())
+						{
+							player.setTeam(client.isLeader() ? Constants.TEAM1 : Constants.TEAM2);
+							player.setNumSoldiers(1);
+						}
 						client.addPlayer(player);
 						players.add(player);
 						
@@ -1418,7 +1483,7 @@ public class GraphServer implements Runnable
 					int playerID = Integer.parseInt(info[1]);
 					
 					// Only send message to everyone if player belongs to that client
-					if(removePlayer(playerID, client))
+					if(!roomAccessPolicy.isRequired() && removePlayer(playerID, client))
 					{
 						setEveryoneNotReady();
 						sendMessageAll(message);
@@ -1429,7 +1494,7 @@ public class GraphServer implements Runnable
 				{
 					int playerID = Integer.parseInt(info[1]);
 					
-					if(addSoldier(playerID, client))
+					if(!roomAccessPolicy.isRequired() && addSoldier(playerID, client))
 					{
 						setEveryoneNotReady();
 						sendMessageAll(message);
@@ -1440,7 +1505,7 @@ public class GraphServer implements Runnable
 				{
 					int playerID = Integer.parseInt(info[1]);
 					
-					if(removeSoldier(playerID, client))
+					if(!roomAccessPolicy.isRequired() && removeSoldier(playerID, client))
 					{
 						setEveryoneNotReady();
 						sendMessageAll(message);
@@ -1460,7 +1525,7 @@ public class GraphServer implements Runnable
 				
 				case NetworkProtocol.NEXT_MODE:
 				{
-					if(client.isLeader())
+					if(client.isLeader() && !roomAccessPolicy.isRequired())
 					{
 						gameMode = (gameMode+1)%3;
 						
@@ -1471,7 +1536,7 @@ public class GraphServer implements Runnable
 
 				case NetworkProtocol.SET_MODE:
 				{
-					if(client.isLeader() && gameState == Constants.PRE_GAME && info.length > 1)
+					if(!roomAccessPolicy.isRequired() && client.isLeader() && gameState == Constants.PRE_GAME && info.length > 1)
 					{
 						try
 						{
@@ -1492,7 +1557,7 @@ public class GraphServer implements Runnable
 
 				case NetworkProtocol.SET_PREVIEW:
 				{
-					if(client.isLeader() && gameState == Constants.PRE_GAME && info.length > 1)
+					if(!roomAccessPolicy.isRequired() && client.isLeader() && gameState == Constants.PRE_GAME && info.length > 1)
 					{
 						previewEnabled = Integer.parseInt(info[1]) != 0;
 						sendRoomSettings();
@@ -1501,7 +1566,7 @@ public class GraphServer implements Runnable
 
 				case NetworkProtocol.SET_TURN_TIME:
 				{
-					if(client.isLeader() && gameState == Constants.PRE_GAME && info.length > 1)
+					if(!roomAccessPolicy.isRequired() && client.isLeader() && gameState == Constants.PRE_GAME && info.length > 1)
 					{
 						turnTime = clampTurnTime(Integer.parseInt(info[1]));
 						sendRoomSettings();
@@ -1510,7 +1575,7 @@ public class GraphServer implements Runnable
 
 				case NetworkProtocol.SET_TRAJECTORY_MODE:
 				{
-					if(client.isLeader() && gameState == Constants.PRE_GAME && info.length > 1)
+					if(!roomAccessPolicy.isRequired() && client.isLeader() && gameState == Constants.PRE_GAME && info.length > 1)
 					{
 						trajectoryMode = clampTrajectoryMode(Integer.parseInt(info[1]));
 						sendRoomSettings();
@@ -1519,7 +1584,7 @@ public class GraphServer implements Runnable
 
 				case NetworkProtocol.SET_MAP:
 				{
-					if(client.isLeader() && gameState == Constants.PRE_GAME)
+					if(!roomAccessPolicy.isRequired() && client.isLeader() && gameState == Constants.PRE_GAME)
 					{
 						List<MapShape> parsedMap = parseMapMessage(info);
 						if(parsedMap != null && canPlaceCustomMap(parsedMap))

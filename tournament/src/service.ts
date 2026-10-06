@@ -461,7 +461,7 @@ export class TournamentService {
     const row = this.db.prepare(`
       SELECT tournament_id FROM tournaments
       WHERE status IN (${ACTIVE_TOURNAMENT_STATUSES})
-      ORDER BY updated_at DESC, created_at DESC LIMIT 1
+      ORDER BY CASE status WHEN 'RUNNING' THEN 0 ELSE 1 END, updated_at DESC, created_at DESC LIMIT 1
     `).get() as any;
     return row ? this.publicBracket(String(row.tournament_id)) : null;
   }
@@ -470,7 +470,7 @@ export class TournamentService {
     this.requireAdmin(adminToken);
     const active = this.db.prepare(`
       SELECT tournament_id FROM tournaments WHERE status IN (${ACTIVE_TOURNAMENT_STATUSES})
-      ORDER BY updated_at DESC, created_at DESC LIMIT 1
+      ORDER BY CASE status WHEN 'RUNNING' THEN 0 ELSE 1 END, updated_at DESC, created_at DESC LIMIT 1
     `).get() as any;
     const row = active ?? this.db.prepare(`
       SELECT tournament_id FROM tournaments WHERE status = 'DRAFT'

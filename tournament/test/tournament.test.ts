@@ -275,6 +275,21 @@ test('only one tournament may enter an active lifecycle at a time', () => {
   app.close();
 });
 
+test('public and organizer views prefer a running tournament over a newer legacy start-blocked record', () => {
+  const app = service();
+  tournament(app, 2, 'running-event');
+  app.createTournament('admin-test-token', {
+    tournamentId: 'legacy-blocked-event', name: 'Legacy Blocked Event',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.db.prepare("UPDATE tournaments SET status = 'START_BLOCKED', updated_at = ? WHERE tournament_id = ?")
+    .run(clock + 1, 'legacy-blocked-event');
+
+  assert.equal(app.activeTournament()?.tournamentId, 'running-event');
+  assert.equal(app.currentAdminTournament('admin-test-token')?.tournamentId, 'running-event');
+  app.close();
+});
+
 test('a verified win advances the player to the next match and completes the tournament final', () => {
   const app = service();
   const seeded = tournament(app, 4);

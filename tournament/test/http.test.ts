@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { createTournamentHttpServer } from '../src/server.ts';
-import { TournamentService } from '../src/service.ts';
+import { TournamentService, verifyRoomToken } from '../src/service.ts';
 
 test('advertises the v2.2.0 build ID when the tournament service uses defaults', async () => {
   const app = new TournamentService({
@@ -163,6 +163,22 @@ test('authorizes the desktop tournament-room flow from a participant code', asyn
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address: any = server.address();
   try {
+    const wrongPort = await fetch(`http://127.0.0.1:${address.port}/api/v1/game/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        participantCode: 'DESKTOP-CODE-1', displayName: 'Official Desktop 1', roomPort: '31001',
+        buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: '2',
+      }),
+    });
+    assert.equal(wrongPort.status, 409);
+    assert.match(decodeURIComponent((await wrongPort.text()).split('&').slice(2).join('&')), /port 31000/i);
+    assert.deepEqual(launchedRooms, [], 'a rejected port must not start a room on a hidden assignment');
+    assert.equal(app.db.prepare("SELECT status FROM matches WHERE tournament_id = ? AND status <> 'BYE'")
+      .get('desktop-join').status, 'OPEN');
+    assert.equal(app.db.prepare("SELECT COUNT(*) AS count FROM room_slots WHERE state <> 'AVAILABLE'")
+      .get().count, 0);
+
     const response = await fetch(`http://127.0.0.1:${address.port}/api/v1/game/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -175,6 +191,8 @@ test('authorizes the desktop tournament-room flow from a participant code', asyn
     assert.equal(response.status, 200);
     assert.match(body, /^YIMO_ROOM&31000&[A-Za-z0-9_.-]+&[A-Za-z0-9_-]+$/);
     assert.equal(Buffer.from(body.split('&')[3], 'base64url').toString('utf8'), 'Official Desktop 1');
+    const access = verifyRoomToken(body.split('&')[2], 'room-test-secret', Date.now()) as any;
+    assert.equal(access.participantId, 'desktop-1', 'the participant code must determine the signed room identity');
     assert.deepEqual(launchedRooms, [['desktop-join-r1-m1', 31000]]);
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));

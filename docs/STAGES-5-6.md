@@ -177,9 +177,15 @@ Practice rooms remain on `30000–30049`. Hidden tournament rooms use
 secret, and YIMO network configuration. The process binds before reporting
 ready and is never registered in the public lobby.
 
-Tournament rooms admit two distinct candidates, one player/team/soldier each,
-and ignore lobby setting changes. On a normal finish, the surviving team is
-reported; a live-match disconnect is a forfeit. The Java server signs
+Tournament rooms admit two distinct candidates, one player/team/soldier each.
+The client hides roster-editing controls and disables match settings for both
+players; the server independently ignores setup mutations. The desktop
+tournament flow resets room state before starting its socket reader, so initial
+roster packets cannot be overwritten by connection setup. On a normal finish,
+the surviving team is reported; a live-match disconnect is a forfeit. The
+desktop tournament join path verifies the assigned port before consuming a room
+slot and signs a room token only for the candidate assigned to that match.
+The Java server signs
 `matchId|winnerParticipantId|loserParticipantId|reason|serverNonce` with
 HMAC-SHA256. The API verifies the signature, advances the winner in the
 bracket, marks the final tournament complete, and releases the room slot. The

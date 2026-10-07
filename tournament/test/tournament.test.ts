@@ -419,16 +419,53 @@ test('the game can join an active assigned match using only the candidate code a
   app.closeRegistration('admin-test-token', 'game-join-test');
   app.startTournament('admin-test-token', 'game-join-test');
 
+  throwsCode(() => app.joinActiveMatch({
+    participantCode: 'PARTICIPANT-1', displayName: 'Official Player 1', roomPort: 31001,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  }), 'WRONG_TOURNAMENT_PORT');
+  assert.equal(app.db.prepare("SELECT status FROM matches WHERE tournament_id = ? AND status <> 'BYE'")
+    .get('game-join-test').status, 'OPEN', 'a wrong port must not assign the match');
+  assert.equal(app.db.prepare("SELECT COUNT(*) AS count FROM room_slots WHERE state <> 'AVAILABLE'")
+    .get().count, 0, 'a rejected port must not consume a tournament room');
+
   const joined = app.joinActiveMatch({
     participantCode: 'PARTICIPANT-1', displayName: 'Official Player 1', roomPort: 31000,
     buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   });
   assert.equal(joined.port, 31000);
   assert.ok(joined.roomToken);
+  assert.equal(verifyRoomToken(joined.roomToken, 'room-test-secret', clock * 1000)?.participantId, 'p-1',
+    'the candidate code must determine the identity bound into the room token');
+  const opponent = app.joinActiveMatch({
+    participantCode: 'PARTICIPANT-2', displayName: 'Official Player 2', roomPort: 31000,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  assert.equal(verifyRoomToken(opponent.roomToken, 'room-test-secret', clock * 1000)?.participantId, 'p-2',
+    'the opponent code must receive only its own identity-bound room token');
   assert.throws(() => app.joinActiveMatch({
     participantCode: 'PARTICIPANT-2', displayName: 'Official Player 2', roomPort: 31001,
     buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
   }), (error: any) => error?.code === 'WRONG_TOURNAMENT_PORT');
+  assert.equal(app.db.prepare("SELECT COUNT(*) AS count FROM room_slots WHERE state <> 'AVAILABLE'")
+    .get().count, 1, 'a wrong port must not consume another room for the same match');
+  app.close();
+});
+
+test('room launch lookup returns exactly the two assigned participants', () => {
+  const app = service();
+  const bracket = tournament(app, 2, 'room-participants-test');
+  const match: any = bracket.matches.find((candidate) => candidate.status === 'OPEN');
+  const session = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.joinMatch({
+    sessionToken: session.sessionToken, matchCode: match.matchCode,
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+
+  const roomParticipantIds = (app as any).roomParticipantIds;
+  assert.equal(typeof roomParticipantIds, 'function', 'room launcher must receive a match participant allowlist');
+  assert.deepEqual(roomParticipantIds.call(app, match.matchId), ['p-1', 'p-2']);
   app.close();
 });
 

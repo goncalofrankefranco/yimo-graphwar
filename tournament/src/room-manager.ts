@@ -13,7 +13,7 @@ interface RoomManagerOptions {
   portEnd?: number;
   startupTimeoutMs?: number;
   processExitTimeoutMs?: number;
-  argsForRoom?: (matchId: string, port: number) => string[];
+  argsForRoom?: (matchId: string, port: number, participantIds: string[]) => string[];
 }
 
 /** Starts one hidden Java room process when the tournament service assigns its port. */
@@ -28,11 +28,16 @@ export class TournamentRoomManager {
     this.options = options;
   }
 
-  async ensure(matchId: string, port: number): Promise<void> {
+  async ensure(matchId: string, port: number, participantIds: string[]): Promise<void> {
     const start = this.options.portStart ?? 31000;
     const end = this.options.portEnd ?? 31049;
     if (!/^[A-Za-z0-9_-]{1,100}$/.test(matchId) || !Number.isInteger(port) || port < start || port > end) {
       throw new Error('Tournament room assignment is invalid.');
+    }
+    if (!Array.isArray(participantIds) || participantIds.length !== 2
+      || !participantIds.every((id) => /^[A-Za-z0-9_-]{1,100}$/.test(id))
+      || participantIds[0] === participantIds[1]) {
+      throw new Error('Tournament room assignment must contain two distinct participant IDs.');
     }
     const running = this.rooms.get(port);
     if (running) {
@@ -50,10 +55,11 @@ export class TournamentRoomManager {
       }
     }
 
-    const args = this.options.argsForRoom?.(matchId, port) ?? [
+    const args = this.options.argsForRoom?.(matchId, port, participantIds) ?? [
       '-Xms24m', '-Xmx96m', '-XX:+UseSerialGC', '-Djava.awt.headless=true',
       '-Dyimo.config=/etc/yimo/yimo.properties', '-cp', this.options.roomServerJar,
       'RoomServer.TournamentRoomMain', '--port', String(port), '--match-id', matchId,
+      '--participant-a', participantIds[0], '--participant-b', participantIds[1],
     ];
     const child = spawn(this.options.javaCommand, args, {
       env: process.env,

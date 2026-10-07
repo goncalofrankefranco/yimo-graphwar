@@ -17,25 +17,39 @@ public final class RoomAccessPolicy {
     private final String secret;
     private final String matchId;
     private final int roomSlot;
+    private final Set<String> assignedParticipants;
     private final Set<String> usedNonces = new HashSet<String>();
     private final Set<String> activeParticipants = new HashSet<String>();
 
-    private RoomAccessPolicy(boolean required, String secret, String matchId, int roomSlot) {
+    private RoomAccessPolicy(boolean required, String secret, String matchId, int roomSlot,
+            Set<String> assignedParticipants) {
         this.required = required;
         this.secret = secret;
         this.matchId = matchId;
         this.roomSlot = roomSlot;
+        this.assignedParticipants = assignedParticipants;
     }
 
     public static RoomAccessPolicy open() {
-        return new RoomAccessPolicy(false, "", "", -1);
+        return new RoomAccessPolicy(false, "", "", -1, new HashSet<String>());
     }
 
-    public static RoomAccessPolicy required(String secret, String matchId, int roomSlot) {
+    public static RoomAccessPolicy required(String secret, String matchId, int roomSlot,
+            String participantA, String participantB) {
         if (secret == null || secret.length() == 0 || matchId == null || matchId.length() == 0 || roomSlot <= 0) {
             throw new IllegalArgumentException("Tournament room access settings are incomplete");
         }
-        return new RoomAccessPolicy(true, secret, matchId, roomSlot);
+        if (!isParticipantId(participantA) || !isParticipantId(participantB) || participantA.equals(participantB)) {
+            throw new IllegalArgumentException("Tournament room participant assignments are invalid");
+        }
+        Set<String> assigned = new HashSet<String>();
+        assigned.add(participantA);
+        assigned.add(participantB);
+        return new RoomAccessPolicy(true, secret, matchId, roomSlot, assigned);
+    }
+
+    private static boolean isParticipantId(String participantId) {
+        return participantId != null && participantId.matches("[A-Za-z0-9_-]{1,100}");
     }
 
     public boolean isRequired() {
@@ -58,6 +72,7 @@ public final class RoomAccessPolicy {
         if (payload == null || payload.getProtocolVersion() != Constants.PROTOCOL_VERSION
                 || !Constants.BUILD_ID.equals(payload.getBuildId()) || !matchId.equals(payload.getMatchId())
                 || payload.getRoomSlot() != roomSlot || usedNonces.contains(payload.getNonce())
+                || !assignedParticipants.contains(payload.getParticipantId())
                 || activeParticipants.contains(payload.getParticipantId())) {
             return null;
         }

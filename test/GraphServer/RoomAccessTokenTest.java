@@ -19,7 +19,8 @@ public final class RoomAccessTokenTest {
         check(RoomAccessToken.verify(token, "wrong-secret", now) == null, "wrong secret must fail");
         check(RoomAccessToken.verify(token, "test-secret", now + 60_001L) == null, "expired token must fail");
 
-        RoomAccessPolicy policy = RoomAccessPolicy.required("test-secret", "match-1", 30000);
+        RoomAccessPolicy policy = RoomAccessPolicy.required("test-secret", "match-1", 30000,
+                "participant-1", "participant-2");
         check(policy.accept(token, now) != null, "first token use must be accepted");
         check(policy.accept(token, now) == null, "replayed token nonce must be rejected");
         String duplicateParticipantToken = RoomAccessToken.issue(new RoomAccessToken.Payload(2, Constants.BUILD_ID,

@@ -1325,7 +1325,7 @@ export class TournamentService {
     return match;
   }
 
-  private joinMatchForParticipant(match: MatchRow, participant: any): {
+  private joinMatchForParticipant(match: MatchRow, participant: any, requestedPort?: number): {
     matchId: string; roomSlot: number; port: number; roomToken: string; expiresAt: number;
   } {
     const now = this.timestamp();
@@ -1341,6 +1341,11 @@ export class TournamentService {
           ORDER BY room_slot LIMIT 1
         `).get(match.tournament_id) as any;
         if (!room) throw new ServiceError(503, 'ROOM_POOL_EXHAUSTED', 'No tournament room is available.');
+        if (requestedPort !== undefined && Number(room.port) !== requestedPort) {
+          throw new ServiceError(409, 'WRONG_TOURNAMENT_PORT',
+            `The next available room is port ${Number(room.port)}.`,
+            { assignedPort: Number(room.port), matchId: match.match_id });
+        }
         const roomExpiry = now + Number(match.match_timeout_seconds ?? 1200);
         this.db.prepare(`
           UPDATE room_slots SET state = 'ASSIGNED', match_id = ?, assigned_at = ?, heartbeat_at = ?,
@@ -1351,6 +1356,10 @@ export class TournamentService {
           WHERE match_id = ?
         `).run(room.room_slot, roomExpiry, now, match.match_id);
         matchExpiresAt = roomExpiry;
+      } else if (requestedPort !== undefined && Number(room.port) !== requestedPort) {
+        throw new ServiceError(409, 'WRONG_TOURNAMENT_PORT',
+          `This match is assigned to port ${Number(room.port)}.`,
+          { assignedPort: Number(room.port), matchId: match.match_id });
       }
       const expirySeconds = matchExpiresAt === null ? now + 900 : Math.min(matchExpiresAt, now + 900);
       const expiryMillis = expirySeconds * 1000;
@@ -1386,7 +1395,20 @@ export class TournamentService {
     return this.joinMatchForParticipant(match, participant);
   }
 
-  joinAssignedMatch(input: AssignedJoinInput): {
+  roomParticipantIds(matchId: string): [string, string] {
+    const id = validateIdentifier(matchId, 'matchId');
+    const match = this.db.prepare(
+      'SELECT player_a_id, player_b_id, status FROM matches WHERE match_id = ?',
+    ).get(id) as any;
+    if (!match) throw new ServiceError(404, 'MATCH_NOT_FOUND', 'Match not found.');
+    if (!['ASSIGNED', 'IN_PROGRESS'].includes(String(match.status))
+      || !match.player_a_id || !match.player_b_id || match.player_a_id === match.player_b_id) {
+      throw new ServiceError(409, 'MATCH_NOT_ASSIGNED', 'The room needs two assigned tournament participants.');
+    }
+    return [String(match.player_a_id), String(match.player_b_id)];
+  }
+
+  joinAssignedMatch(input: AssignedJoinInput, requestedPort?: number): {
     matchId: string; roomSlot: number; port: number; roomToken: string; expiresAt: number;
   } {
     this.rateLimiter.check(`join:${input?.clientKey ?? 'local'}`, this.timestamp());
@@ -1412,7 +1434,7 @@ export class TournamentService {
     if (match.player_a_id !== participant.participant_id && match.player_b_id !== participant.participant_id) {
       throw new ServiceError(403, 'PARTICIPANT_NOT_IN_MATCH', 'Participant is not assigned to this match.');
     }
-    return this.joinMatchForParticipant(match, participant);
+    return this.joinMatchForParticipant(match, participant, requestedPort);
   }
 
   joinActiveMatch(input: GameJoinInput): {
@@ -1442,11 +1464,7 @@ export class TournamentService {
       buildId: input.buildId,
       protocolVersion: input.protocolVersion,
       clientKey: input.clientKey,
-    });
-    if (joined.port !== requestedPort) {
-      throw new ServiceError(409, 'WRONG_TOURNAMENT_PORT',
-        `This match is assigned to port ${joined.port}.`, { assignedPort: joined.port, matchId: joined.matchId });
-    }
+    }, requestedPort);
     return { ...joined, displayName: player.participant.displayName };
   }
 

@@ -52,6 +52,7 @@ public class GameData implements Runnable
 	private MapShape[] customMap;
 	
 	private boolean leader;
+	private boolean tournamentRoom;
 	
 	private int currentTurn;
 	private Player lastLocalHumanPlayer;
@@ -102,6 +103,7 @@ public class GameData implements Runnable
 		soldiersHit = new ArrayList<Soldier>();
 		
 		this.leader = false;
+		this.tournamentRoom = false;
 		
 		lastLocalHumanPlayer = null;
 		currentTurn = -1;
@@ -126,27 +128,48 @@ public class GameData implements Runnable
 
 	public void connect(String ip, int port, String playerName, String tournamentToken) throws IOException
 	{
-		serverConnection = new ServerConnection(this, ip, port, playerName, tournamentToken);
-		
-		new Thread(serverConnection).start();
-	
+		boolean tournament = tournamentToken != null && tournamentToken.trim().length() > 0;
+		resetRoomState(tournament);
+		ServerConnection connection = new ServerConnection(this, ip, port, playerName, tournamentToken);
+		serverConnection = connection;
 		gameState = Constants.PRE_GAME;
-		trajectoryMode = Constants.SHOOTER_RELATIVE_TRAJECTORY;
-		customMapEnabled = false;
-		customMap = new MapShape[0];
-		
-		previewFunction = null;
-		drawingFunction = false;
-		exploding = false;
-		players = new ArrayList<Player>();
-		lastLocalHumanPlayer = null;
-		currentTurn = -1;
-		turnTimeUp = false;
-		nextTurnSent = false;
-		
+		((PreGameScreen)graphwar.getUI().getScreen(Constants.PRE_GAME_SCREEN)).setTournamentRoom(tournament);
+		new Thread(connection).start();
 		new Thread(this).start();
 		
 		((GlobalScreen)graphwar.getUI().getScreen(Constants.GLOBAL_ROOM_SCREEN)).refreshGameButton();
+	}
+
+	void resetRoomState(boolean tournamentRoom)
+	{
+		if(countdowner != null) countdowner.stop();
+		this.tournamentRoom = tournamentRoom;
+		this.leader = false;
+		this.gameMode = Constants.NORMAL_FUNC;
+		this.gameState = Constants.NONE;
+		this.previewEnabled = true;
+		this.turnTime = Constants.DEFAULT_TURN_TIME;
+		this.trajectoryMode = Constants.SHOOTER_RELATIVE_TRAJECTORY;
+		this.customMapEnabled = false;
+		this.customMap = new MapShape[0];
+		this.function = null;
+		this.previewFunction = null;
+		this.drawingFunction = false;
+		this.exploding = false;
+		this.soldiersHit = new ArrayList<Soldier>();
+		this.players = new ArrayList<Player>();
+		this.lastLocalHumanPlayer = null;
+		this.currentTurn = -1;
+		this.turnTimeUp = false;
+		this.nextTurnSent = false;
+		this.countingDown = false;
+		this.countdowner = null;
+		this.sayFunc = true;
+	}
+
+	public boolean isTournamentRoom()
+	{
+		return tournamentRoom;
 	}
 	
 	public List<Player> getPlayers()

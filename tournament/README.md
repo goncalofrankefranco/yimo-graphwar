@@ -66,8 +66,11 @@ When a match is ready:
   `graphwar-server.yimo-official.org`.
 3. The desktop client sends the code over HTTPS to `/api/v1/game/join`. The
    service checks the active tournament, eligibility, assigned match, build,
-   and port, then returns a short-lived signed room token and the official
-   display name. The client passes the opaque token to the Java room server.
+   and requested port before allocating a room, then returns a short-lived
+   signed room token and the official display name. The participant identity
+   in that token comes from the candidate code and must be one of the match's
+   two competitors. A wrong port does not consume a room slot. The client
+   passes the opaque token to the Java room server.
 4. After a verified result, the bracket advances in SQLite. The still-open
    portal refreshes automatically and presents **Join Room** once the next
    match is ready; it does not launch the desktop app automatically.

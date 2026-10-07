@@ -1447,7 +1447,8 @@ public class GraphServer implements Runnable
 				case NetworkProtocol.ADD_PLAYER:
 				{
 					if(players.size() < Constants.MAX_PLAYERS
-							&& (!roomAccessPolicy.isRequired() || (players.size() < 2 && client.getPlayers().isEmpty())))
+							&& (!roomAccessPolicy.isRequired() || (client.getTournamentParticipantId() != null
+									&& players.size() < 2 && client.getPlayers().isEmpty())))
 					{
 						String playerName = roomAccessPolicy.isRequired()
 								? client.getTournamentDisplayName() : info[1];

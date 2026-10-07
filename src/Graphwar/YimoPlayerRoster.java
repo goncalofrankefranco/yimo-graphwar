@@ -145,7 +145,12 @@ public final class YimoPlayerRoster extends JPanel {
             JButton plus = smallButton("+");
             JButton remove = smallButton("×");
 
+            boolean rosterEditable = PreGameScreen.canChangeRoster(graphwar.getGameData().isTournamentRoom());
             boolean canManage = player.isLocalPlayer() || graphwar.getGameData().isLeader();
+            side.setVisible(rosterEditable);
+            remove.setVisible(rosterEditable);
+            minus.setVisible(rosterEditable);
+            plus.setVisible(rosterEditable);
             side.setEnabled(canManage);
             remove.setEnabled(graphwar.getGameData().isLeader() || player.isLocalPlayer());
             minus.setEnabled(canManage && player.getNumSoldiers() > 1);

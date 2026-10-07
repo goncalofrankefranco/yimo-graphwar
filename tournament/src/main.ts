@@ -29,7 +29,7 @@ if (!adminToken || !roomSecret) {
   const host = process.env.HOST ?? '127.0.0.1';
   const server = createTournamentHttpServer(service, (matchId, roomPort) => {
     if (!roomManager) throw new Error('Tournament room launcher is not configured.');
-    return roomManager.ensure(matchId, roomPort);
+    return roomManager.ensure(matchId, roomPort, service.roomParticipantIds(matchId));
   }, (matchId) => roomManager ? roomManager.release(matchId) : false);
   const stop = () => {
     clearInterval(scheduler);

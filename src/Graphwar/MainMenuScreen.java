@@ -529,7 +529,9 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         } catch (NumberFormatException error) {
             status("Port must be a number between 1 and 65535.", true);
         } catch (IOException error) {
-            status("Connection failed. Check the port, candidate code, and internet connection.", true);
+            String message = error.getMessage();
+            status(message == null || message.trim().length() == 0
+                    ? "Connection failed. Check the port, candidate code, and internet connection." : message, true);
             error.printStackTrace();
         }
     }

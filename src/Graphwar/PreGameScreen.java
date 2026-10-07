@@ -51,6 +51,7 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
     private final YimoPlayerRoster playerBoard;
 
     private JPanel roomSettingsPanel;
+    private JPanel roomSettingsControls;
     private JCheckBox previewCheckBox;
     private JComboBox<Integer> turnTimeComboBox;
     private JComboBox<String> trajectoryModeComboBox;
@@ -58,7 +59,9 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
     private JLabel mapStatusLabel;
     private JLabel invalidStatusLabel;
     private JLabel modeSummaryLabel;
+    private JLabel tournamentLockLabel;
     private boolean updatingRoomSettings;
+    private volatile boolean tournamentRoom;
 
     private final JTextField nameFieldAddLocal;
     private final JButton yesButtonAddLocal;
@@ -208,6 +211,9 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
         heading.add(YimoTheme.title("Room rules"));
         modeSummaryLabel = YimoTheme.mutedLabel("Normal functions");
         heading.add(modeSummaryLabel);
+        tournamentLockLabel = YimoTheme.mutedLabel("Tournament settings are locked by the organizer");
+        tournamentLockLabel.setVisible(false);
+        heading.add(tournamentLockLabel);
         panel.add(heading, BorderLayout.NORTH);
 
         JPanel controls = new JPanel(new GridBagLayout());
@@ -241,16 +247,20 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
         readyRow.setOpaque(false);
         readyRow.add(readyOff);
         readyRow.add(readyOn);
-        addControl(controls, 5, readyRow, 2);
+        roomSettingsControls = controls;
         JPanel centeredControls = new JPanel(new GridBagLayout());
         centeredControls.setOpaque(false);
+        JPanel settingsAndReady = new JPanel(new BorderLayout(0, 8));
+        settingsAndReady.setOpaque(false);
+        settingsAndReady.add(controls, BorderLayout.CENTER);
+        settingsAndReady.add(readyRow, BorderLayout.SOUTH);
         GridBagConstraints centeredConstraints = new GridBagConstraints();
         centeredConstraints.gridx = 0;
         centeredConstraints.gridy = 0;
         centeredConstraints.weightx = 1.0;
         centeredConstraints.weighty = 1.0;
         centeredConstraints.fill = GridBagConstraints.HORIZONTAL;
-        centeredControls.add(controls, centeredConstraints);
+        centeredControls.add(settingsAndReady, centeredConstraints);
         panel.add(centeredControls, BorderLayout.CENTER);
 
         return panel;
@@ -391,16 +401,59 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
         okButton.addActionListener(this);
     }
 
-    public void setRoomSettingsEditable(boolean editable) {
-        if (previewCheckBox != null) {
-            previewCheckBox.setEnabled(editable);
-            turnTimeComboBox.setEnabled(editable);
-            trajectoryModeComboBox.setEnabled(editable);
-            mapEditorButton.setEnabled(editable);
-            normalFuncButton.setEnabled(editable);
-            firstFuncButton.setEnabled(editable);
-            secondFuncButton.setEnabled(editable);
-        }
+    public void setRoomSettingsEditable(final boolean editable) {
+        Runnable update = new Runnable() {
+            public void run() {
+                boolean controlsEnabled = canEditRoomSettings(tournamentRoom, editable);
+                if (previewCheckBox != null) {
+                    previewCheckBox.setEnabled(controlsEnabled);
+                    turnTimeComboBox.setEnabled(controlsEnabled);
+                    trajectoryModeComboBox.setEnabled(controlsEnabled);
+                    mapEditorButton.setEnabled(controlsEnabled);
+                    normalFuncButton.setEnabled(controlsEnabled);
+                    firstFuncButton.setEnabled(controlsEnabled);
+                    secondFuncButton.setEnabled(controlsEnabled);
+                }
+            }
+        };
+        if (SwingUtilities.isEventDispatchThread()) update.run();
+        else SwingUtilities.invokeLater(update);
+    }
+
+    static boolean canEditRoomSettings(boolean isTournamentRoom, boolean isLeader) {
+        return !isTournamentRoom && isLeader;
+    }
+
+    static boolean canChangeRoster(boolean isTournamentRoom) {
+        return !isTournamentRoom;
+    }
+
+    static boolean showRoomSetupOptions(boolean isTournamentRoom) {
+        return !isTournamentRoom;
+    }
+
+    public void setTournamentRoom(boolean tournamentRoom) {
+        this.tournamentRoom = tournamentRoom;
+        Runnable update = new Runnable() {
+            public void run() {
+                boolean rosterActionsVisible = canChangeRoster(PreGameScreen.this.tournamentRoom);
+                addLocalPlayer.setVisible(rosterActionsVisible);
+                addPCPlayer.setVisible(rosterActionsVisible);
+                yesButtonAddLocal.setEnabled(rosterActionsVisible);
+                yesButtonAddPC.setEnabled(rosterActionsVisible);
+                roomSettingsControls.setVisible(showRoomSetupOptions(PreGameScreen.this.tournamentRoom));
+                tournamentLockLabel.setVisible(PreGameScreen.this.tournamentRoom);
+                if (PreGameScreen.this.tournamentRoom) {
+                    showAddLocal(false);
+                    showAddPC(false);
+                }
+                setRoomSettingsEditable(graphwar.getGameData().isLeader());
+                revalidate();
+                repaint();
+            }
+        };
+        if (SwingUtilities.isEventDispatchThread()) update.run();
+        else SwingUtilities.invokeLater(update);
     }
 
     public void setRoomPreviewEnabled(boolean enabled) {
@@ -506,6 +559,7 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
     }
 
     private void showAddLocal(boolean show) {
+        if (show && !canChangeRoster(tournamentRoom)) return;
         if (show) {
             nameFieldAddLocal.requestFocusInWindow();
             showCard("add-local", false, true, false);
@@ -515,6 +569,7 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
     }
 
     private void showAddPC(boolean show) {
+        if (show && !canChangeRoster(tournamentRoom)) return;
         if (show) {
             nameFieldAddPC.requestFocusInWindow();
             showCard("add-pc", false, false, true);
@@ -595,6 +650,7 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
     }
 
     private void addPlayerFromField() {
+        if (!canChangeRoster(tournamentRoom)) return;
         String name = nameFieldAddLocal.getText() == null ? "" : nameFieldAddLocal.getText().trim();
         if (name.length() == 0) {
             return;
@@ -608,6 +664,7 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
     }
 
     private void addPCFromField() {
+        if (!canChangeRoster(tournamentRoom)) return;
         String name = nameFieldAddPC.getText() == null ? "" : nameFieldAddPC.getText().trim();
         if (name.length() == 0) {
             return;
@@ -635,6 +692,13 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent event) {
         Object source = event.getSource();
+        if (tournamentRoom && (source == addLocalPlayer || source == addPCPlayer
+                || source == yesButtonAddLocal || source == yesButtonAddPC
+                || source == previewCheckBox || source == turnTimeComboBox || source == trajectoryModeComboBox
+                || source == mapEditorButton || source == normalFuncButton || source == firstFuncButton
+                || source == secondFuncButton)) {
+            return;
+        }
         if (addLocalVisible) {
             if (source == noButtonAddLocal) {
                 showAddLocal(false);
@@ -665,12 +729,12 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
         }
 
         if (source == previewCheckBox || source == turnTimeComboBox || source == trajectoryModeComboBox) {
-            if (!updatingRoomSettings && graphwar.getGameData().isLeader()) {
+            if (!updatingRoomSettings && canEditRoomSettings(tournamentRoom, graphwar.getGameData().isLeader())) {
                 graphwar.getGameData().setPreviewEnabled(previewCheckBox.isSelected());
                 graphwar.getGameData().setTurnTime(((Integer) turnTimeComboBox.getSelectedItem()).intValue() * 1000);
                 graphwar.getGameData().setTrajectoryMode(trajectoryModeComboBox.getSelectedIndex());
             }
-        } else if (source == mapEditorButton && graphwar.getGameData().isLeader()) {
+        } else if (source == mapEditorButton && canEditRoomSettings(tournamentRoom, graphwar.getGameData().isLeader())) {
             MapEditorPanel.showDialog(graphwar, graphwar.getGameData().getCustomMap(), new MapEditorPanel.ApplyListener() {
                 public void apply(MapShape[] shapes) {
                     graphwar.getGameData().setCustomMap(shapes);
@@ -689,7 +753,8 @@ public class PreGameScreen extends YimoScreen implements ActionListener {
                 graphwar.getGameData().sendChatMessage(text);
                 chatField.setText("");
             }
-        } else if (source == normalFuncButton || source == firstFuncButton || source == secondFuncButton) {
+        } else if ((source == normalFuncButton || source == firstFuncButton || source == secondFuncButton)
+                && canEditRoomSettings(tournamentRoom, graphwar.getGameData().isLeader())) {
             int buttonIndex = source == normalFuncButton ? 0 : source == firstFuncButton ? 1 : 2;
             graphwar.getGameData().setMode(modeForButton(buttonIndex));
         } else if (source == back) {

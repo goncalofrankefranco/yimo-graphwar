@@ -98,6 +98,9 @@ if grep -q '^YIMO_BUILD_ID=' "$tournament_env"; then
 else
   printf 'YIMO_BUILD_ID=YIMO-Graphwar-2.2.0\n' >> "$tournament_env"
 fi
+if ! grep -q '^YIMO_TOURNAMENT_ROOM_COUNT=' "$tournament_env"; then
+  printf 'YIMO_TOURNAMENT_ROOM_COUNT=1\n' >> "$tournament_env"
+fi
 if [[ -f /root/yimo-admin-password.txt ]]; then
   chmod 600 /root/yimo-admin-password.txt
 fi

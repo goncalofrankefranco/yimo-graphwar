@@ -38,6 +38,35 @@ function signRoomResult(secret: string, matchId: string, winnerId: string, loser
     .digest('base64url');
 }
 
+test('uses the configured default room count when a tournament has no explicit port range', () => {
+  const app = service({ defaultRoomCount: 4 });
+  app.createTournament('admin-test-token', {
+    tournamentId: 'four-room-default',
+    name: 'YIMO Four Room Test',
+    buildId: 'YIMO-Graphwar-2.2.0',
+    protocolVersion: 2,
+  });
+
+  const tournamentRow: any = app.db.prepare(
+    'SELECT room_port_start, room_port_end FROM tournaments WHERE tournament_id = ?',
+  ).get('four-room-default');
+  const ports = app.db.prepare(
+    'SELECT port FROM room_slots WHERE tournament_id = ? ORDER BY port',
+  ).all('four-room-default').map((row: any) => row.port);
+
+  assert.equal(tournamentRow.room_port_start, 31000);
+  assert.equal(tournamentRow.room_port_end, 31003);
+  assert.deepEqual(ports, [31000, 31001, 31002, 31003]);
+  app.close();
+});
+
+test('rejects a default room count outside the reserved tournament port pool', () => {
+  assert.throws(
+    () => service({ defaultRoomCount: 51 }),
+    /YIMO_TOURNAMENT_ROOM_COUNT must be an integer from 1 to 50/,
+  );
+});
+
 function tournament(app: TournamentService, count: number, tournamentId = 'tournament-1') {
   addParticipants(app, count);
   app.createTournament('admin-test-token', {

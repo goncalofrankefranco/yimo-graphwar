@@ -17,7 +17,9 @@ Node's built-in SQLite module may print its experimental-feature warning.
 
 The production service requires `YIMO_ADMIN_PASSWORD` and
 `YIMO_ROOM_HMAC_SECRET`. It also accepts `YIMO_TOURNAMENT_DB`, `YIMO_BUILD_ID`,
-`YIMO_PROTOCOL_VERSION`, `HOST`, and `PORT`. Keep secrets in the service's
+`YIMO_PROTOCOL_VERSION`, `YIMO_TOURNAMENT_ROOM_COUNT`, `HOST`, and `PORT`.
+`YIMO_TOURNAMENT_ROOM_COUNT` defaults to one and controls the default number of
+simultaneously available tournament rooms (1–50). Keep secrets in the service's
 environment file, never in source, a public page, or a client build.
 
 On the VPS, `yimo-tournament.service` provides the room launcher variables:
@@ -28,8 +30,12 @@ YIMO_TOURNAMENT_ROOM_SERVER_JAR=/opt/yimo-graphwar/current/roomServer.jar
 ```
 
 The launcher inherits `YIMO_ROOM_HMAC_SECRET` from the service environment and
-starts one hidden Java process for the assigned match. The 1 GB staging setup
-defaults to one tournament port (`31000`) and one active match room at a time.
+starts one hidden Java process per assigned match. The 1 GB staging setup
+defaults to one tournament port (`31000`); a 2 GB staging setup can use four
+rooms by setting `YIMO_TOURNAMENT_ROOM_COUNT=4` in `/etc/yimo/tournament.env`.
+That is a cautious starting capacity, not a 200-player load-test guarantee;
+the current 1 vCPU can become the bottleneck before RAM. Each room count
+reserves a consecutive port range beginning at `31000`.
 Practice rooms use `30000–30049`; tournament-only room ports use
 `31000–31049`. The firewall must allow both ranges, but the tournament range is
 never published in the public lobby.

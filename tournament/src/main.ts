@@ -18,6 +18,7 @@ if (!adminToken || !roomSecret) {
     roomSecret,
     buildId: process.env.YIMO_BUILD_ID ?? 'YIMO-Graphwar-2.2.0',
     protocolVersion: Number(process.env.YIMO_PROTOCOL_VERSION ?? 2),
+    defaultRoomCount: Number(process.env.YIMO_TOURNAMENT_ROOM_COUNT ?? 1),
   });
   const roomJar = process.env.YIMO_TOURNAMENT_ROOM_SERVER_JAR;
   const roomManager = roomJar ? new TournamentRoomManager({

@@ -20,6 +20,7 @@ export interface ServiceOptions {
   now?: () => number;
   participantScryptCost?: number;
   rateLimitMax?: number;
+  defaultRoomCount?: number;
 }
 
 export interface ParticipantInput {
@@ -355,6 +356,7 @@ export class TournamentService {
   private readonly now: () => number;
   private readonly participantScryptCost: number;
   private readonly rateLimiter: RateLimiter;
+  private readonly defaultRoomCount: number;
 
   constructor(options: ServiceOptions) {
     if (!options?.adminToken || !options.roomSecret) {
@@ -367,6 +369,10 @@ export class TournamentService {
     this.now = options.now ?? (() => Math.floor(Date.now() / 1000));
     this.participantScryptCost = options.participantScryptCost ?? 16384;
     this.rateLimiter = new RateLimiter(options.rateLimitMax ?? 120);
+    this.defaultRoomCount = options.defaultRoomCount ?? 1;
+    if (!Number.isInteger(this.defaultRoomCount) || this.defaultRoomCount < 1 || this.defaultRoomCount > 50) {
+      throw new Error('YIMO_TOURNAMENT_ROOM_COUNT must be an integer from 1 to 50.');
+    }
     this.db = new DatabaseSync(options.dbPath ?? ':memory:');
     this.db.exec('PRAGMA foreign_keys = ON;');
     this.db.exec('PRAGMA busy_timeout = 5000;');
@@ -515,8 +521,8 @@ export class TournamentService {
     this.requireBuild(input?.buildId, input?.protocolVersion);
     const timeout = Number(input?.matchTimeoutSeconds ?? 1200);
     const roomStart = Number(input?.roomPortStart ?? TOURNAMENT_PORT_START);
-    // ponytail: one on-demand room per 1 GB staging VPS; widen the configured range after load testing.
-    const roomEnd = Number(input?.roomPortEnd ?? TOURNAMENT_PORT_START);
+    // ponytail: the configured pool size supplies the default; explicit ranges stay authoritative.
+    const roomEnd = Number(input?.roomPortEnd ?? roomStart + this.defaultRoomCount - 1);
     if (!Number.isInteger(timeout) || timeout < 60 || timeout > 1200
       || !Number.isInteger(roomStart) || !Number.isInteger(roomEnd)
       || roomStart < TOURNAMENT_PORT_START || roomEnd > TOURNAMENT_PORT_END

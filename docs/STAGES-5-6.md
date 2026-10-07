@@ -169,8 +169,10 @@ rejects the old token. A newly issued token can reconnect the same candidate.
 
 Practice rooms remain on `30000–30049`. Hidden tournament rooms use
 `31000–31049`; the 1 GB staging configuration defaults to the single port
-`31000`, so only one match process runs at a time. SQLite `room_slots` is the
-allocation source of truth. On assignment, `TournamentRoomManager` starts
+`31000`, while a 2 GB staging configuration can set
+`YIMO_TOURNAMENT_ROOM_COUNT=4` to allocate four match rooms. SQLite
+`room_slots` is the allocation source of truth. On assignment,
+`TournamentRoomManager` starts
 `RoomServer.TournamentRoomMain` with the match ID, exact port, server HMAC
 secret, and YIMO network configuration. The process binds before reporting
 ready and is never registered in the public lobby.

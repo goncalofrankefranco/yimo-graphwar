@@ -176,6 +176,9 @@ Practice rooms remain on `30000–30049`. Hidden tournament rooms use
 `RoomServer.TournamentRoomMain` with the match ID, exact port, server HMAC
 secret, and YIMO network configuration. The process binds before reporting
 ready and is never registered in the public lobby.
+When a match starts, the room closes its accept socket to reject late joins;
+player-reader threads remain non-daemon so that closing the accept loop does
+not terminate the JVM and disconnect the active competitors.
 
 Tournament rooms admit two distinct candidates, one player/team/soldier each.
 The client hides roster-editing controls and disables match settings for both
@@ -220,13 +223,14 @@ GraphServer.RoomAccessTokenTest
 GraphServer.TournamentRoomAccessTest
 GraphServer.TournamentRoomSettingsTest
 GraphServer.TournamentResultReporterTest
+GraphServer.TournamentRoomThreadLifecycleTest
 ```
 
 The full regression suite must be run alongside those three Stage 6 checks.
 The Java tests cover token issue/verify, expiry, wrong-secret and replay
 rejection, duplicate-candidate rejection, immutable tournament room rules,
-HMAC result reporting, and a client-room handshake that accepts a valid token
-before room state is available.
+HMAC result reporting, and a client-room lifecycle check that keeps both
+competitors connected after the accept loop closes at match start.
 
 ## Operations and rollback
 

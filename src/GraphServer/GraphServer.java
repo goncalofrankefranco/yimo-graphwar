@@ -205,7 +205,10 @@ public class GraphServer implements Runnable
 				client.setLeader(true);
 			}
 			clients.add(client);
-			new Thread(client).start();
+			Thread clientReader = new Thread(client, "graphserver-client-reader");
+			// The room accept loop stops at game start; readers must keep the room JVM alive.
+			clientReader.setDaemon(false);
+			clientReader.start();
 			sendAllInfoMessage(client);
 			if(client.isLeader())
 			{

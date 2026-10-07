@@ -135,7 +135,35 @@ export function createTournamentHttpServer(service: TournamentService,
       } else if (request.method === 'POST' && url.pathname === '/api/v1/admin/tournaments') {
         send(response, 201, service.createTournament(bearer(request), body));
       } else if (isAdminDeleteTournamentRoute) {
-        send(response, 200, service.deleteTournament(bearer(request), url.pathname.split('/')[5]));
+        const deletion = service.deleteTournament(bearer(request), url.pathname.split('/')[5]);
+        const roomStops = deletion.roomMatchIds.map((matchId) => {
+          try {
+            return Promise.resolve(releaseRoom(matchId));
+          } catch (error) {
+            return Promise.reject(error);
+          }
+        });
+        const stopResults = await Promise.allSettled(roomStops);
+        const roomsStopped = stopResults.filter((result) =>
+          result.status === 'fulfilled' && result.value === true).length;
+        const roomStopFailures = stopResults.length - roomsStopped;
+        for (let index = 0; index < stopResults.length; index += 1) {
+          const result = stopResults[index];
+          if (result.status === 'rejected') {
+            console.error(`Failed to stop tournament room ${deletion.roomMatchIds[index]} during tournament deletion.`, result.reason);
+          } else if (!result.value) {
+            console.error(`Could not confirm tournament room ${deletion.roomMatchIds[index]} stopped during tournament deletion.`);
+          }
+        }
+        const responseBody: Record<string, unknown> = {
+          tournamentId: deletion.tournamentId,
+          deleted: true,
+        };
+        if (deletion.roomMatchIds.length > 0) {
+          responseBody.roomsStopped = roomsStopped;
+          responseBody.roomStopFailures = roomStopFailures;
+        }
+        send(response, 200, responseBody);
       } else if (request.method === 'GET' && isAdminTournamentRoute) {
         send(response, 200, service.adminTournament(bearer(request), url.pathname.split('/')[5]));
       } else if (isCurrentAdminTournamentRoute) {

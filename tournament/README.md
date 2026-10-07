@@ -40,6 +40,13 @@ Practice rooms use `30000–30049`; tournament-only room ports use
 `31000–31049`. The firewall must allow both ranges, but the tournament range is
 never published in the public lobby.
 
+Organizers can delete a running tournament from the admin console. The
+confirmation warns that entries, schedule, and bracket history are removed and
+active matches end. The service deletes the tournament transactionally, then
+asks the room manager to stop every room associated with it; the audit record
+is retained. If a room does not confirm shutdown, the console reports the
+failure for follow-up.
+
 ## Competitor flow
 
 There is one active tournament at a time. Competitors open `/participant`; the

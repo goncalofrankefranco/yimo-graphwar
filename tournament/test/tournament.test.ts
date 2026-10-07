@@ -808,7 +808,7 @@ test('organizers can delete a start-blocked tournament so it no longer blocks a 
     .run('stuck-event');
 
   const result = app.deleteTournament('admin-test-token', 'stuck-event');
-  assert.deepEqual(result, { tournamentId: 'stuck-event', deleted: true });
+  assert.deepEqual(result, { tournamentId: 'stuck-event', deleted: true, roomMatchIds: [] });
   assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM tournaments').get().count, 0);
   assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM tournament_entries').get().count, 0);
   assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM room_slots').get().count, 0);
@@ -822,18 +822,35 @@ test('organizers can delete a start-blocked tournament so it no longer blocks a 
   app.close();
 });
 
-test('organizers cannot delete a running tournament', () => {
+test('deleting a running tournament removes its records and returns active rooms to stop', () => {
   const app = service();
-  tournament(app, 2, 'protected-running-event');
-  throwsCode(() => app.deleteTournament('admin-test-token', 'protected-running-event'), 'TOURNAMENT_NOT_DELETABLE');
-  assert.equal(app.adminTournament('admin-test-token', 'protected-running-event').status, 'RUNNING');
-  app.db.prepare("UPDATE tournaments SET status = 'COMPLETED' WHERE tournament_id = ?")
-    .run('protected-running-event');
-  app.db.prepare("UPDATE room_slots SET state = 'IN_PROGRESS' WHERE tournament_id = ? AND room_slot = 31000")
-    .run('protected-running-event');
-  throwsCode(() => app.deleteTournament('admin-test-token', 'protected-running-event'), 'TOURNAMENT_NOT_DELETABLE');
+  const bracket = tournament(app, 2, 'running-delete-event');
+  const match: any = bracket.matches.find((candidate) => candidate.status === 'OPEN');
+  assert.ok(match?.matchCode);
+  const session = app.createParticipantSession({
+    participantCode: 'PARTICIPANT-1', buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.joinMatch({
+    sessionToken: session.sessionToken,
+    matchCode: match.matchCode,
+    buildId: 'YIMO-Graphwar-2.2.0',
+    protocolVersion: 2,
+  });
+
+  const result = app.deleteTournament('admin-test-token', 'running-delete-event');
+  assert.deepEqual(result, {
+    tournamentId: 'running-delete-event', deleted: true, roomMatchIds: [match.matchId],
+  });
   assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM tournaments WHERE tournament_id = ?')
-    .get('protected-running-event').count, 1);
+    .get('running-delete-event').count, 0);
+  assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM matches WHERE tournament_id = ?')
+    .get('running-delete-event').count, 0);
+  assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM room_slots WHERE tournament_id = ?')
+    .get('running-delete-event').count, 0);
+  const audit: any = app.db.prepare(
+    "SELECT details_json FROM audit_events WHERE event_type = 'TOURNAMENT_DELETED' AND subject_id = ?",
+  ).get('running-delete-event');
+  assert.equal(JSON.parse(audit.details_json).activeRoomCount, 1);
   app.close();
 });
 

@@ -643,3 +643,75 @@ test('organizer can delete a non-running tournament through the authenticated ad
     app.close();
   }
 });
+
+test('deleting a running tournament stops its active room before confirming deletion', async () => {
+  const app = new TournamentService({
+    dbPath: ':memory:', adminToken: 'admin-test-token', roomSecret: 'room-test-secret',
+    participantScryptCost: 256, rateLimitMax: 1000,
+  });
+  app.addParticipant('admin-test-token', {
+    participantId: 'running-delete-p1', displayName: 'Player One', participantCode: 'RUNNING-DELETE-1',
+  });
+  app.addParticipant('admin-test-token', {
+    participantId: 'running-delete-p2', displayName: 'Player Two', participantCode: 'RUNNING-DELETE-2',
+  });
+  app.createTournament('admin-test-token', {
+    tournamentId: 'running-delete-http', name: 'Running Delete HTTP',
+    buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+  });
+  app.openRegistration('admin-test-token', 'running-delete-http');
+  for (const [participantCode, participantId] of [
+    ['RUNNING-DELETE-1', 'running-delete-p1'],
+    ['RUNNING-DELETE-2', 'running-delete-p2'],
+  ]) {
+    const session = app.createParticipantSession({
+      participantCode, buildId: 'YIMO-Graphwar-2.2.0', protocolVersion: 2,
+    });
+    app.registerParticipant(session.sessionToken, 'running-delete-http');
+  }
+  app.closeRegistration('admin-test-token', 'running-delete-http');
+  app.startTournament('admin-test-token', 'running-delete-http');
+  const match: any = app.db.prepare(
+    "SELECT match_id FROM matches WHERE tournament_id = ? AND status = 'OPEN'",
+  ).get('running-delete-http');
+  app.db.prepare("UPDATE room_slots SET state = 'IN_PROGRESS', match_id = ? WHERE tournament_id = ? AND room_slot = 31000")
+    .run(match.match_id, 'running-delete-http');
+
+  const released: string[] = [];
+  let roomShutdownConfirmed = false;
+  const server = createTournamentHttpServer(app, () => {}, async (matchId) => {
+    released.push(matchId);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    roomShutdownConfirmed = true;
+    return true;
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address: any = server.address();
+  const base = `http://127.0.0.1:${address.port}`;
+  const admin = { Authorization: 'Bearer admin-test-token' };
+  try {
+    const page = await fetch(`${base}/admin`);
+    const html = await page.text();
+    assert.match(html, />Delete tournament</);
+    assert.match(html, /any active matches will end and their rooms will be stopped/i);
+
+    const unauthorized = await fetch(`${base}/api/v1/admin/tournaments/running-delete-http`, { method: 'DELETE' });
+    assert.equal(unauthorized.status, 401);
+    assert.deepEqual(released, []);
+
+    const deleted = await fetch(`${base}/api/v1/admin/tournaments/running-delete-http`, {
+      method: 'DELETE', headers: admin,
+    });
+    assert.equal(deleted.status, 200);
+    assert.deepEqual(await deleted.json(), {
+      tournamentId: 'running-delete-http', deleted: true, roomsStopped: 1, roomStopFailures: 0,
+    });
+    assert.deepEqual(released, [match.match_id]);
+    assert.equal(roomShutdownConfirmed, true);
+    assert.equal(app.db.prepare('SELECT COUNT(*) AS count FROM tournaments WHERE tournament_id = ?')
+      .get('running-delete-http').count, 0);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    app.close();
+  }
+});

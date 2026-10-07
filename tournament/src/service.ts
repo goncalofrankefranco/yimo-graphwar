@@ -490,27 +490,31 @@ export class TournamentService {
     return row ? this.adminTournament(adminToken, String(row.tournament_id)) : null;
   }
 
-  deleteTournament(adminToken: string | undefined, tournamentId: string): { tournamentId: string; deleted: true } {
+  deleteTournament(adminToken: string | undefined, tournamentId: string): {
+    tournamentId: string; deleted: true; roomMatchIds: string[];
+  } {
     this.requireAdmin(adminToken);
     const id = validateIdentifier(tournamentId, 'tournamentId');
     return this.transaction(() => {
       const tournament = this.db.prepare('SELECT name, status FROM tournaments WHERE tournament_id = ?').get(id) as any;
       if (!tournament) throw new ServiceError(404, 'TOURNAMENT_NOT_FOUND', 'Tournament not found.');
-      const deletable = new Set(['DRAFT', 'REGISTRATION_OPEN', 'CHECK_IN', 'READY', 'START_BLOCKED', 'COMPLETED']);
-      const activeRoom = this.db.prepare(`
-        SELECT 1 FROM room_slots WHERE tournament_id = ? AND state IN ('ASSIGNED', 'IN_PROGRESS', 'DRAINING') LIMIT 1
-      `).get(id);
-      if (!deletable.has(String(tournament.status)) || activeRoom) {
+      const deletable = new Set(['DRAFT', 'REGISTRATION_OPEN', 'CHECK_IN', 'READY', 'START_BLOCKED', 'RUNNING', 'COMPLETED']);
+      if (!deletable.has(String(tournament.status))) {
         throw new ServiceError(409, 'TOURNAMENT_NOT_DELETABLE',
-          'Running tournaments or tournaments with active rooms cannot be deleted.');
+          'Tournament cannot be deleted in its current state.');
       }
+      const roomMatchIds = (this.db.prepare(
+        'SELECT DISTINCT match_id FROM room_slots WHERE tournament_id = ? AND match_id IS NOT NULL',
+      ).all(id) as any[]).map((room) => String(room.match_id));
       this.db.prepare('DELETE FROM tournament_entries WHERE tournament_id = ?').run(id);
       this.db.prepare('DELETE FROM match_players WHERE match_id IN (SELECT match_id FROM matches WHERE tournament_id = ?)').run(id);
       this.db.prepare('DELETE FROM room_slots WHERE tournament_id = ?').run(id);
       this.db.prepare('DELETE FROM matches WHERE tournament_id = ?').run(id);
       this.db.prepare('DELETE FROM tournaments WHERE tournament_id = ?').run(id);
-      this.audit('TOURNAMENT_DELETED', id, { name: tournament.name, status: tournament.status });
-      return { tournamentId: id, deleted: true };
+      this.audit('TOURNAMENT_DELETED', id, {
+        name: tournament.name, status: tournament.status, activeRoomCount: roomMatchIds.length,
+      });
+      return { tournamentId: id, deleted: true, roomMatchIds };
     });
   }
 

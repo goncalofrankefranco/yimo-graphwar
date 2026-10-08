@@ -27,7 +27,7 @@ public final class TournamentRoomAccessTest {
                 expiry, "nonce-unassigned"), secret);
         check(policy.accept(unassigned, System.currentTimeMillis()) == null,
                 "a valid signature cannot authorize a candidate outside this match");
-        GraphServer server = new GraphServer(0, policy);
+        GraphServer server = new GraphServer(0, policy, 1);
         ServerSocket pair = new ServerSocket(0);
         Socket clientSocket = new Socket("127.0.0.1", pair.getLocalPort());
         Socket serverSocket = pair.accept();

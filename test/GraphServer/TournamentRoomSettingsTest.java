@@ -19,7 +19,7 @@ public final class TournamentRoomSettingsTest {
                 Constants.BUILD_ID, matchId, "candidate-1", "Official Candidate", port, expiry, "settings-nonce"), "settings-secret");
         RoomAccessPolicy policy = RoomAccessPolicy.required("settings-secret", matchId, port,
                 "candidate-1", "candidate-2");
-        GraphServer server = new GraphServer(0, policy);
+        GraphServer server = new GraphServer(0, policy, 1);
         ServerSocket pair = new ServerSocket(0);
         Socket clientSocket = new Socket("127.0.0.1", pair.getLocalPort());
         Socket serverSocket = pair.accept();

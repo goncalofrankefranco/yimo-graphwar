@@ -21,6 +21,12 @@ public final class GameScreenPreviewRaceTest {
                 "a delayed first-player preview must not replace the second player's preview");
         check(!GameScreen.isCurrentPreviewRequest(2, 2, 11, 22),
                 "a preview calculated for a different turn must be discarded");
+        check(!GraphPlane.shouldReverseFunctionPath(true, true),
+                "team-two preview and fired curves must share the unmirrored local-view transform");
+        check(GraphPlane.shouldReverseFunctionPath(false, true),
+                "a global curve must mirror with team-two terrain");
+        check(!GraphPlane.shouldReverseFunctionPath(false, false),
+                "team-one curves must remain unmirrored in the normal view");
         checkSecondTeamPreviewStartsFromItsOwnSide();
         System.out.println("game-screen-preview-race-check: PASS");
     }

@@ -24,6 +24,7 @@ import java.net.Socket;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Random;
@@ -51,6 +52,7 @@ public class GraphServer implements Runnable
 	protected List<MapShape> customMap;
 	private AuthoritativeGame authoritativeGame;
 	private RoomAccessPolicy roomAccessPolicy;
+	private final int tournamentRound;
 	private final Semaphore pendingHandshakes = new Semaphore(16);
 	private boolean countingDown;
 	StartDelayer startDelayer;
@@ -59,6 +61,16 @@ public class GraphServer implements Runnable
 	
 	private static Random random = new Random();
 	private static int nextConfiguredRoomPort = Constants.ROOM_PORT_START;
+
+	private static int validateTournamentRound(RoomAccessPolicy policy, int round)
+	{
+		RoomAccessPolicy access = policy == null ? RoomAccessPolicy.open() : policy;
+		if(round < 0 || (access.isRequired() && round < 1) || (!access.isRequired() && round > 0))
+		{
+			throw new IllegalArgumentException("Tournament maps require an assigned tournament room");
+		}
+		return round;
+	}
 
 	/** Bind dynamic rooms inside the firewall range instead of an unreachable ephemeral port. */
 	private static synchronized ServerSocket openConfiguredRoomSocket() throws IOException
@@ -102,8 +114,14 @@ public class GraphServer implements Runnable
 
 	public GraphServer(int port, RoomAccessPolicy roomAccessPolicy) throws IOException
 	{
+		this(port, roomAccessPolicy, 0);
+	}
+
+	public GraphServer(int port, RoomAccessPolicy roomAccessPolicy, int tournamentRound) throws IOException
+	{
 		clients = new ArrayList<ClientConnection>();
 		players = new ArrayList<Player>();
+		this.tournamentRound = validateTournamentRound(roomAccessPolicy, tournamentRound);
 		
 		this.port = port;
 		serverSocket = new ServerSocket(port);	
@@ -131,8 +149,14 @@ public class GraphServer implements Runnable
 
 	public GraphServer(RoomAccessPolicy roomAccessPolicy) throws IOException
 	{
+		this(roomAccessPolicy, 0);
+	}
+
+	public GraphServer(RoomAccessPolicy roomAccessPolicy, int tournamentRound) throws IOException
+	{
 		clients = new ArrayList<ClientConnection>();
 		players = new ArrayList<Player>();
+		this.tournamentRound = validateTournamentRound(roomAccessPolicy, tournamentRound);
 		
 		serverSocket = openConfiguredRoomSocket();
 		this.port = serverSocket.getLocalPort();
@@ -950,11 +974,12 @@ public class GraphServer implements Runnable
 	{
 		for(int attempt=0; attempt<5000; attempt++)
 		{
-			int x = random.nextInt(Constants.PLANE_LENGTH/2 - 2*Constants.SOLDIER_RADIUS) + Constants.SOLDIER_RADIUS;
+			int x = tournamentRound > 0 ? 25 + random.nextInt(31)
+					: random.nextInt(Constants.PLANE_LENGTH/2 - 2*Constants.SOLDIER_RADIUS) + Constants.SOLDIER_RADIUS;
 			int y = random.nextInt(Constants.PLANE_HEIGHT - 2*Constants.SOLDIER_RADIUS) + Constants.SOLDIER_RADIUS;
 			if(team == Constants.TEAM2)
 			{
-				x += Constants.PLANE_LENGTH/2;
+				x = tournamentRound > 0 ? Constants.PLANE_LENGTH - x : x + Constants.PLANE_LENGTH/2;
 			}
 			Soldier soldier = new Soldier(x, y);
 			if(testSoldier(soldier, soldiers, shapes))
@@ -1198,7 +1223,12 @@ public class GraphServer implements Runnable
 				
 		MapShape[] shapes;
 		int[] soldiers;
-		if(customMapEnabled)
+		if(tournamentRound > 0)
+		{
+			shapes = TournamentMap.shapesForRound(tournamentRound);
+			soldiers = generateSoldiers(Arrays.asList(shapes));
+		}
+		else if(customMapEnabled)
 		{
 			shapes = customMap.toArray(new MapShape[customMap.size()]);
 			soldiers = generateSoldiers(customMap);

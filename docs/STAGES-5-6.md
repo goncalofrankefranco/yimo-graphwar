@@ -176,6 +176,13 @@ Practice rooms remain on `30000–30049`. Hidden tournament rooms use
 `RoomServer.TournamentRoomMain` with the match ID, exact port, server HMAC
 secret, and YIMO network configuration. The process binds before reporting
 ready and is never registered in the public lobby.
+
+The service also passes the authoritative bracket round as `--round`; it is
+not parsed from the opaque match ID or accepted from the client. Tournament
+matches use 25 authored, horizontally mirrored map tiers, one per round, with
+rounds beyond 25 capped at the hardest map. Layouts reserve spawn lanes and the
+map regression test checks a rightward navigable route with soldier-clearance
+margins. Practice rooms continue to use random circle maps.
 When a match starts, the room closes its accept socket to reject late joins;
 player-reader threads remain non-daemon so that closing the accept loop does
 not terminate the JVM and disconnect the active competitors.
@@ -188,6 +195,8 @@ roster packets cannot be overwritten by connection setup. On a normal finish,
 the surviving team is reported; a live-match disconnect is a forfeit. The
 desktop tournament join path verifies the assigned port before consuming a room
 slot and signs a room token only for the candidate assigned to that match.
+The dashed aim preview uses the same function/terrain mirror transform as the
+fired trajectory, so the second team sees its preview on the correct side.
 The Java server signs
 `matchId|winnerParticipantId|loserParticipantId|reason|serverNonce` with
 HMAC-SHA256. The API verifies the signature, advances the winner in the

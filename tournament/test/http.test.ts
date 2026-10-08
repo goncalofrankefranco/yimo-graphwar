@@ -158,8 +158,9 @@ test('authorizes the desktop tournament-room flow from a participant code', asyn
   }
   app.closeRegistration('admin-test-token', 'desktop-join');
   app.startTournament('admin-test-token', 'desktop-join');
-  const launchedRooms: Array<[string, number]> = [];
-  const server = createTournamentHttpServer(app, (matchId, port) => { launchedRooms.push([matchId, port]); });
+  const launchedRooms: Array<[string, number, number]> = [];
+  app.db.prepare('UPDATE matches SET round = 6 WHERE tournament_id = ?').run('desktop-join');
+  const server = createTournamentHttpServer(app, (matchId, port, round) => { launchedRooms.push([matchId, port, round]); });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address: any = server.address();
   try {
@@ -193,7 +194,7 @@ test('authorizes the desktop tournament-room flow from a participant code', asyn
     assert.equal(Buffer.from(body.split('&')[3], 'base64url').toString('utf8'), 'Official Desktop 1');
     const access = verifyRoomToken(body.split('&')[2], 'room-test-secret', Date.now()) as any;
     assert.equal(access.participantId, 'desktop-1', 'the participant code must determine the signed room identity');
-    assert.deepEqual(launchedRooms, [['desktop-join-r1-m1', 31000]]);
+    assert.deepEqual(launchedRooms, [['desktop-join-r1-m1', 31000, 6]], 'room startup uses the database round, not matchId parsing');
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     app.close();

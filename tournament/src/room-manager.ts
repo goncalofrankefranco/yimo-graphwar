@@ -13,7 +13,17 @@ interface RoomManagerOptions {
   portEnd?: number;
   startupTimeoutMs?: number;
   processExitTimeoutMs?: number;
-  argsForRoom?: (matchId: string, port: number, participantIds: string[]) => string[];
+  argsForRoom?: (matchId: string, port: number, participantIds: string[], round: number) => string[];
+}
+
+export function tournamentRoomArgs(roomServerJar: string, matchId: string, port: number,
+  participantIds: string[], round: number): string[] {
+  return [
+    '-Xms24m', '-Xmx96m', '-XX:+UseSerialGC', '-Djava.awt.headless=true',
+    '-Dyimo.config=/etc/yimo/yimo.properties', '-cp', roomServerJar,
+    'RoomServer.TournamentRoomMain', '--port', String(port), '--match-id', matchId,
+    '--round', String(round), '--participant-a', participantIds[0], '--participant-b', participantIds[1],
+  ];
 }
 
 /** Starts one hidden Java room process when the tournament service assigns its port. */
@@ -28,10 +38,11 @@ export class TournamentRoomManager {
     this.options = options;
   }
 
-  async ensure(matchId: string, port: number, participantIds: string[]): Promise<void> {
+  async ensure(matchId: string, port: number, participantIds: string[], round: number): Promise<void> {
     const start = this.options.portStart ?? 31000;
     const end = this.options.portEnd ?? 31049;
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(matchId) || !Number.isInteger(port) || port < start || port > end) {
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(matchId) || !Number.isInteger(port) || port < start || port > end
+      || !Number.isInteger(round) || round < 1) {
       throw new Error('Tournament room assignment is invalid.');
     }
     if (!Array.isArray(participantIds) || participantIds.length !== 2
@@ -55,12 +66,8 @@ export class TournamentRoomManager {
       }
     }
 
-    const args = this.options.argsForRoom?.(matchId, port, participantIds) ?? [
-      '-Xms24m', '-Xmx96m', '-XX:+UseSerialGC', '-Djava.awt.headless=true',
-      '-Dyimo.config=/etc/yimo/yimo.properties', '-cp', this.options.roomServerJar,
-      'RoomServer.TournamentRoomMain', '--port', String(port), '--match-id', matchId,
-      '--participant-a', participantIds[0], '--participant-b', participantIds[1],
-    ];
+    const args = this.options.argsForRoom?.(matchId, port, participantIds, round)
+      ?? tournamentRoomArgs(this.options.roomServerJar, matchId, port, participantIds, round);
     const child = spawn(this.options.javaCommand, args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],

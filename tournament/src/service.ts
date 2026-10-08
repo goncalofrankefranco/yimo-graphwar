@@ -1408,6 +1408,15 @@ export class TournamentService {
     return [String(match.player_a_id), String(match.player_b_id)];
   }
 
+  roomRound(matchId: string): number {
+    const id = validateIdentifier(matchId, 'matchId');
+    const match = this.db.prepare(
+      "SELECT round FROM matches WHERE match_id = ? AND status IN ('ASSIGNED', 'IN_PROGRESS')",
+    ).get(id) as any;
+    if (!match) throw new ServiceError(404, 'MATCH_NOT_FOUND', 'Assigned tournament match not found.');
+    return Number(match.round);
+  }
+
   joinAssignedMatch(input: AssignedJoinInput, requestedPort?: number): {
     matchId: string; roomSlot: number; port: number; roomToken: string; expiresAt: number;
   } {

@@ -63,7 +63,7 @@ public final class TournamentRoomThreadLifecycleTest {
         String secret = "room-thread-lifecycle-secret";
         int roomSlot = freePort();
         GraphServer server = new GraphServer(roomSlot, RoomAccessPolicy.required(secret, "lifecycle-match", roomSlot,
-                "candidate-a", "candidate-b"));
+                "candidate-a", "candidate-b"), 1);
         Thread acceptor = new Thread(server, "test-room-acceptor");
         Socket first = null;
         Socket second = null;

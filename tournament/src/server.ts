@@ -58,11 +58,11 @@ function readJson(request: any): Promise<any> {
 const idPattern = '[A-Za-z0-9_-]+';
 
 export function createTournamentHttpServer(service: TournamentService,
-  ensureRoom: (matchId: string, port: number) => Promise<void> | void = () => {},
+  ensureRoom: (matchId: string, port: number, round: number) => Promise<void> | void = () => {},
   releaseRoom: (matchId: string) => Promise<boolean> | boolean = () => false): any {
   const prepareRoom = async (matchId: string, port: number) => {
     try {
-      await ensureRoom(matchId, port);
+      await ensureRoom(matchId, port, service.roomRound(matchId));
     } catch {
       throw new ServiceError(503, 'ROOM_START_FAILED', 'The assigned tournament room is not ready. Try again shortly.');
     }

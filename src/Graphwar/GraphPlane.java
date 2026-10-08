@@ -385,7 +385,7 @@ public class GraphPlane extends JPanel implements ActionListener
 		if(graphwar.getGameData().isDrawingFunction())
 		{
 			boolean funcReversed = graphwar.getGameData().isFunctionReversed();
-			drawFunctionImage(functionGraphics, (funcReversed || terrainReversed) && !(funcReversed && terrainReversed));
+			drawFunctionImage(functionGraphics, shouldReverseFunctionPath(funcReversed, terrainReversed));
 			
 			Graphics2D g2d = (Graphics2D)g;
 			
@@ -409,6 +409,11 @@ public class GraphPlane extends JPanel implements ActionListener
 		}
 	}
 
+	static boolean shouldReverseFunctionPath(boolean functionReversed, boolean terrainReversed)
+	{
+		return functionReversed ^ terrainReversed;
+	}
+
 	private void drawPreview(Graphics g, boolean terrainReversed)
 	{
 		if(previewFunction == null || graphwar.getGameData().isDrawingFunction())
@@ -423,11 +428,12 @@ public class GraphPlane extends JPanel implements ActionListener
 
 		GeneralPath path = new GeneralPath();
 		int steps = previewFunction.getNumSteps();
+		boolean reverse = shouldReverseFunctionPath(graphwar.getGameData().isFunctionReversed(), terrainReversed);
 		if(steps > 0)
 		{
 			double x = convertX(previewFunction.getX(0));
 			double y = convertY(previewFunction.getY(0));
-			if(terrainReversed)
+			if(reverse)
 			{
 				x = Constants.PLANE_LENGTH-x;
 			}
@@ -436,7 +442,7 @@ public class GraphPlane extends JPanel implements ActionListener
 			{
 				x = convertX(previewFunction.getX(i));
 				y = convertY(previewFunction.getY(i));
-				if(terrainReversed)
+				if(reverse)
 				{
 					x = Constants.PLANE_LENGTH-x;
 				}

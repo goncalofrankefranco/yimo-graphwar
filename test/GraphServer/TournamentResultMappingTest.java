@@ -15,7 +15,7 @@ public final class TournamentResultMappingTest {
         String secret = "mapping-secret";
         RoomAccessPolicy policy = RoomAccessPolicy.required(secret, "mapping-match", 31000,
                 "candidate-blue", "candidate-red");
-        GraphServer server = new GraphServer(0, policy);
+        GraphServer server = new GraphServer(0, policy, 1);
         ClientConnection first = client(server, policy, secret, "candidate-blue", "nonce-blue");
         ClientConnection second = client(server, policy, secret, "candidate-red", "nonce-red");
         first.setLeader(true);

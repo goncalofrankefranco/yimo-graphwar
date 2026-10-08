@@ -42,6 +42,9 @@ public final class GraphServerProtocolTest
 		{
 		}
 		check(message != null, "the server must send a start message");
+		String[] startFields = message.split("&");
+		check(Integer.parseInt(startFields[2]) == MapShape.CIRCLE,
+				"practice rooms must keep using the existing random-circle map generator");
 
 		server.handleMessage(NetworkProtocol.FIRE_FUNC+"&"+player.getID()+"&0", client);
 		String shot = input.readLine();

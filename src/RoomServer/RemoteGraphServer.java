@@ -76,6 +76,14 @@ public class RemoteGraphServer extends GraphServer
 		tournamentResultReported = false;
 	}
 
+	public RemoteGraphServer(GlobalClient globalClient, int port, RoomAccessPolicy roomAccessPolicy,
+			int tournamentRound) throws IOException
+	{
+		super(port, roomAccessPolicy, tournamentRound);
+		this.globalClient = globalClient;
+		tournamentResultReported = false;
+	}
+
 	protected void sendAddPlayerMessage(Player player, ClientConnection playerFrom)
 	{
 		super.sendAddPlayerMessage(player, playerFrom);

@@ -239,6 +239,11 @@ test('serves health, admin, participant, match, room, and result routes', async 
     const home = await request('/', { redirect: 'manual' });
     assert.equal(home.response.status, 200);
     assert.match(home.body as string, /YIMO Graphwar/);
+    assert.match(home.body as string, /property="og:title" content="YIMO Graphwar \| Strategy through mathematics"/);
+    assert.match(home.body as string, /property="og:description" content="Build a function\. Shape the battlefield\. Make every curve count\."/);
+    assert.match(home.body as string, /property="og:url" content="https:\/\/graphwar\.yimo-official\.org\/"/);
+    assert.match(home.body as string, /property="og:image" content="https:\/\/yimo-official\.org\/og\/graphwar\.png"/);
+    assert.match(home.body as string, /name="twitter:card" content="summary_large_image"/);
     assert.match(home.body as string, /href="\/participant"/);
     assert.match(home.body as string, /href="\/admin"/);
     assert.match(home.body as string, /https:\/\/github\.com\/goncalofrankefranco\/yimo-graphwar/);

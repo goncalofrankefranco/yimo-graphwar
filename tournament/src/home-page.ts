@@ -4,7 +4,23 @@ export const HOME_PAGE = `<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f0e8">
-  <title>YIMO Graphwar</title>
+  <meta name="description" content="Build a function. Shape the battlefield. Make every curve count.">
+  <link rel="canonical" href="https://graphwar.yimo-official.org/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="YIMO Graphwar">
+  <meta property="og:title" content="YIMO Graphwar | Strategy through mathematics">
+  <meta property="og:description" content="Build a function. Shape the battlefield. Make every curve count.">
+  <meta property="og:url" content="https://graphwar.yimo-official.org/">
+  <meta property="og:image" content="https://yimo-official.org/og/graphwar.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="627">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:alt" content="YIMO Graphwar: an orange function curve plotted across coordinate axes.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="YIMO Graphwar | Strategy through mathematics">
+  <meta name="twitter:description" content="Build a function. Shape the battlefield. Make every curve count.">
+  <meta name="twitter:image" content="https://yimo-official.org/og/graphwar.png">
+  <title>YIMO Graphwar | Strategy through mathematics</title>
   <style>
     :root{color-scheme:light;--ink:#101916;--muted:#58635d;--paper:#f4f0e8;--line:#d4cbbc;--orange:#ee8c39;--green:#183a32}
     *{box-sizing:border-box}

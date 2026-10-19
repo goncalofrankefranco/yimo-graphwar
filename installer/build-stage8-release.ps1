@@ -17,6 +17,17 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 
 function Fail([string]$message) { throw "Stage 8 build failed: $message" }
 
+$gitMetadata = Join-Path $root '.git'
+if (Test-Path -LiteralPath $gitMetadata) {
+    $workingTree = (& git -C $root status --porcelain 2>$null) -join "`n"
+    if ($LASTEXITCODE -ne 0) { Fail 'Could not verify the source tree status.' }
+    if (-not [string]::IsNullOrWhiteSpace($workingTree)) {
+        Fail 'Refusing to build from a dirty source tree, even when SourceRevision is supplied. Build from a clean Git archive.'
+    }
+} elseif ([string]::IsNullOrWhiteSpace($SourceRevision)) {
+    Fail 'SourceRevision is required when building outside a Git worktree.'
+}
+
 if ([string]::IsNullOrWhiteSpace($RuntimeSource)) {
     $RuntimeSource = Join-Path $JavaHome 'jre'
 }
@@ -42,10 +53,6 @@ $revision = $SourceRevision
 if ([string]::IsNullOrWhiteSpace($revision)) {
     $revision = (& git -C $root rev-parse HEAD 2>$null) -join ''
     if ([string]::IsNullOrWhiteSpace($revision)) { $revision = 'unknown' }
-}
-$workingTree = (& git -C $root status --porcelain 2>$null) -join "`n"
-if ([string]::IsNullOrWhiteSpace($SourceRevision) -and $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($workingTree)) {
-    $revision += '-working-tree'
 }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('yimo-stage8-' + [Guid]::NewGuid().ToString('N'))

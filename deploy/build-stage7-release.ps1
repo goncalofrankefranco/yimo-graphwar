@@ -9,6 +9,16 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $javac = Join-Path $JavaHome 'bin\javac.exe'
 $jar = Join-Path $JavaHome 'bin\jar.exe'
+$gitMetadata = Join-Path $root '.git'
+if (Test-Path -LiteralPath $gitMetadata) {
+    $workingTree = (& git -C $root status --porcelain 2>$null) -join "`n"
+    if ($LASTEXITCODE -ne 0) { throw 'Could not verify the source tree status.' }
+    if (-not [string]::IsNullOrWhiteSpace($workingTree)) {
+        throw 'Refusing to build from a dirty source tree, even when SourceRevision is supplied. Build from a clean Git archive.'
+    }
+} elseif ([string]::IsNullOrWhiteSpace($SourceRevision)) {
+    throw 'SourceRevision is required when building outside a Git worktree.'
+}
 
 if (-not (Test-Path -LiteralPath $javac)) {
     throw "Java 8 javac was not found at $javac. Pass -JavaHome with the Java 8 installation path."
@@ -74,10 +84,6 @@ $sourceRevision = $SourceRevision
 if ([string]::IsNullOrWhiteSpace($sourceRevision)) {
     $sourceRevision = (& git -C $root rev-parse HEAD 2>$null) -join ''
     if ([string]::IsNullOrWhiteSpace($sourceRevision)) { $sourceRevision = 'unknown' }
-}
-$workingTree = (& git -C $root status --porcelain 2>$null) -join "`n"
-if ([string]::IsNullOrWhiteSpace($SourceRevision) -and $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($workingTree)) {
-    $sourceRevision += '-working-tree'
 }
 
 $manifest = @(

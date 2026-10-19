@@ -58,8 +58,9 @@ Assert-True ($buildScript -match 'SourceRevision' -and $stage7BuildScript -match
 Assert-True ($buildScript -match 'Join-Path \$work .*Portable\.zip') 'Portable staging must stay in the temporary build directory.'
 Assert-True ($buildScript -match 'YIMO-Graphwar\.exe') 'Build must package the clickable executable.'
 Assert-True ($buildScript -match 'win32icon') 'Build must embed the YIMO icon in the executable.'
-Assert-True ($buildScript -match 'status --porcelain') 'Build manifest must detect an uncommitted source tree.'
-Assert-True ($buildScript -match 'working-tree') 'Dirty builds must not claim a clean commit revision.'
+Assert-True ($buildScript -match 'status --porcelain' -and $buildScript -match 'Refusing to build from a dirty source tree') 'Stage 8 must reject a dirty Git checkout even with an explicit source revision.'
+Assert-True ($stage7BuildScript -match 'status --porcelain' -and $stage7BuildScript -match 'Refusing to build from a dirty source tree') 'Stage 7 must reject a dirty Git checkout even with an explicit source revision.'
+Assert-True ($buildScript -match 'SourceRevision is required when building outside a Git worktree') 'Clean source exports must identify the reviewed revision.'
 Assert-True ($buildScript -match 'packageFingerprint' -and $buildScript -match 'Package fingerprint:') 'Installed build identity must be derived from the actual portable package.'
 Assert-True ($installScript -match 'YIMO-Graphwar\.exe') 'Shortcut must target the clickable executable.'
 

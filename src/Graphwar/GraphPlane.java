@@ -756,7 +756,6 @@ public class GraphPlane extends JPanel implements ActionListener
 						
 					if(drawImage != null)
 					{					
-						drawAppearanceMarker(g2d, x, y, player);
 						int width = drawImage.getWidth(null);
 						int height = drawImage.getHeight(null);
 						
@@ -766,6 +765,7 @@ public class GraphPlane extends JPanel implements ActionListener
 										x-width/2, y-height/2,
 										x+width/2, y+height/2, 	
 										null);
+						drawAppearanceMarker(g2d, x, y, player);
 						
 						if((player.getTeam() == Constants.TEAM2 || reversed) && !(player.getTeam() == Constants.TEAM2 && reversed))
 						{							

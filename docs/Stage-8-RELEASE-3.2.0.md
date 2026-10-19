@@ -33,11 +33,13 @@ not changed.
 
 ## Build and verification
 
-Build the single-file Windows installer with
-installer/build-stage8-release.ps1, passing a JDK with javac and a Java 8
-runtime directory. A newer JDK must support --release 8. Intermediate payload
-files stay in a temporary directory; the release output contains only the
-installer, manifest, and SHA256SUMS.txt.
+Build the single-file Windows installer from a clean `git archive` export of
+the reviewed commit, passing that full SHA as `-SourceRevision`, a JDK with
+`javac`, and a Java 8 runtime directory. The builders reject dirty Git
+worktrees, even with an explicit source revision, because Stage 7 packages the
+tournament website too. A newer JDK must support `--release 8`. Intermediate
+payload files stay in a temporary directory; the release output contains only
+the installer, manifest, and SHA256SUMS.txt.
 
 Run installer/test-stage8.ps1, installer/test-stage8-install.ps1 with the
 release output directory, npm test from tournament/, and every Java test main.

@@ -5,10 +5,30 @@ import java.util.prefs.Preferences;
 
 /** Local-only visual choices; the game protocol and collision data never see these values. */
 public final class AppearanceSettings {
-    public enum MarkerShape { LEGACY_SOLDIER, ORB, STAR }
-    public enum MarkerPalette { TEAM, CORAL, MINT, GOLD }
-    public enum MarkerPattern { SOLID, DOTS, RINGS }
-    public enum ArenaTheme { CLASSIC, GARDEN, ARCADE }
+    public enum MarkerShape {
+        LEGACY_SOLDIER("Classic Soldier"), ORB("Orb"), STAR("Star");
+        private final String label;
+        MarkerShape(String label) { this.label = label; }
+        @Override public String toString() { return label; }
+    }
+    public enum MarkerPalette {
+        TEAM("Team Colors"), CORAL("Coral"), MINT("Mint"), GOLD("Gold");
+        private final String label;
+        MarkerPalette(String label) { this.label = label; }
+        @Override public String toString() { return label; }
+    }
+    public enum MarkerPattern {
+        SOLID("Solid"), DOTS("Dots"), RINGS("Rings");
+        private final String label;
+        MarkerPattern(String label) { this.label = label; }
+        @Override public String toString() { return label; }
+    }
+    public enum ArenaTheme {
+        CLASSIC("Classic"), GARDEN("Garden"), ARCADE("Arcade");
+        private final String label;
+        ArenaTheme(String label) { this.label = label; }
+        @Override public String toString() { return label; }
+    }
 
     private static volatile AppearanceSettings active;
 

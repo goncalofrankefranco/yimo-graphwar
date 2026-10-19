@@ -11,6 +11,10 @@ public final class AppearanceSettingsTest {
     }
 
     public static void main(String[] args) throws Exception {
+        check("Classic Soldier".equals(AppearanceSettings.MarkerShape.LEGACY_SOLDIER.toString()),
+                "marker choices must use friendly labels instead of enum identifiers");
+        check("Team Colors".equals(AppearanceSettings.MarkerPalette.TEAM.toString()),
+                "palette choices must use friendly labels instead of enum identifiers");
         Preferences parent = Preferences.userRoot();
         Preferences preferences = parent.node("YIMO-AppearanceSettingsTest-" + System.nanoTime());
         try {

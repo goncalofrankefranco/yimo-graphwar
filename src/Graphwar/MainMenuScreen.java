@@ -194,10 +194,15 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         markerPaletteChoice = YimoTheme.combo(AppearanceSettings.MarkerPalette.values());
         markerPatternChoice = YimoTheme.combo(AppearanceSettings.MarkerPattern.values());
         arenaThemeChoice = YimoTheme.combo(AppearanceSettings.ArenaTheme.values());
+        markerShapeChoice.setName("appearance-marker-shape");
+        markerPaletteChoice.setName("appearance-marker-palette");
+        markerPatternChoice.setName("appearance-marker-pattern");
+        arenaThemeChoice.setName("appearance-arena-theme");
         markerShapeChoice.setSelectedItem(appearanceSettings.getMarkerShape());
         markerPaletteChoice.setSelectedItem(appearanceSettings.getMarkerPalette());
         markerPatternChoice.setSelectedItem(appearanceSettings.getMarkerPattern());
         arenaThemeChoice.setSelectedItem(appearanceSettings.getArenaTheme());
+        updateAppearanceControlAvailability();
         appearanceBack = YimoTheme.quietButton("Back");
         appearanceReset = YimoTheme.button("Reset to Classic");
         appearancePreview = new AppearancePreview();
@@ -391,7 +396,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
 
         JPanel footer = new JPanel(new BorderLayout(10, 0));
         footer.setOpaque(false);
-        footer.add(YimoTheme.mutedLabel("Saved on this device. Team colors and player names stay clear."), BorderLayout.CENTER);
+        footer.add(YimoTheme.mutedLabel("Classic keeps the original soldier; color and pattern apply to Orb or Star."), BorderLayout.CENTER);
         footer.add(formActions(appearanceReset, appearanceBack), BorderLayout.EAST);
         panel.add(footer, BorderLayout.SOUTH);
         return panel;
@@ -413,6 +418,12 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
         controlConstraints.fill = GridBagConstraints.HORIZONTAL;
         controlConstraints.insets = new Insets(0, 0, 10, 0);
         grid.add(control, controlConstraints);
+    }
+
+    private void updateAppearanceControlAvailability() {
+        boolean customMarker = markerShapeChoice.getSelectedItem() != AppearanceSettings.MarkerShape.LEGACY_SOLDIER;
+        markerPaletteChoice.setEnabled(customMarker);
+        markerPatternChoice.setEnabled(customMarker);
     }
 
     private final class AppearancePreview extends JPanel {
@@ -454,32 +465,42 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
 
                 int markerX = Math.max(26, width / 4);
                 int markerY = Math.max(36, height * 3 / 4);
-                Color markerColor = YimoTheme.markerColor(appearanceSettings.getMarkerPalette(), YimoTheme.PLAYER_BLUE);
-                g.setColor(new Color(markerColor.getRed(), markerColor.getGreen(), markerColor.getBlue(), 90));
-                if (appearanceSettings.getMarkerShape() == AppearanceSettings.MarkerShape.STAR) {
-                    java.awt.geom.Path2D star = new java.awt.geom.Path2D.Double();
-                    for (int i = 0; i < 10; i++) {
-                        double angle = -Math.PI / 2 + i * Math.PI / 5;
-                        double radius = i % 2 == 0 ? 17 : 9;
-                        double x = markerX + Math.cos(angle) * radius;
-                        double y = markerY + Math.sin(angle) * radius;
-                        if (i == 0) star.moveTo(x, y); else star.lineTo(x, y);
-                    }
-                    star.closePath();
-                    g.fill(star);
+                if (appearanceSettings.getMarkerShape() == AppearanceSettings.MarkerShape.LEGACY_SOLDIER) {
+                    g.setColor(YimoTheme.PLAYER_BLUE);
+                    g.fillRoundRect(markerX - 8, markerY - 8, 16, 20, 8, 8);
+                    g.fillOval(markerX - 7, markerY - 17, 14, 14);
+                    g.setColor(YimoTheme.ORANGE);
+                    g.fillOval(markerX - 7, markerY - 19, 14, 6);
+                    g.setColor(YimoTheme.TEXT);
+                    g.drawString("CLASSIC SOLDIER", 12, height - 10);
                 } else {
-                    g.fillOval(markerX - 16, markerY - 16, 32, 32);
+                    Color markerColor = YimoTheme.markerColor(appearanceSettings.getMarkerPalette(), YimoTheme.PLAYER_BLUE);
+                    g.setColor(new Color(markerColor.getRed(), markerColor.getGreen(), markerColor.getBlue(), 90));
+                    if (appearanceSettings.getMarkerShape() == AppearanceSettings.MarkerShape.STAR) {
+                        java.awt.geom.Path2D star = new java.awt.geom.Path2D.Double();
+                        for (int i = 0; i < 10; i++) {
+                            double angle = -Math.PI / 2 + i * Math.PI / 5;
+                            double radius = i % 2 == 0 ? 17 : 9;
+                            double x = markerX + Math.cos(angle) * radius;
+                            double y = markerY + Math.sin(angle) * radius;
+                            if (i == 0) star.moveTo(x, y); else star.lineTo(x, y);
+                        }
+                        star.closePath();
+                        g.fill(star);
+                    } else {
+                        g.fillOval(markerX - 16, markerY - 16, 32, 32);
+                    }
+                    g.setColor(markerColor);
+                    g.setStroke(new BasicStroke(2.0f));
+                    if (appearanceSettings.getMarkerPattern() == AppearanceSettings.MarkerPattern.RINGS) {
+                        g.drawOval(markerX - 12, markerY - 12, 24, 24);
+                    } else if (appearanceSettings.getMarkerPattern() == AppearanceSettings.MarkerPattern.DOTS) {
+                        g.fillOval(markerX - 2, markerY - 2, 4, 4);
+                        g.fillOval(markerX - 13, markerY - 2, 4, 4);
+                        g.fillOval(markerX + 9, markerY - 2, 4, 4);
+                    }
+                    g.drawString("CUSTOM MARKER", 12, height - 10);
                 }
-                g.setColor(markerColor);
-                g.setStroke(new BasicStroke(2.0f));
-                if (appearanceSettings.getMarkerPattern() == AppearanceSettings.MarkerPattern.RINGS) {
-                    g.drawOval(markerX - 12, markerY - 12, 24, 24);
-                } else if (appearanceSettings.getMarkerPattern() == AppearanceSettings.MarkerPattern.DOTS) {
-                    g.fillOval(markerX - 2, markerY - 2, 4, 4);
-                    g.fillOval(markerX - 13, markerY - 2, 4, 4);
-                    g.fillOval(markerX + 9, markerY - 2, 4, 4);
-                }
-                g.drawString("LIVE PREVIEW", 12, height - 10);
             } finally {
                 g.dispose();
             }
@@ -584,6 +605,7 @@ public class MainMenuScreen extends YimoScreen implements ActionListener {
 
     private void saveAppearance() {
         if (updatingAppearance) return;
+        updateAppearanceControlAvailability();
         appearanceSettings.setMarkerShape((AppearanceSettings.MarkerShape) markerShapeChoice.getSelectedItem());
         appearanceSettings.setMarkerPalette((AppearanceSettings.MarkerPalette) markerPaletteChoice.getSelectedItem());
         appearanceSettings.setMarkerPattern((AppearanceSettings.MarkerPattern) markerPatternChoice.getSelectedItem());

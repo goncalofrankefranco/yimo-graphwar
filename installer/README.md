@@ -14,12 +14,17 @@ expanding `payload.zip` again, while any package-content change gets a new
 fingerprint and updates the installation. Use the Start menu shortcut or
 `YIMO-Graphwar.exe` to launch the game.
 
-Build it from the repository root:
+Build it from a clean source tree. Release builders reject dirty Git
+worktrees, even when `-SourceRevision` is supplied, because Stage 7 also
+packages the tournament website. For a release, export the reviewed commit
+with `git archive`, extract it to a temporary directory, and pass that
+commit's full SHA using `-SourceRevision`:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\test-stage8.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\build-stage8-release.ps1 `
   -JavaHome 'C:\Program Files\Eclipse Adoptium\jdk-8.0.492.9-hotspot' `
+  -SourceRevision '<reviewed-commit-sha>' `
   -GlobalHost 'graphwar-server.yimo-official.org' `
   -TournamentApiBaseUrl 'https://graphwar-server.yimo-official.org'
 ```

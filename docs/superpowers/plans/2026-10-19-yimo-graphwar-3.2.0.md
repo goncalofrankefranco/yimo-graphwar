@@ -139,9 +139,9 @@
 - Modify: README.md and docs/Stage-8-RELEASE-3.2.0.md with verified behavior.
 - Release output: build/yimo-3.2.0-release-final/YIMO-Graphwar-3.2.0-Setup.exe, RELEASE-MANIFEST.txt, and SHA256SUMS.txt only.
 
-- [ ] **Step 1: Compile every Java production/test source into a unique %TEMP% directory and run all Java test mains.** Expected: zero failures.
-- [ ] **Step 2: Run npm test in tournament/ and installer/test-stage8.ps1.** Confirm the tournament service and the two pre-existing user-edited tournament files are unchanged and unstaged.
-- [ ] **Step 3: Commit only feature-owned files, then create a temporary clean source export from that commit, excluding the existing uncommitted tournament edits.** Build from that export with SourceRevision set to the commit hash; remove the temporary export after packaging.
-- [ ] **Step 4: Build the single 3.2.0 setup asset under the specified output directory.** Verify its config still uses build ID 2.2.0/protocol 2, its launcher points to the 3.2.0 client JAR, no second portable ZIP is left in the release output, and ignored local tournament secrets/databases are excluded.
-- [ ] **Step 5: Run installer/test-stage8-install.ps1 with its temporary install root; open that temporary installation and verify the version badge, Appearance menu, slope-paced shot, Direct Hit callout, and campaign lessons 21–30.**
-- [ ] **Step 6: Verify the canonical GitHub remote and publish a separate v3.2.0 tag/release with the installer and checksum.** Leave the published 2.2.0 release and production servers untouched; provide the local installer path.
+- [x] **Step 1: Compile every Java production/test source into a unique %TEMP% directory and run all Java test mains.** Expected: zero failures.
+- [x] **Step 2: Run npm test in tournament/ and installer/test-stage8.ps1.** Confirm the tournament service and the two pre-existing user-edited tournament files are unchanged and unstaged.
+- [x] **Step 3: Commit only feature-owned files, then create a temporary clean source export from that commit, excluding the existing uncommitted tournament edits.** Build from that export with SourceRevision set to the commit hash; remove the temporary export after packaging.
+- [x] **Step 4: Build the single 3.2.0 setup asset under the specified output directory.** Verify its config still uses build ID 2.2.0/protocol 2, its launcher points to the 3.2.0 client JAR, no second portable ZIP is left in the release output, and ignored local tournament secrets/databases are excluded by injected fixtures.
+- [x] **Step 5: Run installer/test-stage8-install.ps1 with its temporary install root. Verify install metadata, launcher/icon, old-client cleanup, tournament data exclusions, and run focused Java checks for the version badge, Appearance menu, slope-paced animation, server-confirmed Direct Hit feedback, and campaign lessons 21–30.**
+- [x] **Step 6: Verify the canonical GitHub remote and publish a separate v3.2.0 tag/release with the installer and checksum.** Leave the published 2.2.0 release and production servers untouched; provide the local installer path.

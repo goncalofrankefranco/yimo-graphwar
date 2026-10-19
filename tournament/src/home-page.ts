@@ -29,6 +29,7 @@ export const HOME_PAGE = `<!doctype html>
     nav{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:18px}
     .brand{color:var(--green);font:700 21px Georgia,serif;letter-spacing:.08em}
     nav a,.source{color:var(--ink);font-weight:650;text-decoration:none}
+    .nav-links{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:18px}
     .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.82fr);align-items:center;gap:clamp(28px,6vw,76px);flex:1;padding:56px 0}
     .eyebrow{margin:0 0 14px;color:#a84f12;font-size:12px;font-weight:750;letter-spacing:.16em;text-transform:uppercase}
     h1{margin:0;max-width:660px;font-size:clamp(48px,8vw,92px);line-height:.92;letter-spacing:-.065em}
@@ -50,7 +51,10 @@ export const HOME_PAGE = `<!doctype html>
   <main>
     <nav aria-label="YIMO Graphwar">
       <div class="brand">YIMO / GRAPHWAR</div>
-      <a href="https://github.com/goncalofrankefranco/yimo-graphwar" rel="noopener noreferrer" target="_blank">Source ↗</a>
+      <div class="nav-links">
+        <a href="https://graphwar.yimo-official.org/" rel="noopener noreferrer" target="_blank">Play Graphwar ↗</a>
+        <a href="https://github.com/goncalofrankefranco/yimo-graphwar" rel="noopener noreferrer" target="_blank">Source ↗</a>
+      </div>
     </nav>
     <section class="hero" aria-labelledby="title">
       <div>
@@ -60,6 +64,7 @@ export const HOME_PAGE = `<!doctype html>
         <div class="links">
           <a class="button" href="/participant">Competitor portal</a>
           <a class="button secondary" href="/admin">Organizer panel</a>
+          <a class="button secondary" href="https://docs.google.com/forms/d/e/1FAIpQLSchBQN188XqoV8X7OG8CTeTMHaH9n847Z1ygZOhkf000uVLZQ/viewform?usp=preview" target="_blank" rel="noopener noreferrer">Official registration</a>
         </div>
       </div>
       <svg class="graph" viewBox="0 0 420 330" role="img" aria-label="An orange function curve plotted across coordinate axes">

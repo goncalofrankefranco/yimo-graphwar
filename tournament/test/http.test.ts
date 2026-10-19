@@ -247,6 +247,8 @@ test('serves health, admin, participant, match, room, and result routes', async 
     assert.match(home.body as string, /href="\/participant"/);
     assert.match(home.body as string, /href="\/admin"/);
     assert.match(home.body as string, /https:\/\/github\.com\/goncalofrankefranco\/yimo-graphwar/);
+    assert.match(home.body as string, /<a class="button secondary" href="https:\/\/docs\.google\.com\/forms\/d\/e\/1FAIpQLSchBQN188XqoV8X7OG8CTeTMHaH9n847Z1ygZOhkf000uVLZQ\/viewform\?usp=preview" target="_blank" rel="noopener noreferrer">Official registration<\/a>/);
+    assert.match(home.body as string, /<a href="https:\/\/graphwar\.yimo-official\.org\/" rel="noopener noreferrer" target="_blank">Play Graphwar ↗<\/a>/);
     assert.match(home.body as string, /Powered by Cloudzy/);
     const adminPage = await request('/admin');
     assert.equal(adminPage.response.status, 200, 'the public admin page must not have a site-password gate');

@@ -12,6 +12,7 @@ function Assert-File([string]$path, [string]$message) {
 
 Assert-File (Join-Path $root 'NOTICE.md') 'NOTICE.md is required.'
 Assert-File (Join-Path $root 'THIRD-PARTY-LICENSES.md') 'THIRD-PARTY-LICENSES.md is required.'
+Assert-File (Join-Path $root 'deploy\tournament-package-policy.ps1') 'Tournament package policy is required.'
 Assert-File (Join-Path $PSScriptRoot 'build-stage8-release.ps1') 'Stage 8 build script is required.'
 Assert-File (Join-Path $PSScriptRoot 'test-stage8-install.ps1') 'Clean-install test is required.'
 Assert-File (Join-Path $PSScriptRoot 'launch-yimo.cmd') 'YIMO launcher is required.'
@@ -46,8 +47,10 @@ foreach ($path in $sourceFiles) {
 
 $buildScript = Get-Content -Raw (Join-Path $PSScriptRoot 'build-stage8-release.ps1')
 $stage7BuildScript = Get-Content -Raw (Join-Path $root 'deploy\build-stage7-release.ps1')
+$packagePolicyScript = Get-Content -Raw (Join-Path $root 'deploy\tournament-package-policy.ps1')
 $installScript = Get-Content -Raw (Join-Path $PSScriptRoot 'install.ps1')
 $launcherSource = Get-Content -Raw (Join-Path $PSScriptRoot 'YimoLauncher.cs')
+. (Join-Path $root 'deploy\tournament-package-policy.ps1')
 Assert-True ($buildScript -match 'YIMO-Graphwar-3\.2\.0-Setup\.exe') 'Build must name the v3.2.0 installer.'
 Assert-True ($buildScript -match 'build\.id=YIMO-Graphwar-2\.2\.0' -and $buildScript -match 'protocol\.version=2') 'Installer must retain the v2.2 wire build and protocol.'
 Assert-True ($stage7BuildScript -match 'YIMO-Graphwar-3\.2\.0\.jar') 'Stage 7 must package the v3.2.0 client JAR.'
@@ -61,8 +64,16 @@ Assert-True ($buildScript -match 'win32icon') 'Build must embed the YIMO icon in
 Assert-True ($buildScript -match 'status --porcelain' -and $buildScript -match 'Refusing to build from a dirty source tree') 'Stage 8 must reject a dirty Git checkout even with an explicit source revision.'
 Assert-True ($stage7BuildScript -match 'status --porcelain' -and $stage7BuildScript -match 'Refusing to build from a dirty source tree') 'Stage 7 must reject a dirty Git checkout even with an explicit source revision.'
 Assert-True ($buildScript -match 'SourceRevision is required when building outside a Git worktree') 'Clean source exports must identify the reviewed revision.'
-Assert-True ($stage7BuildScript -match 'tournamentRoot' -and $stage7BuildScript -match '\.env' -and
-        $stage7BuildScript -match 'sqlite' -and $stage7BuildScript -match 'data') 'Stage 7 must exclude ignored tournament secrets and local database files.'
+Assert-True ($stage7BuildScript -match 'tournament-package-policy\.ps1' -and $stage7BuildScript -match 'Test-TournamentReleaseFile') 'Stage 7 must use the shared tournament package policy.'
+Assert-True ($packagePolicyScript -match '\.env' -and $packagePolicyScript -match 'sqlite' -and
+        $packagePolicyScript -match 'data' -and $packagePolicyScript -match 'backups') 'Package policy must cover ignored local data patterns.'
+foreach ($path in @('.env', '.envrc', '.env-backup', 'data/production.sqlite', 'backups/staging.db',
+        'sessions.sqlite-wal', 'sessions.sqlite-journal', 'sessions.db-shm', 'cache.db-wal', 'state.sqlite3-journal')) {
+    Assert-True (-not (Test-TournamentReleaseFile $path)) "Local tournament data must be excluded: $path"
+}
+foreach ($path in @('package.json', 'src/main.ts', 'README.md')) {
+    Assert-True (Test-TournamentReleaseFile $path) "Required tournament source must remain packageable: $path"
+}
 Assert-True ($buildScript -match 'packageFingerprint' -and $buildScript -match 'Package fingerprint:') 'Installed build identity must be derived from the actual portable package.'
 Assert-True ($installScript -match 'YIMO-Graphwar\.exe') 'Shortcut must target the clickable executable.'
 

@@ -7,6 +7,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $repoRoot 'deploy\tournament-package-policy.ps1')
 $release = (Resolve-Path -LiteralPath $ReleaseDir).Path
 $test = Join-Path $env:TEMP ('yimo-clean-install-' + [Guid]::NewGuid().ToString('N'))
 $oldLocal = $env:LOCALAPPDATA
@@ -68,9 +70,7 @@ try {
     Assert-True (Test-Path -LiteralPath (Join-Path $tournamentRoot 'package.json') -PathType Leaf) 'tournament service source is missing.'
     $privateTournamentFiles = @(Get-ChildItem -LiteralPath $tournamentRoot -Recurse -File -Force | Where-Object {
         $relative = $_.FullName.Substring($tournamentRoot.Length).TrimStart('\')
-        $relative -match '(^|[\\/])(data|backups)([\\/]|$)' -or
-                $_.Name -match '^\.env(?:\.|$)' -or
-                $_.Name -match '(?i)\.(?:sqlite(?:-(?:shm|wal))?|sqlite3?|db)$'
+        -not (Test-TournamentReleaseFile $relative)
     })
     Assert-True ($privateTournamentFiles.Count -eq 0) 'local tournament secrets or database files must not be packaged.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $target 'YIMO-Graphwar-2.2.0.jar'))) 'upgrade must remove the obsolete versioned client JAR.'

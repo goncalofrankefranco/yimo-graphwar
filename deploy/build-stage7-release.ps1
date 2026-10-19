@@ -7,6 +7,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'tournament-package-policy.ps1')
 $javac = Join-Path $JavaHome 'bin\javac.exe'
 $jar = Join-Path $JavaHome 'bin\jar.exe'
 $gitMetadata = Join-Path $root '.git'
@@ -78,10 +79,7 @@ $tournamentRoot = Join-Path $root 'tournament'
 $tournamentOutput = Join-Path $output 'tournament'
 $tournamentFiles = @(Get-ChildItem -LiteralPath $tournamentRoot -Recurse -File -Force | Where-Object {
     $relativePath = $_.FullName.Substring($tournamentRoot.Length).TrimStart('\')
-    $localDirectory = $relativePath -match '(^|[\\/])(data|backups)([\\/]|$)'
-    $environmentFile = $_.Name -match '^\.env(?:\.|$)'
-    $databaseFile = $_.Name -match '(?i)\.(?:sqlite(?:-(?:shm|wal))?|sqlite3?|db)$'
-    -not ($localDirectory -or $environmentFile -or $databaseFile)
+    Test-TournamentReleaseFile $relativePath
 })
 foreach ($file in $tournamentFiles) {
     $relativePath = $file.FullName.Substring($tournamentRoot.Length).TrimStart('\')

@@ -21,7 +21,7 @@ function Assert-True([bool]$condition, [string]$message) {
 
 New-Item -ItemType Directory -Path $test -Force | Out-Null
 try {
-    $activeInstaller = Get-Process -Name 'YIMO-Graphwar-2.2.0-Setup' -ErrorAction SilentlyContinue
+    $activeInstaller = Get-Process -Name 'YIMO-Graphwar-3.2.0-Setup' -ErrorAction SilentlyContinue
     if ($null -ne $activeInstaller) { throw 'another YIMO installer test is already running.' }
     $env:LOCALAPPDATA = Join-Path $test 'local'
     $env:APPDATA = Join-Path $test 'roaming'
@@ -30,16 +30,25 @@ try {
     $env:YIMO_INSTALL_NO_LAUNCH = '1'
     New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
 
-    $setup = Join-Path $release 'YIMO-Graphwar-2.2.0-Setup.exe'
-    $portable = Join-Path $release 'YIMO-Graphwar-2.2.0-Portable.zip'
-    $packageFingerprint = (Get-FileHash -LiteralPath $portable -Algorithm SHA256).Hash
+    $target = Join-Path $env:LOCALAPPDATA 'YIMO Graphwar'
+    New-Item -ItemType Directory -Path $target -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $target 'YIMO-Graphwar-2.2.0.jar') -Value 'old client fixture'
+
+    $setup = Join-Path $release 'YIMO-Graphwar-3.2.0-Setup.exe'
+    $manifestPath = Join-Path $release 'RELEASE-MANIFEST.txt'
+    Assert-True (Test-Path -LiteralPath $manifestPath -PathType Leaf) 'release manifest is missing.'
+    $manifest = Get-Content -Raw $manifestPath
+    $fingerprintMatch = [regex]::Match($manifest, 'Package fingerprint: ([A-Fa-f0-9]{64})')
+    Assert-True $fingerprintMatch.Success 'release manifest must record the embedded payload fingerprint.'
+    $packageFingerprint = $fingerprintMatch.Groups[1].Value.ToUpperInvariant()
+    $portableFiles = @(Get-ChildItem -LiteralPath $release -Filter '*Portable.zip' -File -ErrorAction SilentlyContinue)
+    Assert-True ($portableFiles.Count -eq 0) 'release output must not keep a duplicate portable ZIP.'
     Assert-True (Test-Path -LiteralPath $setup -PathType Leaf) 'setup executable is missing.'
     $process = Start-Process -FilePath $setup -Wait -PassThru -WindowStyle Hidden
     Assert-True ($process.ExitCode -eq 0) "setup exited with code $($process.ExitCode)."
 
-    $target = Join-Path $env:LOCALAPPDATA 'YIMO Graphwar'
     foreach ($relative in @(
-            'YIMO-Graphwar-2.2.0.jar',
+            'YIMO-Graphwar-3.2.0.jar',
             'YIMO-Graphwar.exe',
             'YIMO.ico',
             'yimo-logo.png',
@@ -55,8 +64,11 @@ try {
     }
 
     $properties = Get-Content -Raw (Join-Path $target 'yimo.properties')
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $target 'YIMO-Graphwar-2.2.0.jar'))) 'upgrade must remove the obsolete versioned client JAR.'
     Assert-True ($properties -match ('global\.host=' + [regex]::Escape($ExpectedGlobalHost))) 'installed global endpoint is incorrect.'
     Assert-True ($properties -match ('tournament\.api\.baseUrl=' + [regex]::Escape($ExpectedTournamentApiBaseUrl))) 'installed tournament endpoint is incorrect.'
+    Assert-True ($properties -match '(?m)^build\.id=YIMO-Graphwar-2\.2\.0\r?$') 'installed build ID must remain compatible with the existing servers.'
+    Assert-True ($properties -match '(?m)^protocol\.version=2\r?$') 'installed protocol must remain compatible with the existing servers.'
     Assert-True ($properties -notmatch '(?i)(YIMO_ADMIN_TOKEN|ROOM_HMAC_SECRET|BEGIN (RSA|OPENSSH) PRIVATE KEY)') 'secret-like value was installed.'
     $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\YIMO Graphwar\YIMO Graphwar.lnk'
     Assert-True (Test-Path -LiteralPath $shortcut -PathType Leaf) 'Start menu shortcut is missing.'
@@ -66,10 +78,11 @@ try {
     $secondProcess = Start-Process -FilePath $setup -Wait -PassThru -WindowStyle Hidden
     Assert-True ($secondProcess.ExitCode -eq 0) "second setup run exited with code $($secondProcess.ExitCode)."
     $installedVersion = (Get-Content -Raw (Join-Path $target '.yimo-installed-version')).Trim()
-    Assert-True ($installedVersion -match '^YIMO-Graphwar-2\.2\.0\|') 'installed version marker is invalid.'
-    Assert-True ($installedVersion -eq ('YIMO-Graphwar-2.2.0|' + $packageFingerprint.Substring(0, 16))) 'installed marker must change with the actual package contents.'
-    $manifest = Get-Content -Raw (Join-Path $release 'RELEASE-MANIFEST.txt')
-    Assert-True ($manifest.Contains("Package fingerprint: $packageFingerprint")) 'release manifest must record the portable-package fingerprint.'
+    Assert-True ($installedVersion -match '^YIMO-Graphwar-3\.2\.0\|') 'installed product version marker is invalid.'
+    Assert-True ($installedVersion -eq ('YIMO-Graphwar-3.2.0|' + $packageFingerprint.Substring(0, 16))) 'installed marker must identify the embedded package contents.'
+    Assert-True ($manifest.Contains('Product version: 3.2.0')) 'manifest must identify the product version.'
+    Assert-True ($manifest.Contains('Build ID: YIMO-Graphwar-2.2.0')) 'manifest must preserve the compatible wire build ID.'
+    Assert-True ($manifest.Contains('Protocol version: 2')) 'manifest must preserve the compatible protocol.'
 
     $javaProcess = Start-Process -FilePath (Join-Path $target 'runtime\bin\java.exe') -ArgumentList @('-version') -Wait -PassThru -WindowStyle Hidden
     Assert-True ($javaProcess.ExitCode -eq 0) 'bundled Java did not start.'

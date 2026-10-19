@@ -29,9 +29,10 @@ public final class MainMenuDesignTest {
 
     public static void main(String[] args) {
         String[] labels = MainMenuScreen.menuLabels();
-        check(labels.length == 4, "menu must expose four primary actions without endpoint settings");
+        check(labels.length == 5, "menu must expose the game and appearance actions without endpoint settings");
         check("Join YIMO Lobby".equals(labels[0]), "lobby action must stay YIMO-branded");
         check("Tutorial".equals(labels[3]), "tutorial action must remain visible");
+        check("Appearance".equals(labels[4]), "appearance customization must have a separate menu action");
         for (String label : labels) {
             check(!"Settings".equals(label), "network settings must not be in the player menu");
         }
@@ -43,6 +44,7 @@ public final class MainMenuDesignTest {
             MainMenuScreen screen = new MainMenuScreen(null, null);
             check(containsText(screen, "Powered by Cloudzy"), "the main menu must credit Cloudzy");
             check(containsText(screen, "Candidate code"), "the room form must provide candidate-code entry");
+            check(containsText(screen, "Make the battlefield yours"), "appearance controls must be in their own card");
             check(!containsText(screen, "Address"), "the room host must not be user-editable");
         } catch (Exception error) {
             throw new AssertionError("main menu should construct without a running game", error);

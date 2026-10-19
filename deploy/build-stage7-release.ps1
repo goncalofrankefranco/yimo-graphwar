@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$JavaHome = 'C:\Program Files\Eclipse Adoptium\jdk-8.0.492.9-hotspot',
-    [string]$OutputDir = (Join-Path (Split-Path -Parent $PSScriptRoot) 'build\yimo-stage7-release')
+    [string]$OutputDir = (Join-Path (Split-Path -Parent $PSScriptRoot) 'build\yimo-stage7-release'),
+    [string]$SourceRevision = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,12 +30,14 @@ if ($sources.Count -eq 0) {
     throw 'No Java production sources were found.'
 }
 
-$javacArgs = @(
-    '-encoding', 'UTF-8',
-    '-source', '8',
-    '-target', '8',
-    '-d', $classes
-)
+$javacVersion = (& $javac -version 2>&1) -join ''
+$javacArgs = @('-encoding', 'UTF-8')
+if ($javacVersion.Contains('1.8')) {
+    $javacArgs += @('-source', '8', '-target', '8')
+} else {
+    $javacArgs += @('--release', '8')
+}
+$javacArgs += @('-d', $classes)
 $javacArgs += @($sources | ForEach-Object { $_.FullName })
 & $javac @javacArgs
 if ($LASTEXITCODE -ne 0) {
@@ -43,7 +46,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $resourceDir = Join-Path $root 'rsc'
 $jarSpecs = @(
-    @{ Name = 'YIMO-Graphwar-2.2.0.jar'; Main = 'Graphwar.Graphwar' },
+    @{ Name = 'YIMO-Graphwar-3.2.0.jar'; Main = 'Graphwar.Graphwar' },
     @{ Name = 'globalServer.jar'; Main = 'GlobalServer.GlobalServer' },
     @{ Name = 'roomServer.jar'; Main = 'RoomServer.RoomServer' }
 )
@@ -67,15 +70,19 @@ Copy-Item -LiteralPath (Join-Path $root 'COPYING') -Destination $output
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $output
 Copy-Item -LiteralPath (Join-Path $root 'README.md') -Destination $output
 
-$sourceRevision = (& git -C $root rev-parse HEAD 2>$null) -join ''
-if ([string]::IsNullOrWhiteSpace($sourceRevision)) { $sourceRevision = 'unknown' }
+$sourceRevision = $SourceRevision
+if ([string]::IsNullOrWhiteSpace($sourceRevision)) {
+    $sourceRevision = (& git -C $root rev-parse HEAD 2>$null) -join ''
+    if ([string]::IsNullOrWhiteSpace($sourceRevision)) { $sourceRevision = 'unknown' }
+}
 $workingTree = (& git -C $root status --porcelain 2>$null) -join "`n"
-if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($workingTree)) {
+if ([string]::IsNullOrWhiteSpace($SourceRevision) -and $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($workingTree)) {
     $sourceRevision += '-working-tree'
 }
 
 $manifest = @(
-    'YIMO Graphwar 2.0 Stage 7 release',
+    'YIMO Graphwar 3.2.0 client / 2.2.0-compatible Stage 7 release',
+    'Product version: 3.2.0',
     'Build ID: YIMO-Graphwar-2.2.0',
     'Protocol version: 2',
     'Java target: 8',

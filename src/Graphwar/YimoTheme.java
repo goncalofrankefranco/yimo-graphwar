@@ -55,6 +55,10 @@ public final class YimoTheme {
     public static final Color MENU_PANEL = new Color(19, 27, 33);
     public static final Color MENU_LINE = new Color(176, 190, 187);
     public static final Color MENU_WHITE = new Color(248, 246, 239);
+    public static final Color GARDEN_BACKGROUND = new Color(238, 247, 232);
+    public static final Color GARDEN_OBSTACLE = new Color(43, 81, 64);
+    public static final Color ARCADE_BACKGROUND = new Color(235, 241, 255);
+    public static final Color ARCADE_OBSTACLE = new Color(47, 56, 103);
 
     public static final Font BRAND = new Font("Serif", Font.BOLD, 22);
     public static final Font DISPLAY = new Font("Serif", Font.PLAIN, 58);
@@ -176,6 +180,18 @@ public final class YimoTheme {
         JLabel label = label(text);
         label.setHorizontalAlignment(SwingConstants.CENTER);
         return label;
+    }
+
+    public static Color markerColor(AppearanceSettings.MarkerPalette palette, Color teamColor) {
+        if (palette == null || palette == AppearanceSettings.MarkerPalette.TEAM) {
+            return teamColor;
+        }
+        switch (palette) {
+            case CORAL: return new Color(238, 116, 103);
+            case MINT: return new Color(57, 160, 126);
+            case GOLD: return new Color(232, 177, 69);
+            default: return teamColor;
+        }
     }
 
     /** Rounded controls share one animated renderer across every YIMO screen. */

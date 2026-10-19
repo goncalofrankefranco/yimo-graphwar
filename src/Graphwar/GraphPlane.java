@@ -21,6 +21,8 @@ import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
@@ -76,6 +78,8 @@ public class GraphPlane extends JPanel implements ActionListener
 	private Graphics2D backg;
 	
 	private boolean animating;
+	private String shotFeedback;
+	private long shotFeedbackUntil;
 	
 	private boolean repaintBack;
 	
@@ -279,6 +283,7 @@ public class GraphPlane extends JPanel implements ActionListener
 		drawPreview(g, reversed);
 		drawFunction(g, reversed);	//	times[4] = System.nanoTime();
 		drawExplosion(g, reversed);	//	times[5] = System.nanoTime();
+		drawShotFeedback(g);
 				
 	//	for(int i=1; i<times.length; i++)
 	//	{
@@ -294,15 +299,58 @@ public class GraphPlane extends JPanel implements ActionListener
 		}
 	}
 		
+	public void showShotFeedback(String text)
+	{
+		if(text == null || text.length() == 0)
+		{
+			return;
+		}
+		shotFeedback = text;
+		shotFeedbackUntil = System.currentTimeMillis() + 1200L;
+		repaint();
+	}
+
+	private void drawShotFeedback(Graphics2D g)
+	{
+		if(shotFeedback == null)
+		{
+			return;
+		}
+		if(System.currentTimeMillis() >= shotFeedbackUntil)
+		{
+			shotFeedback = null;
+			return;
+		}
+
+		Font previousFont = g.getFont();
+		java.awt.Composite previousComposite = g.getComposite();
+		g.setComposite(AlphaComposite.SrcOver);
+		g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 28));
+		FontMetrics metrics = g.getFontMetrics();
+		int padding = 14;
+		int width = metrics.stringWidth(shotFeedback) + padding * 2;
+		int x = (Constants.PLANE_LENGTH - width) / 2;
+		int baseline = 48;
+		int top = baseline - metrics.getAscent() - 8;
+		g.setColor(new Color(18, 38, 42, 220));
+		g.fillRoundRect(x, top, width, metrics.getHeight() + 14, 14, 14);
+		g.setColor(new Color(255, 211, 91));
+		g.drawString(shotFeedback, x + padding, baseline);
+		g.setFont(previousFont);
+		g.setComposite(previousComposite);
+	}
+
 	private void drawBackground(Graphics2D g, boolean reversed)
 	{
+		java.awt.image.BufferedImage display = graphwar.getGameData().getObstacle().getDisplayImage(
+				AppearanceSettings.current().getArenaTheme());
 		if(reversed)
 		{
-			g.drawImage(graphwar.getGameData().getObstacle().getImage(), 0, 0, Constants.PLANE_LENGTH, Constants.PLANE_HEIGHT, Constants.PLANE_LENGTH, 0, 0, Constants.PLANE_HEIGHT, null);
+			g.drawImage(display, 0, 0, Constants.PLANE_LENGTH, Constants.PLANE_HEIGHT, Constants.PLANE_LENGTH, 0, 0, Constants.PLANE_HEIGHT, null);
 		}
 		else
 		{
-			g.drawImage(graphwar.getGameData().getObstacle().getImage(), 0, 0, null);
+			g.drawImage(display, 0, 0, null);
 		}
 		
 		g.setColor(Color.BLACK);
@@ -708,6 +756,7 @@ public class GraphPlane extends JPanel implements ActionListener
 						
 					if(drawImage != null)
 					{					
+						drawAppearanceMarker(g2d, x, y, player);
 						int width = drawImage.getWidth(null);
 						int height = drawImage.getHeight(null);
 						
@@ -735,6 +784,62 @@ public class GraphPlane extends JPanel implements ActionListener
 			
 			playerNum++;
 		}
+	}
+
+	private void drawAppearanceMarker(Graphics2D graphics, int x, int y, Player player)
+	{
+		AppearanceSettings settings = AppearanceSettings.current();
+		if(settings.getMarkerShape() == AppearanceSettings.MarkerShape.LEGACY_SOLDIER)
+		{
+			return;
+		}
+		Color color = YimoTheme.markerColor(settings.getMarkerPalette(), player.getColor());
+		java.awt.Shape marker;
+		if(settings.getMarkerShape() == AppearanceSettings.MarkerShape.ORB)
+		{
+			marker = new java.awt.geom.Ellipse2D.Double(x - 16, y - 16, 32, 32);
+		}
+		else
+		{
+			java.awt.geom.Path2D star = new java.awt.geom.Path2D.Double();
+			for(int point=0; point<10; point++)
+			{
+				double angle = -Math.PI / 2.0 + point * Math.PI / 5.0;
+				double radius = point % 2 == 0 ? 18.0 : 10.0;
+				double markerX = x + Math.cos(angle) * radius;
+				double markerY = y + Math.sin(angle) * radius;
+				if(point == 0) star.moveTo(markerX, markerY);
+				else star.lineTo(markerX, markerY);
+			}
+			star.closePath();
+			marker = star;
+		}
+
+		java.awt.Composite previousComposite = graphics.getComposite();
+		Color previousColor = graphics.getColor();
+		graphics.setComposite(AlphaComposite.SrcOver.derive(0.32f));
+		graphics.setColor(color);
+		if(settings.getMarkerPattern() == AppearanceSettings.MarkerPattern.SOLID)
+		{
+			graphics.fill(marker);
+		}
+		else
+		{
+			graphics.setStroke(new BasicStroke(2.0f));
+			graphics.draw(marker);
+			if(settings.getMarkerPattern() == AppearanceSettings.MarkerPattern.DOTS)
+			{
+				graphics.fillOval(x - 2, y - 2, 4, 4);
+				graphics.fillOval(x - 14, y - 2, 4, 4);
+				graphics.fillOval(x + 10, y - 2, 4, 4);
+			}
+			else
+			{
+				graphics.drawOval(x - 10, y - 10, 20, 20);
+			}
+		}
+		graphics.setColor(previousColor);
+		graphics.setComposite(previousComposite);
 	}
 	
 	private void paintPlayerName(Graphics g, int x, int y, Player player)

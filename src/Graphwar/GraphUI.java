@@ -32,6 +32,8 @@ import GraphServer.Constants;
 
 public class GraphUI extends JPanel
 {
+	public static final String APP_VERSION = "3.2.0";
+
 	private JPanel[] screens;
 	private JPanel currentScreen;
 	private int currentScreenIndex;
@@ -104,9 +106,7 @@ public class GraphUI extends JPanel
 
 	static String versionBadgeText()
 	{
-		String buildId = Constants.BUILD_ID;
-		String prefix = "YIMO-Graphwar-";
-		return buildId.startsWith(prefix) ? "YIMO Graphwar " + buildId.substring(prefix.length()) : buildId;
+		return "YIMO Graphwar " + APP_VERSION;
 	}
 
 	static void paintVersionBadge(Graphics graphics, int width, int height)

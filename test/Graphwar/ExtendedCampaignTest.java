@@ -45,7 +45,7 @@ public final class ExtendedCampaignTest {
 
     public static void main(String[] args) throws Exception {
         CampaignLesson[] lessons = CampaignLesson.loadAll(CampaignScreen.class);
-        check(lessons.length == 20, "the campaign must contain twenty lessons");
+        check(lessons.length == 30, "the campaign must contain thirty lessons");
 
         for (int index = 0; index < NORMAL_FUNCTIONS.length; index++) {
             CampaignLesson lesson = lessons[index + 10];

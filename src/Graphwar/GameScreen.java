@@ -419,6 +419,10 @@ public class GameScreen extends YimoScreen implements ActionListener, StartStopP
         plane.startDrawingFunction();
     }
 
+    void showShotFeedback(String text) {
+        plane.showShotFeedback(text);
+    }
+
     private void invalidatePreviewRequests() {
         previewRequestGeneration++;
     }

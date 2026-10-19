@@ -34,6 +34,13 @@ if (-not $alreadyInstalled) {
     Write-Host "YIMO Graphwar $version is already installed; reusing the existing files."
 }
 
+# Keep only the versioned client packaged by this installer. The unversioned
+# practice/global server JARs remain alongside the client.
+$currentClientJar = 'YIMO-Graphwar-3.2.0.jar'
+Get-ChildItem -LiteralPath $target -File -Filter 'YIMO-Graphwar-*.jar' |
+    Where-Object { $_.Name -ne $currentClientJar } |
+    Remove-Item -Force
+
 $shell = New-Object -ComObject WScript.Shell
 New-Item -ItemType Directory -Force -Path $startMenu | Out-Null
 $shortcutPath = Join-Path $startMenu 'YIMO Graphwar.lnk'

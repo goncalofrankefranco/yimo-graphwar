@@ -4,14 +4,15 @@ param(
     [string]$RuntimeSource = '',
     [string]$GlobalHost = 'graphwar-server.yimo-official.org',
     [string]$TournamentApiBaseUrl = 'https://graphwar-server.yimo-official.org',
-    [string]$OutputDir = ''
+    [string]$OutputDir = '',
+    [string]$SourceRevision = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $installerRoot = $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $OutputDir = Join-Path $root 'build\yimo-stage8-release'
+    $OutputDir = Join-Path $root 'build\yimo-3.2.0-release'
 }
 
 function Fail([string]$message) { throw "Stage 8 build failed: $message" }
@@ -37,10 +38,13 @@ if (-not [Uri]::TryCreate($TournamentApiBaseUrl, [UriKind]::Absolute, [ref]$apiU
 $output = [IO.Path]::GetFullPath($OutputDir)
 if (Test-Path -LiteralPath $output) { Fail "Output directory already exists: $output. Choose a new directory." }
 New-Item -ItemType Directory -Path $output -Force | Out-Null
-$revision = (& git -C $root rev-parse HEAD 2>$null) -join ''
-if ([string]::IsNullOrWhiteSpace($revision)) { $revision = 'unknown' }
+$revision = $SourceRevision
+if ([string]::IsNullOrWhiteSpace($revision)) {
+    $revision = (& git -C $root rev-parse HEAD 2>$null) -join ''
+    if ([string]::IsNullOrWhiteSpace($revision)) { $revision = 'unknown' }
+}
 $workingTree = (& git -C $root status --porcelain 2>$null) -join "`n"
-if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($workingTree)) {
+if ([string]::IsNullOrWhiteSpace($SourceRevision) -and $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($workingTree)) {
     $revision += '-working-tree'
 }
 
@@ -52,7 +56,7 @@ New-Item -ItemType Directory -Path $work, $payload, $iexpressSource -Force | Out
 
 try {
     $stage7Builder = Join-Path $root 'deploy\build-stage7-release.ps1'
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $stage7Builder -JavaHome $JavaHome -OutputDir $stage7
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $stage7Builder -JavaHome $JavaHome -OutputDir $stage7 -SourceRevision $revision
     if ($LASTEXITCODE -ne 0) { Fail 'Stage 7 Java build failed.' }
 
     Copy-Item -Path (Join-Path $stage7 '*') -Destination $payload -Recurse -Force
@@ -67,7 +71,7 @@ try {
     if ($null -eq $csc) { Fail 'The Windows .NET Framework C# compiler was not found.' }
 
     $yimoProperties = @"
-# YIMO Graphwar 2.2.0 default endpoint
+# YIMO Graphwar 3.2.0 endpoint; wire build remains compatible with 2.2.0
 global.host=$GlobalHost
 global.port=23762
 room.port.start=30000
@@ -95,7 +99,7 @@ protocol.version=2
     Set-Content -LiteralPath (Join-Path $payload 'practice.properties') -Value $practiceProperties -Encoding ASCII
 
     $installedReadme = @"
-YIMO Graphwar 2.2.0
+YIMO Graphwar 3.2.0
 Powered by Cloudzy
 
 Double-click YIMO-Graphwar.exe to connect to the configured YIMO endpoint.
@@ -138,19 +142,19 @@ License: GPL-3.0-or-later; see COPYING and NOTICE.md.
     Copy-Item -LiteralPath $icon -Destination (Join-Path $payload 'YIMO.ico') -Force
     Copy-Item -LiteralPath $officialLogo -Destination (Join-Path $payload 'yimo-logo.png') -Force
 
-    $portable = Join-Path $output 'YIMO-Graphwar-2.2.0-Portable.zip'
+    $portable = Join-Path $work 'YIMO-Graphwar-3.2.0-Portable.zip'
     Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $portable -CompressionLevel Optimal
     $packageFingerprint = (Get-FileHash -LiteralPath $portable -Algorithm SHA256).Hash
     $packageVersion = $packageFingerprint.Substring(0, 16)
 
     $payloadZip = Join-Path $iexpressSource 'payload.zip'
     Copy-Item -LiteralPath $portable -Destination $payloadZip -Force
-    Set-Content -LiteralPath (Join-Path $iexpressSource 'payload.version') -Value ("YIMO-Graphwar-2.2.0|$packageVersion") -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $iexpressSource 'payload.version') -Value ("YIMO-Graphwar-3.2.0|$packageVersion") -Encoding ASCII
     Copy-Item -LiteralPath (Join-Path $installerRoot 'install.cmd') -Destination $iexpressSource -Force
     Copy-Item -LiteralPath (Join-Path $installerRoot 'install.ps1') -Destination $iexpressSource -Force
 
-    $installer = Join-Path $output 'YIMO-Graphwar-2.2.0-Setup.exe'
-    $sed = Join-Path $work 'YIMO-Graphwar-2.2.0.sed'
+    $installer = Join-Path $output 'YIMO-Graphwar-3.2.0-Setup.exe'
+    $sed = Join-Path $work 'YIMO-Graphwar-3.2.0.sed'
     $sourceFilesRoot = $iexpressSource.TrimEnd('\') + '\'
     $sedContent = @"
 [Version]
@@ -180,7 +184,7 @@ InstallPrompt=
 DisplayLicense=
 FinishMessage=
 TargetName=$installer
-FriendlyName=YIMO Graphwar 2.2.0
+FriendlyName=YIMO Graphwar 3.2.0
 AppLaunched=install.cmd
 PostInstallCmd=<None>
 AdminQuietInstCmd=
@@ -207,12 +211,13 @@ SourceFiles0=$sourceFilesRoot
     }
 
     $manifest = @(
-        'YIMO Graphwar 2.2.0 release',
+        'YIMO Graphwar 3.2.0 release',
+        'Product version: 3.2.0',
         'Build ID: YIMO-Graphwar-2.2.0',
         'Protocol version: 2',
         'Java target: 8',
-        'Installer: YIMO-Graphwar-2.2.0-Setup.exe',
-        'Portable package: YIMO-Graphwar-2.2.0-Portable.zip',
+        'Installer: YIMO-Graphwar-3.2.0-Setup.exe',
+        'Payload: embedded in installer',
         "Default global host: $GlobalHost",
         "Default tournament API: $TournamentApiBaseUrl",
         "Source revision: $revision",
@@ -229,7 +234,7 @@ SourceFiles0=$sourceFilesRoot
 
     Write-Output "Built Stage 8 release: $output"
     Write-Output "Installer: $installer"
-    Write-Output "Portable: $portable"
+    Write-Output 'Portable payload is embedded inside the installer.'
 }
 finally {
     if (Test-Path -LiteralPath $work) { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }

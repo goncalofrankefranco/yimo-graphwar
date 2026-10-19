@@ -24,10 +24,10 @@ Assert-File (Join-Path $PSScriptRoot 'launch-practice-client.cmd') 'Practice-cli
 $notice = Get-Content -Raw (Join-Path $root 'NOTICE.md')
 $licenses = Get-Content -Raw (Join-Path $root 'THIRD-PARTY-LICENSES.md')
 $readme = Get-Content -Raw (Join-Path $PSScriptRoot 'README.md')
-Assert-True ($notice -match 'YIMO Graphwar 2\.2\.0') 'Notice must identify the v2.2 release.'
+Assert-True ($notice -match 'YIMO Graphwar 3\.2\.0') 'Notice must identify the v3.2 product release.'
 Assert-True ($notice -match 'GPL-3\.0') 'Notice must identify GPL-3.0.'
 Assert-True ($licenses -match 'OpenJDK') 'Third-party license audit must cover the bundled runtime.'
-Assert-True ($readme -match 'YIMO-Graphwar-2\.2\.0-Setup\.exe') 'Installer README must document the v2.2 installer.'
+Assert-True ($readme -match 'YIMO-Graphwar-3\.2\.0-Setup\.exe') 'Installer README must document the v3.2 installer.'
 
 $sourceFiles = @(
         (Join-Path $PSScriptRoot 'build-stage8-release.ps1'),
@@ -45,7 +45,17 @@ foreach ($path in $sourceFiles) {
 }
 
 $buildScript = Get-Content -Raw (Join-Path $PSScriptRoot 'build-stage8-release.ps1')
+$stage7BuildScript = Get-Content -Raw (Join-Path $root 'deploy\build-stage7-release.ps1')
 $installScript = Get-Content -Raw (Join-Path $PSScriptRoot 'install.ps1')
+$launcherSource = Get-Content -Raw (Join-Path $PSScriptRoot 'YimoLauncher.cs')
+Assert-True ($buildScript -match 'YIMO-Graphwar-3\.2\.0-Setup\.exe') 'Build must name the v3.2.0 installer.'
+Assert-True ($buildScript -match 'build\.id=YIMO-Graphwar-2\.2\.0' -and $buildScript -match 'protocol\.version=2') 'Installer must retain the v2.2 wire build and protocol.'
+Assert-True ($stage7BuildScript -match 'YIMO-Graphwar-3\.2\.0\.jar') 'Stage 7 must package the v3.2.0 client JAR.'
+Assert-True ($stage7BuildScript -match 'YIMO-Graphwar-2\.2\.0' -and $stage7BuildScript -match 'Protocol version: 2') 'Stage 7 must preserve 2.2.0 server compatibility.'
+Assert-True ($stage7BuildScript -match 'javacVersion' -and $stage7BuildScript -match '--release') 'Modern JDK builds must target the Java 8 API.'
+Assert-True ($launcherSource -match 'YIMO-Graphwar-3\.2\.0\.jar') 'Clickable launcher must start the v3.2.0 client JAR.'
+Assert-True ($buildScript -match 'SourceRevision' -and $stage7BuildScript -match 'SourceRevision') 'Clean source exports must preserve the reviewed commit in release manifests.'
+Assert-True ($buildScript -match 'Join-Path \$work .*Portable\.zip') 'Portable staging must stay in the temporary build directory.'
 Assert-True ($buildScript -match 'YIMO-Graphwar\.exe') 'Build must package the clickable executable.'
 Assert-True ($buildScript -match 'win32icon') 'Build must embed the YIMO icon in the executable.'
 Assert-True ($buildScript -match 'status --porcelain') 'Build manifest must detect an uncommitted source tree.'

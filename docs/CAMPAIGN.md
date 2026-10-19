@@ -8,7 +8,7 @@ The campaign is an offline, sequential curriculum. Each lesson has two steps:
 The target coordinates are calibrated against the same shooter-relative
 trajectory and collision engine used by a normal game shot. Lesson files live
 in `rsc/campaign/lesson-01.properties` through
-`rsc/campaign/lesson-20.properties` and are loaded by
+`rsc/campaign/lesson-30.properties` and are loaded by
 `Graphwar.CampaignLesson`.
 
 While a lesson is open, the function field updates the board immediately. A
@@ -40,6 +40,16 @@ Previewing never advances lesson progress.
 | 18 | Logarithms | Valid `ln` domains and input shifts |
 | 19 | Cosine waves | Amplitude and wavelength |
 | 20 | Tangent curves | Safe intervals around asymptotes |
+| 21 | Backbone + Ripple | Line plus sine |
+| 22 | Wave Strength | Sine amplitude over a line |
+| 23 | Wave Spacing | Sine input scale over a line |
+| 24 | Line + Cosine | Linear trend and cosine ripple |
+| 25 | Quadratic + Wave | Curvature plus sine |
+| 26 | Cubic + Wave | Odd-power curve plus sine |
+| 27 | Exponential + Line | Exponential growth with linear correction |
+| 28 | Modulated Cosine | Input-modulated cosine plus line |
+| 29 | Bounded Trend + Wave | Bounded rational trend plus sine |
+| 30 | Three-Term Challenge | Line, sine, and quadratic terms |
 
 ## Normal-function rule
 
@@ -62,5 +72,6 @@ Copy the two-step shape of an existing `.properties` file and provide:
 - a target inside the 770×450 logical map.
 
 For normal shooter-relative lessons, validate both supplied functions with
-`CampaignScreen.simulateStep`. The `ExtendedCampaignTest` regression check is
-the reference for the additional normal-function curriculum.
+`CampaignScreen.simulateStep`. The `ExtendedCampaignTest` and
+`CombinedFunctionCampaignTest` checks verify target reachability and term-by-term
+guidance for the combined-function curriculum.

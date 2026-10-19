@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Queue;
 
+import javax.swing.SwingUtilities;
+
 import GraphServer.Constants;
 import GraphServer.GraphServer;
 import GraphServer.MapShape;
@@ -62,6 +64,7 @@ public class GameData implements Runnable
 	
 	private Function function;
 	private Function previewFunction;
+	private FunctionAnimation functionAnimation;
 	private boolean drawingFunction;
 	private long timeStartedDrawingFunction;
 	private boolean exploding;
@@ -98,6 +101,7 @@ public class GameData implements Runnable
 		
 		function = null;
 		previewFunction = null;
+		functionAnimation = null;
 		drawingFunction = false;
 		exploding = false;
 		soldiersHit = new ArrayList<Soldier>();
@@ -154,6 +158,7 @@ public class GameData implements Runnable
 		this.customMap = new MapShape[0];
 		this.function = null;
 		this.previewFunction = null;
+		this.functionAnimation = null;
 		this.drawingFunction = false;
 		this.exploding = false;
 		this.soldiersHit = new ArrayList<Soldier>();
@@ -1137,7 +1142,20 @@ public class GameData implements Runnable
 			{
 				Player player = getPlayer(playerID);
 				
-				processFunction(player, function, info);
+				int[] hitTeams = processFunction(player, function, info);
+				String feedback = ShotFeedback.textFor(player.getTeam(), hitTeams);
+				if(feedback != null)
+				{
+					final String callout = feedback;
+					SwingUtilities.invokeLater(new Runnable()
+					{
+						public void run()
+						{
+							((GameScreen)graphwar.getUI().getScreen(Constants.GAME_SCREEN)).showShotFeedback(callout);
+						}
+					});
+				}
+				this.functionAnimation = new FunctionAnimation(this.function);
 				
 				this.drawingFunction = true;
 				this.timeStartedDrawingFunction = System.currentTimeMillis();	
@@ -1246,9 +1264,9 @@ public class GameData implements Runnable
 			return function.getNumSteps();
 		}
 		
-		int numDrawSteps = (int)((System.currentTimeMillis() - timeStartedDrawingFunction)*Constants.FUNCTION_VELOCITY)/1000;
+		int numDrawSteps = functionAnimation.stepAt(System.currentTimeMillis() - timeStartedDrawingFunction);
 		
-		if(numDrawSteps > function.getNumSteps() && drawingFunction)
+		if(numDrawSteps >= function.getNumSteps() && drawingFunction)
 		{
 			numDrawSteps = function.getNumSteps();
 			
@@ -1341,7 +1359,7 @@ public class GameData implements Runnable
 		return calculated;
 	}
 
-	private void processFunction(Player player, String functionString, String[] info) throws MalformedFunction
+	private int[] processFunction(Player player, String functionString, String[] info) throws MalformedFunction
 	{
 		function = calculateFunction(player, functionString);
 		player.getCurrentTurnSoldier().setFunction(functionString);
@@ -1349,9 +1367,11 @@ public class GameData implements Runnable
 		soldiersHit = new ArrayList<Soldier>();
 		int numPlayersHit = function.getNumPlayersHit();
 		boolean authoritative = info.length >= 5;
+		int[] hitTeams = null;
 		if(authoritative)
 		{
 			numPlayersHit = Integer.parseInt(info[4]);
+			hitTeams = new int[numPlayersHit];
 		}
 		for(int i=0; i<numPlayersHit; i++)
 		{
@@ -1379,6 +1399,10 @@ public class GameData implements Runnable
 			soldier = players.get(hitPlayer).getSoldiers()[hitSoldier];
 			soldier.setKillPosition(hitPosition);
 			soldiersHit.add(soldier);
+			if(authoritative)
+			{
+				hitTeams[i] = players.get(hitPlayer).getTeam();
+			}
 		}
 		
 		if(authoritative)
@@ -1390,7 +1414,7 @@ public class GameData implements Runnable
 			player.getCurrentTurnSoldier().setAngle(function.getFireAngle());
 		}
 		((GameScreen)graphwar.getUI().getScreen(Constants.GAME_SCREEN)).repaintAngle();
-					
+		return hitTeams;
 	}
 
 	private int findPlayerIndex(int playerID)

@@ -32,7 +32,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\build-stage8
 The build targets the Java 8 API (using `--release 8` with a newer JDK)
 and uses the selected Java 8 runtime. It emits the single-file installer, a
 release manifest, and SHA-256 checksums under
-`build\yimo-3.2.0-release`. The portable staging ZIP stays in a
+`build\yimo-3.2.0-release-final`. The portable staging ZIP stays in a
 temporary folder and is not retained as a second local artifact. Keep the
 generated installer out of Git because it contains the selected Java runtime;
 attach it to the GitHub release instead.

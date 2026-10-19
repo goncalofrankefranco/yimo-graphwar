@@ -137,7 +137,7 @@
 
 **Files:**
 - Modify: README.md and docs/Stage-8-RELEASE-3.2.0.md with verified behavior.
-- Release output: build/yimo-3.2.0-release/YIMO-Graphwar-3.2.0-Setup.exe, RELEASE-MANIFEST.txt, and SHA256SUMS.txt only.
+- Release output: build/yimo-3.2.0-release-final/YIMO-Graphwar-3.2.0-Setup.exe, RELEASE-MANIFEST.txt, and SHA256SUMS.txt only.
 
 - [ ] **Step 1: Compile every Java production/test source into a unique %TEMP% directory and run all Java test mains.** Expected: zero failures.
 - [ ] **Step 2: Run npm test in tournament/ and installer/test-stage8.ps1.** Confirm the tournament service and the two pre-existing user-edited tournament files are unchanged and unstaged.

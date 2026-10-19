@@ -46,6 +46,6 @@ release output directory, npm test from tournament/, and every Java test main.
 The installer test uses a temporary LOCALAPPDATA/APPDATA root and does not
 replace the user's existing installation.
 
-The release output path is build/yimo-3.2.0-release. Keep the setup executable
+The release output path is build/yimo-3.2.0-release-final. Keep the setup executable
 out of Git, attach it and its checksum to the separate v3.2.0 GitHub release,
 and do not replace the v2.2.0 release or restart the production servers.

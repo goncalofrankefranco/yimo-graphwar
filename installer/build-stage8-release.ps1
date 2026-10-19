@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $installerRoot = $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $OutputDir = Join-Path $root 'build\yimo-3.2.0-release'
+    $OutputDir = Join-Path $root 'build\yimo-3.2.0-release-final'
 }
 
 function Fail([string]$message) { throw "Stage 8 build failed: $message" }

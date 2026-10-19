@@ -61,6 +61,8 @@ Assert-True ($buildScript -match 'win32icon') 'Build must embed the YIMO icon in
 Assert-True ($buildScript -match 'status --porcelain' -and $buildScript -match 'Refusing to build from a dirty source tree') 'Stage 8 must reject a dirty Git checkout even with an explicit source revision.'
 Assert-True ($stage7BuildScript -match 'status --porcelain' -and $stage7BuildScript -match 'Refusing to build from a dirty source tree') 'Stage 7 must reject a dirty Git checkout even with an explicit source revision.'
 Assert-True ($buildScript -match 'SourceRevision is required when building outside a Git worktree') 'Clean source exports must identify the reviewed revision.'
+Assert-True ($stage7BuildScript -match 'tournamentRoot' -and $stage7BuildScript -match '\.env' -and
+        $stage7BuildScript -match 'sqlite' -and $stage7BuildScript -match 'data') 'Stage 7 must exclude ignored tournament secrets and local database files.'
 Assert-True ($buildScript -match 'packageFingerprint' -and $buildScript -match 'Package fingerprint:') 'Installed build identity must be derived from the actual portable package.'
 Assert-True ($installScript -match 'YIMO-Graphwar\.exe') 'Shortcut must target the clickable executable.'
 

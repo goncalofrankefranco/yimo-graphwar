@@ -40,6 +40,8 @@ worktrees, even with an explicit source revision, because Stage 7 packages the
 tournament website too. A newer JDK must support `--release 8`. Intermediate
 payload files stay in a temporary directory; the release output contains only
 the installer, manifest, and SHA256SUMS.txt.
+The tournament portion excludes local `.env` files, SQLite databases, and
+`data` or `backups` directories.
 
 Run installer/test-stage8.ps1, installer/test-stage8-install.ps1 with the
 release output directory, npm test from tournament/, and every Java test main.

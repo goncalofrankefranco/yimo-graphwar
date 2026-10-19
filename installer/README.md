@@ -36,6 +36,8 @@ release manifest, and SHA-256 checksums under
 temporary folder and is not retained as a second local artifact. Keep the
 generated installer out of Git because it contains the selected Java runtime;
 attach it to the GitHub release instead.
+The tournament package excludes `.env` files, local database files, and
+`data`/`backups` directories even when they exist as ignored files.
 
 The client displays product version 3.2.0 while retaining wire build ID
 `YIMO-Graphwar-2.2.0` and protocol 2 for compatibility with the existing

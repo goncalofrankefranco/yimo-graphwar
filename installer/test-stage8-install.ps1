@@ -64,6 +64,15 @@ try {
     }
 
     $properties = Get-Content -Raw (Join-Path $target 'yimo.properties')
+    $tournamentRoot = Join-Path $target 'tournament'
+    Assert-True (Test-Path -LiteralPath (Join-Path $tournamentRoot 'package.json') -PathType Leaf) 'tournament service source is missing.'
+    $privateTournamentFiles = @(Get-ChildItem -LiteralPath $tournamentRoot -Recurse -File -Force | Where-Object {
+        $relative = $_.FullName.Substring($tournamentRoot.Length).TrimStart('\')
+        $relative -match '(^|[\\/])(data|backups)([\\/]|$)' -or
+                $_.Name -match '^\.env(?:\.|$)' -or
+                $_.Name -match '(?i)\.(?:sqlite(?:-(?:shm|wal))?|sqlite3?|db)$'
+    })
+    Assert-True ($privateTournamentFiles.Count -eq 0) 'local tournament secrets or database files must not be packaged.'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $target 'YIMO-Graphwar-2.2.0.jar'))) 'upgrade must remove the obsolete versioned client JAR.'
     Assert-True ($properties -match ('global\.host=' + [regex]::Escape($ExpectedGlobalHost))) 'installed global endpoint is incorrect.'
     Assert-True ($properties -match ('tournament\.api\.baseUrl=' + [regex]::Escape($ExpectedTournamentApiBaseUrl))) 'installed tournament endpoint is incorrect.'

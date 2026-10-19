@@ -74,7 +74,24 @@ foreach ($spec in $jarSpecs) {
 Remove-Item -LiteralPath $classes -Recurse -Force
 
 Copy-Item -LiteralPath $resourceDir -Destination (Join-Path $output 'rsc') -Recurse
-Copy-Item -LiteralPath (Join-Path $root 'tournament') -Destination (Join-Path $output 'tournament') -Recurse
+$tournamentRoot = Join-Path $root 'tournament'
+$tournamentOutput = Join-Path $output 'tournament'
+$tournamentFiles = @(Get-ChildItem -LiteralPath $tournamentRoot -Recurse -File -Force | Where-Object {
+    $relativePath = $_.FullName.Substring($tournamentRoot.Length).TrimStart('\')
+    $localDirectory = $relativePath -match '(^|[\\/])(data|backups)([\\/]|$)'
+    $environmentFile = $_.Name -match '^\.env(?:\.|$)'
+    $databaseFile = $_.Name -match '(?i)\.(?:sqlite(?:-(?:shm|wal))?|sqlite3?|db)$'
+    -not ($localDirectory -or $environmentFile -or $databaseFile)
+})
+foreach ($file in $tournamentFiles) {
+    $relativePath = $file.FullName.Substring($tournamentRoot.Length).TrimStart('\')
+    $destination = Join-Path $tournamentOutput $relativePath
+    $destinationDirectory = Split-Path -Parent $destination
+    if (-not (Test-Path -LiteralPath $destinationDirectory)) {
+        New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
+    }
+    Copy-Item -LiteralPath $file.FullName -Destination $destination -Force
+}
 Copy-Item -LiteralPath (Join-Path $root 'yimo.properties.example') -Destination $output
 Copy-Item -LiteralPath (Join-Path $root 'COPYING') -Destination $output
 Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $output

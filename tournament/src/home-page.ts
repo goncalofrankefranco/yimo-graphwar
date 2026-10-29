@@ -60,7 +60,7 @@ export const HOME_PAGE = `<!doctype html>
       <div>
         <p class="eyebrow">YIMO Olympiad · Strategy through mathematics</p>
         <h1 id="title">Graphwar<span>.</span></h1>
-        <p class="intro">Build a function. Shape the battlefield. Make every curve count.</p>
+        <p class="intro">The Graphwar competition takes place on <strong><time datetime="2026-11-06">November 6, 2026</time></strong>. Build a function. Shape the battlefield. Make every curve count.</p>
         <div class="links">
           <a class="button" href="/participant">Competitor portal</a>
           <a class="button secondary" href="/admin">Organizer panel</a>
